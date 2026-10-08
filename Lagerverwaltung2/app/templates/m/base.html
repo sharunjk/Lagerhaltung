@@ -16,6 +16,15 @@
   <script src="/static/js/scan.js?v={{ request.app.state.version }}" defer></script>
   <script src="/static/js/offline.js?v={{ request.app.state.version }}" defer></script>
   <script src="/static/vendor/alpine.min.js" defer></script>
+  <script>// Doppeltes Absenden verhindern (Doppelklick/Doppel-Tipp würde sonst zweimal buchen)
+document.addEventListener("submit", function(e){
+  const f = e.target;
+  if ((f.getAttribute("method") || "").toLowerCase() !== "post" || f.hasAttribute("data-offline") || e.defaultPrevented) return;
+  if (f.dataset.gesendet) { e.preventDefault(); return; }
+  f.dataset.gesendet = "1";
+  setTimeout(function(){ delete f.dataset.gesendet; }, 4000);  // falls keine neue Seite kommt (z. B. Download)
+});
+</script>
   <style>body{padding-bottom:calc(4.5rem + env(safe-area-inset-bottom))} input,select,button{font-size:1.05rem}
     /* Bedienelemente mindestens 44 x 44 px (Bedienung mit Handschuhen / Handheld) */
     header a:not(.hidden){min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}

@@ -14,3 +14,4 @@ __pycache__/
 *.sql
 !Lagerverwaltung2/tests/**/*.sql
 *.zip
+ausgabe/

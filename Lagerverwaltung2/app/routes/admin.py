@@ -361,7 +361,13 @@ async def import_pruefen(request: Request, datei: UploadFile = File(...)):
 @router.post("/import/ausfuehren")
 def import_ausfuehren(request: Request, payload: str = Form(...)):
     require(request, "admin")
-    zeilen = json.loads(base64.b64decode(payload))
+    try:
+        zeilen = json.loads(base64.b64decode(payload))
+        if not isinstance(zeilen, list):
+            raise ValueError
+    except ValueError:
+        flash(request, "Importdaten unvollständig – bitte die Datei erneut prüfen lassen.", "fehler")
+        return RedirectResponse("/import", status_code=303)
     neu = akt = 0
     try:
         with db.schreiben() as con:

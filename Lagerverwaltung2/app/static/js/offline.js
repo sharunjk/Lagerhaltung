@@ -132,6 +132,9 @@
     const f = e.target;
     if (!f.matches("form[data-offline]") || f.dataset.geprueft) return;
     e.preventDefault();
+    if (f.dataset.laeuft) return;  // Doppel-Tipp während der Verbindungsprüfung: nur einmal buchen
+    f.dataset.laeuft = "1";
+    f.querySelectorAll("button[type=submit], button:not([type])").forEach((b) => (b.disabled = true));
     const st = await LV.status();
     if (st.ok && st.angemeldet) { f.dataset.geprueft = "1"; f.submit(); return; }
     // Ohne Verbindung oder mit abgelaufener Anmeldung: Buchung im Gerät behalten statt sie zu verlieren

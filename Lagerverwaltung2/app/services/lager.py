@@ -163,7 +163,9 @@ class Lager:
         a, p, m = self.artikel(nr), self.platz(platz, anlegen=False), self._menge(menge)
         _, neu = self._abbuchen(a, p, m)
         if reservierung_id:
-            self.con.execute(update(reservierungen).where(reservierungen.c.id == reservierung_id).values(status="entnommen"))
+            # nur eine offene Reservierung genau dieses Artikels erledigen
+            self.con.execute(update(reservierungen).where(and_(reservierungen.c.id == reservierung_id, reservierungen.c.artikel_id == a["id"],
+                                                               reservierungen.c.status == "offen")).values(status="entnommen"))
         return self._bewegung(a, p, "ausgang", -m, neu, **ext)
 
     def umbuchung(self, nr, von: str, nach: str, menge) -> tuple[Ergebnis, Ergebnis]:

@@ -87,6 +87,14 @@
 {% endif %}
 <script>
 function lvTheme(){const d=document.documentElement.classList.toggle("dark");try{localStorage.setItem("lv-theme",d?"dark":"light")}catch(e){}}
+// Doppeltes Absenden verhindern (Doppelklick/Doppel-Tipp würde sonst zweimal buchen)
+document.addEventListener("submit", function(e){
+  const f = e.target;
+  if ((f.getAttribute("method") || "").toLowerCase() !== "post" || f.hasAttribute("data-offline") || e.defaultPrevented) return;
+  if (f.dataset.gesendet) { e.preventDefault(); return; }
+  f.dataset.gesendet = "1";
+  setTimeout(function(){ delete f.dataset.gesendet; }, 4000);  // falls keine neue Seite kommt (z. B. Download)
+});
 // Scanner-Erkennung: Barcode-Scanner tippen sehr schnell und schließen mit Enter ab.
 (function(){
   let buf="", last=0;

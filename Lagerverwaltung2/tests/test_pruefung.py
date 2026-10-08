@@ -660,3 +660,13 @@ def test_sql_injection_stichprobe(env):
             r = c.get(pfad)
             assert r.status_code == 200 and "pbkdf2$" not in r.text, pfad
     assert anzahl(eng, "SELECT count(*) FROM artikel") == 1
+
+
+def test_entnahme_erledigt_nur_passende_reservierung(env):
+    _, eng = env
+    with schreib(eng) as con:
+        L(con).artikel_anlegen({"nummer": "1", "bezeichnung": "A"}, "C1", 5)
+        L(con).artikel_anlegen({"nummer": "2", "bezeichnung": "B"}, "C1", 5)
+        con.execute(text("INSERT INTO reservierungen (artikel_id, menge, fuer, status) VALUES (2, 1, 'Auftrag', 'offen')"))
+        L(con).ausgang("1", "C1", 1, reservierung_id=1)  # Reservierung gehört zu Artikel 2
+    assert anzahl(eng, "SELECT status FROM reservierungen WHERE id=1") == "offen"
