@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Lieferanten{% endblock %}
+{% block content %}
+<div class="grid xl:grid-cols-[1fr_380px] gap-6">
+  <div class="min-w-0">
+    <h1 class="mb-5">Lieferanten</h1>
+    <div class="panel overflow-hidden">
+      <table class="tbl">
+        <thead><tr><th>Name</th><th>Kontakt</th><th>Kundennr.</th><th class="num">Artikel</th><th></th></tr></thead>
+        <tbody>
+        {% for l in rows %}
+          <tr>
+            <td class="font-semibold">{{ l.name }}{% if l.webseite %}<div class="text-xs font-normal"><a class="text-primary" href="{{ l.webseite if l.webseite.startswith('http') else 'https://' ~ l.webseite }}" target="_blank" rel="noopener">{{ l.webseite }}</a></div>{% endif %}</td>
+            <td class="text-sm">{{ l.ansprechpartner or "" }}{% if l.email %}<div><a class="text-primary" href="mailto:{{ l.email }}">{{ l.email }}</a></div>{% endif %}{% if l.telefon %}<div class="text-muted">{{ l.telefon }}</div>{% endif %}</td>
+            <td>{{ l.kundennummer or "" }}</td>
+            <td class="num">{{ l.artikel }}</td>
+            <td class="text-right whitespace-nowrap">{% if user.rolle != "lesen" %}<a href="?bearbeiten={{ l.id }}" class="btn btn-sm">Bearbeiten</a>{% endif %}
+              {% if user.rolle == "admin" %}<form method="post" action="/lieferanten/{{ l.id }}/loeschen" class="inline" onsubmit="return confirm('Lieferant löschen? Die Zuordnung an Artikeln wird entfernt.')"><button class="btn btn-sm btn-danger">Löschen</button></form>{% endif %}</td>
+          </tr>
+        {% else %}<tr><td colspan="5" class="py-10 text-center text-muted">Noch keine Lieferanten. Rechts den ersten anlegen.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if user.rolle != "lesen" %}
+  <form method="post" action="/lieferanten/speichern" class="panel p-4 space-y-3 self-start">
+    <h2>{{ "Lieferant bearbeiten" if edit else "Neuer Lieferant" }}</h2>
+    {% if edit %}<input type="hidden" name="id" value="{{ edit.id }}">{% endif %}
+    {% for k, lab in [("name", "Name"), ("ansprechpartner", "Ansprechpartner"), ("email", "E-Mail"), ("telefon", "Telefon"), ("kundennummer", "Unsere Kundennummer"), ("webseite", "Webseite / Shop")] %}
+    <div><label class="label">{{ lab }}</label><input name="{{ k }}" class="field" value="{{ edit[k] if edit and edit[k] else '' }}" {% if k == "name" %}required{% endif %}></div>
+    {% endfor %}
+    <div><label class="label">Notiz</label><textarea name="notiz" rows="2" class="field">{{ edit.notiz if edit and edit.notiz else '' }}</textarea></div>
+    <div class="flex gap-2"><button class="btn btn-primary flex-1">Speichern</button>{% if edit %}<a href="/lieferanten" class="btn">Abbrechen</a>{% endif %}</div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

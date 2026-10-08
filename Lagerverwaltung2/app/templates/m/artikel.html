@@ -1,0 +1,52 @@
+{% extends "m/base.html" %}
+{% from "_macros.html" import icon, status, bew_menge %}
+{% block title %}{{ a.nummer }}{% endblock %}
+{% block kopf %}Artikel {{ a.nummer }}{% endblock %}
+{% block content %}
+<div class="rounded-lg border border-line bg-surface overflow-hidden mb-4">
+  {% if a.bild %}<img src="/anhang/{{ a.bild.id }}" alt="" class="w-full max-h-56 object-cover">{% endif %}
+  <div class="p-4">
+    <div class="flex items-baseline justify-between"><span class="font-cond text-3xl font-bold">{{ a.nummer }}</span><span class="font-cond text-3xl font-bold">{{ a.bestand|num }} <span class="text-sm font-sans text-muted">{{ a.einheit }}</span></span></div>
+    <div class="text-lg">{{ a.bezeichnung }}</div>
+    <div class="text-sm text-muted">{{ [a.typ, a.kategorie, a.lieferant]|select|join(", ") }}</div>
+    <div class="mt-2 flex gap-3 text-sm">{{ status(a.status) }}{% if a.reserviert %}<span class="text-warn">{{ a.reserviert|num }} reserviert</span>{% endif %}</div>
+  </div>
+  <ul class="border-t border-line divide-y divide-line">
+    {% for o, n in a.orte %}<li class="flex items-center justify-between px-4 py-2.5"><a href="/m/platz?code={{ o|urlq }}" class="bintag">{{ o }}</a><span class="font-semibold text-lg tabular-nums">{{ n|num }}</span></li>
+    {% else %}<li class="px-4 py-3 text-muted text-sm">Kein Lagerplatz.</li>{% endfor %}
+  </ul>
+</div>
+{% if user.rolle != "lesen" and a.aktiv %}
+<div class="grid grid-cols-2 gap-2 mb-4">
+  <a href="/m/buchen?typ=ausgang&artikel={{ a.nummer|urlq }}" class="btn btn-primary h-14 text-lg">Entnahme</a>
+  <a href="/m/buchen?typ=eingang&artikel={{ a.nummer|urlq }}" class="btn h-14 text-lg">Eingang</a>
+  <a href="/m/buchen?typ=umbuchung&artikel={{ a.nummer|urlq }}" class="btn h-14 text-lg">Umbuchen</a>
+  <a href="/m/buchen?typ=inventur&artikel={{ a.nummer|urlq }}" class="btn h-14 text-lg">Zählen</a>
+</div>
+<div class="grid grid-cols-2 gap-2 mb-4">
+  <form method="post" action="/artikel/{{ a.nummer|urlq }}/anhang?weiter=/m/artikel/{{ a.nummer|urlq }}" enctype="multipart/form-data">
+    <label class="btn w-full h-12 cursor-pointer">Foto aufnehmen<input type="file" name="datei" accept="image/*" capture="environment" class="hidden" onchange="this.form.submit()"></label>
+  </form>
+  <form method="post" action="/m/artikel/{{ a.nummer|urlq }}/etikett" class="flex gap-1"><input name="anzahl" value="1" inputmode="numeric" class="field h-12 w-14 text-center"><button class="btn h-12 flex-1">Etikett</button></form>
+</div>
+<details class="rounded-lg border border-line bg-surface p-3 mb-4" {% if not a.meldebestand and not a.mindestbestand %}open{% endif %}>
+  <summary class="font-semibold">Melde-/Mindestbestand und Infos</summary>
+  <form method="post" action="/m/artikel/{{ a.nummer|urlq }}/werte" class="space-y-3 mt-3">
+    <div class="grid grid-cols-3 gap-2">
+      <div><label class="label">Melde&shy;bestand</label><input name="meldebestand" value="{{ a.meldebestand|num if a.meldebestand is not none else '' }}" inputmode="decimal" class="field h-12 text-center text-lg font-semibold"></div>
+      <div><label class="label">Mindest&shy;bestand</label><input name="mindestbestand" value="{{ a.mindestbestand|num if a.mindestbestand is not none else '' }}" inputmode="decimal" class="field h-12 text-center text-lg font-semibold"></div>
+      <div><label class="label">Bestell&shy;menge</label><input name="bestellmenge" value="{{ a.bestellmenge|num if a.bestellmenge is not none else '' }}" inputmode="decimal" class="field h-12 text-center text-lg font-semibold"></div>
+    </div>
+    <div><label class="label">Verwendung / Anlage</label><input name="verwendung" value="{{ a.verwendung or '' }}" class="field h-12"></div>
+    <label class="flex items-center gap-2"><input type="checkbox" name="kritisch" {% if a.kritisch %}checked{% endif %}> Kritisches Ersatzteil</label>
+    <button class="btn btn-primary w-full h-12">Speichern</button>
+  </form>
+</details>
+{% endif %}
+{% if a.notiz %}<div class="rounded-lg border border-line bg-surface p-4 mb-4 text-sm whitespace-pre-line">{{ a.notiz }}</div>{% endif %}
+<h2 class="mb-2">Letzte Bewegungen</h2>
+<ul class="rounded-lg border border-line bg-surface divide-y divide-line text-sm">
+  {% for r in hist %}<li class="flex items-center gap-3 px-3 py-2"><span class="w-12 text-right">{{ bew_menge(r) }}</span><span class="flex-1">{{ r.typ|typ_text }} {% if r.lagerplatz %}<span class="text-muted">{{ r.lagerplatz }}</span>{% endif %}<span class="block text-xs text-muted">{{ r.benutzer }}</span></span><span class="text-xs text-muted">{{ r.zeit|datum }}</span></li>
+  {% else %}<li class="px-3 py-3 text-muted">Keine.</li>{% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "m/base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Suchen{% endblock %}
+{% block kopf %}Artikel suchen{% endblock %}
+{% block content %}
+<form class="flex gap-2 mb-4"><input id="q" name="q" value="{{ q }}" autofocus class="field h-14 text-lg flex-1" placeholder="Nummer, Bezeichnung, Typ …"><button type="button" onclick="LV.kamera('q')" class="btn h-14 w-14">{{ icon("scan", "w-7 h-7") }}</button></form>
+<ul class="rounded-lg border border-line bg-surface divide-y divide-line">
+  {% for a in treffer %}<li><a href="/m/artikel/{{ a.nummer|urlq }}" class="flex items-center gap-3 px-4 py-3"><span class="flex-1 min-w-0"><span class="font-semibold">{{ a.nummer }}</span> <span class="text-sm">{{ a.bezeichnung }}</span><span class="block text-xs text-muted">{{ a.orte|map(attribute=0)|join(", ") }}</span></span><span class="font-cond text-xl font-bold">{{ a.bestand|num }}</span></a></li>
+  {% else %}{% if q %}<li class="px-4 py-4 text-muted">Nichts gefunden.</li>{% endif %}{% endfor %}
+</ul>
+{% if q and user.rolle != "lesen" and not treffer|selectattr("nummer", "eq", q)|list %}<a href="/m/neu?nummer={{ q|urlq }}" class="btn btn-primary w-full h-14 mt-4">„{{ q }}“ als neuen Artikel anlegen</a>{% endif %}
+{% endblock %}

@@ -1,0 +1,69 @@
+@font-face { font-family: "Barlow"; font-weight: 400; font-display: swap; src: url("/static/fonts/barlow-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 500; font-display: swap; src: url("/static/fonts/barlow-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 600; font-display: swap; src: url("/static/fonts/barlow-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Semi Condensed"; font-weight: 500; font-display: swap; src: url("/static/fonts/barlow-semi-condensed-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Semi Condensed"; font-weight: 600; font-display: swap; src: url("/static/fonts/barlow-semi-condensed-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Semi Condensed"; font-weight: 700; font-display: swap; src: url("/static/fonts/barlow-semi-condensed-latin-700-normal.woff2") format("woff2"); }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: 238 241 243; --surface: 255 255 255; --ink: 24 34 46; --muted: 91 103 115; --line: 213 219 224;
+    --nav: 28 42 56; --navink: 199 210 220; --tag: 255 199 44; --tagink: 24 24 20;
+    --primary: 31 95 175; --ok: 30 122 90; --warn: 176 104 0; --crit: 192 53 43; --soft: 246 248 249; --onprimary: 255 255 255;
+    color-scheme: light;
+  }
+  .dark {
+    --bg: 18 26 34; --surface: 26 36 46; --ink: 230 235 239; --muted: 154 166 178; --line: 44 58 71;
+    --nav: 13 20 27; --navink: 170 184 197; --tag: 245 190 40; --tagink: 20 20 16;
+    --primary: 96 150 222; --ok: 72 180 140; --warn: 230 160 60; --crit: 236 100 88; --soft: 31 43 54; --onprimary: 10 18 28;
+    color-scheme: dark;
+  }
+  html { font-size: 15.5px; }
+  body { @apply bg-bg text-ink font-sans antialiased; font-feature-settings: "tnum" 1; }
+  h1, h2, h3 { @apply font-cond; letter-spacing: 0.005em; }
+  h1 { @apply text-[1.75rem] font-semibold leading-tight; }
+  h2 { @apply text-lg font-semibold; }
+  :focus-visible { outline: 2px solid rgb(var(--primary)); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+}
+
+@layer components {
+  .panel { @apply bg-surface border border-line rounded-lg; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-semibold border border-line bg-surface text-ink hover:bg-soft disabled:opacity-50 whitespace-nowrap; }
+  .btn-primary { @apply bg-primary border-primary hover:brightness-110 hover:bg-primary; color: rgb(var(--onprimary)); }
+  .btn-danger { @apply text-crit border-crit/40 hover:bg-crit/10; }
+  .btn-lg { @apply px-5 py-3 text-base; }
+  .btn-sm { @apply px-2.5 py-1 text-xs; }
+  .field { @apply block w-full rounded-md border border-line bg-surface px-3 py-2 text-ink placeholder:text-muted/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25; }
+  .label { @apply block text-sm font-medium text-muted mb-1; }
+  .tbl { @apply w-full text-sm; }
+  .tbl th { @apply text-left font-semibold text-muted px-3 py-2 border-b border-line whitespace-nowrap font-cond text-[0.95rem]; }
+  .tbl td { @apply px-3 py-2 border-b border-line/70 align-middle; }
+  .tbl tbody tr:hover { @apply bg-soft; }
+  .num { @apply text-right tabular-nums; }
+  /* Lagerort als gelbes Regaletikett – das wiedererkennbare Element der Oberfläche */
+  .bintag { @apply inline-flex items-center rounded-[3px] bg-tag text-tagink font-cond font-semibold px-1.5 leading-6 text-[0.9rem] whitespace-nowrap; box-shadow: inset 0 -2px 0 rgb(0 0 0 / .12); }
+  .bintag-leer { @apply bg-soft text-muted border border-dashed border-line; box-shadow: none; }
+  .status { @apply inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap; }
+  .status::before { content: ""; @apply inline-block w-2 h-2 rounded-full bg-current; }
+  .st-ok { @apply text-ok; } .st-melden { @apply text-warn; } .st-kritisch { @apply text-crit; }
+  .navlink { @apply flex items-center gap-3 rounded-md px-3 py-2 text-navink hover:bg-white/5 hover:text-white text-[0.95rem]; }
+  .navlink.aktiv { @apply bg-white/10 text-white font-semibold; }
+  .navlink svg { @apply w-5 h-5 shrink-0 opacity-80; }
+  .menge-plus { @apply text-ok font-semibold; } .menge-minus { @apply text-crit font-semibold; }
+  .flash-ok { @apply border-ok/40 bg-ok/10 text-ok; } .flash-fehler { @apply border-crit/40 bg-crit/10 text-crit; }
+  .seg { @apply inline-flex rounded-md border border-line bg-surface p-0.5; }
+  .seg a, .seg label { @apply px-3 py-1.5 rounded text-sm font-semibold text-muted cursor-pointer; }
+  .seg .an, .seg input:checked + span { @apply bg-ink text-surface; }
+  .kbd { @apply inline-block rounded border border-line bg-soft px-1.5 text-xs text-muted font-sans; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+  .panel { border: none; }
+}

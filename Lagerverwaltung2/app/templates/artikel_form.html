@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neuer Artikel" if neu else "Artikel bearbeiten" }}{% endblock %}
+{% block content %}
+{% set zurueck = '/artikel' if neu else '/artikel/' ~ (a._alt or a.nummer) %}
+<div class="mb-6">
+  <a href="{{ zurueck }}" class="text-sm text-muted hover:text-ink">{{ "Artikel" if neu else (a._alt or a.nummer) }}</a>
+  <h1 class="mt-1">{{ "Neuer Artikel" if neu else "Artikel bearbeiten" }}</h1>
+</div>
+{% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-fehler max-w-4xl">{{ fehler }}</div>{% endif %}
+{%- macro z(v) -%}{{ v|num if v not in (None, "") and v is number else (v or "") }}{%- endmacro -%}
+<form method="post" class="max-w-4xl space-y-6">
+  <section class="panel p-5">
+    <h2 class="mb-4">Grunddaten</h2>
+    <div class="grid sm:grid-cols-[180px_1fr] gap-4">
+      <div><label class="label" for="nr">Artikelnummer</label><input id="nr" name="nummer" class="field font-semibold" value="{{ a.nummer or '' }}" required maxlength="60">
+        {% if neu %}<p class="text-xs text-muted mt-1">Nächste freie Nummer</p>{% endif %}</div>
+      <div><label class="label" for="bez">Bezeichnung</label><input id="bez" name="bezeichnung" class="field" value="{{ a.bezeichnung or '' }}" required maxlength="300" {% if neu %}autofocus{% endif %}></div>
+    </div>
+    <div class="grid sm:grid-cols-3 gap-4 mt-4">
+      <div><label class="label">Typenbezeichnung</label><input name="typ" class="field" value="{{ a.typ or '' }}" placeholder="z. B. FIC 1020 01-01"></div>
+      <div><label class="label">Gruppe</label><input name="kategorie" list="kategorien" class="field" value="{{ a.kategorie or '' }}" placeholder="z. B. Kugelhahn"></div>
+      <div><label class="label">Einheit</label><input name="einheit" list="einheiten" class="field" value="{{ a.einheit or cfg.lager.standard_einheit }}"></div>
+    </div>
+    <div class="grid sm:grid-cols-3 gap-4 mt-4">
+      <div><label class="label">Meldebestand</label><input name="meldebestand" inputmode="decimal" class="field" value="{{ z(a.meldebestand) }}"><p class="text-xs text-muted mt-1">Ab hier nachbestellen</p></div>
+      <div><label class="label">Mindestbestand</label><input name="mindestbestand" inputmode="decimal" class="field" value="{{ z(a.mindestbestand) }}"><p class="text-xs text-muted mt-1">Darunter kritisch</p></div>
+      <div><label class="label">Bestellmenge</label><input name="bestellmenge" inputmode="decimal" class="field" value="{{ z(a.bestellmenge) }}"><p class="text-xs text-muted mt-1">Vorschlag beim Nachbestellen</p></div>
+    </div>
+    {% if neu %}
+    <div class="grid sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-line">
+      <div><label class="label">Lagerplatz</label><input name="platz" list="plaetze" class="field" value="{{ a.platz or '' }}" maxlength="60" placeholder="z. B. C2-R7-1"></div>
+      <div><label class="label">Anfangsbestand</label><input name="anfangsbestand" inputmode="decimal" class="field" value="{{ a.anfangsbestand or '0' }}"></div>
+      <label class="flex items-center gap-2 self-end pb-2"><input type="checkbox" name="etikett" checked> Danach Etikett drucken</label>
+    </div>
+    {% endif %}
+  </section>
+  <section class="panel p-5">
+    <h2 class="mb-4">Beschaffung</h2>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div><label class="label">Lieferant</label>
+        <select name="lieferant_id" class="field"><option value="">–</option>{% for l in lieferanten %}<option value="{{ l.id }}" {% if a.lieferant_id|string == l.id|string %}selected{% endif %}>{{ l.name }}</option>{% endfor %}</select>
+        <a href="/lieferanten" class="text-xs text-primary">Lieferanten verwalten</a></div>
+      <div><label class="label">Artikelnummer beim Lieferanten</label><input name="lieferant_artnr" class="field" value="{{ a.lieferant_artnr or '' }}"></div>
+      <div><label class="label">Hersteller</label><input name="hersteller" class="field" value="{{ a.hersteller or '' }}"></div>
+      <div><label class="label">Hersteller-Teilenummer</label><input name="hersteller_nr" class="field" value="{{ a.hersteller_nr or '' }}"></div>
+      <div><label class="label">Preis je Einheit (€)</label><input name="preis" inputmode="decimal" class="field" value="{{ z(a.preis) }}"></div>
+    </div>
+  </section>
+  <section class="panel p-5">
+    <h2 class="mb-4">Zusatzinformationen</h2>
+    <label class="flex items-center gap-2"><input type="checkbox" name="kritisch" {% if a.kritisch in (True, 'on', 1) %}checked{% endif %}> Kritisches Ersatzteil (Anlagenstillstand, wenn nicht vorrätig)</label>
+    <div class="mt-4"><label class="label">Verwendung / Anlage / Tag-Nummer</label><textarea name="verwendung" rows="2" class="field" placeholder="z. B. VV 1040 80, Reformer-Strang">{{ a.verwendung or '' }}</textarea></div>
+    <div class="mt-4"><label class="label">Notiz</label><textarea name="notiz" rows="3" class="field">{{ a.notiz or '' }}</textarea></div>
+  </section>
+  <div class="flex gap-2"><button class="btn btn-primary btn-lg">{{ "Artikel anlegen" if neu else "Änderungen speichern" }}</button><a href="{{ zurueck }}" class="btn btn-lg">Abbrechen</a></div>
+  <datalist id="plaetze">{% for o in vs.plaetze %}<option value="{{ o }}">{% endfor %}</datalist>
+  <datalist id="kategorien">{% for k in vs.kategorien %}<option value="{{ k }}">{% endfor %}</datalist>
+  <datalist id="einheiten">{% for k in vs.einheiten %}<option value="{{ k }}">{% endfor %}</datalist>
+</form>
+{% endblock %}

@@ -1,0 +1,53 @@
+# Lagerverwaltung – Kurzanleitung
+
+Aufruf am PC: Symbol **Lagerverwaltung** auf dem Desktop (öffnet ein eigenes Programmfenster) – am Zebra TC21 oder Handy die **Lager-App** (Scanner-Ansicht, siehe „Zebra TC21 einrichten“). Am Handheld gibt es zusätzlich Sammelentnahme, Neuanlage mit Foto, Melde-/Mindestbestand am Regal, Etikettendruck, Rückgängig und einen Offline-Modus. Jeder arbeitet mit eigenem Benutzer; der Name steht bei jeder Buchung.
+
+## Scannen am PC
+
+Das Suchfeld oben ist zugleich Scanfeld (**F2** springt hinein). Ein USB-Barcodescanner funktioniert auf jeder Seite, auch ohne ins Feld zu klicken: Artikel-Barcode → Buchen, Lagerplatz-Barcode → Platzinhalt.
+
+## Buchen
+
+1. Art wählen: **Entnahme**, **Eingang**, **Umbuchen** (Platzwechsel), **Zählen** (Bestand am Platz auf den gezählten Wert setzen), **Ausleihe** (Werkzeug verleihen, kommt zurück).
+2. Artikel scannen/eingeben, Lagerplatz antippen oder scannen, Menge, **Enter**.
+3. Bei Entnahmen optional Empfänger, Kostenstelle, Verwendung – erscheinen in den Auswertungen.
+
+Fehlbuchung? Bei der Buchung **Storno** – es entsteht eine Gegenbuchung, nichts wird gelöscht.
+
+## Artikel
+
+- **Neuer Artikel:** nächste freie Nummer wird vorgeschlagen; Lagerplatz und Anfangsbestand gleich mitgeben, danach Etikett drucken.
+- **Kopieren:** neuer Artikel mit den Daten eines vorhandenen.
+- **Melde- und Mindestbestand:** ab Meldebestand → Nachbestellvorschlag, unter Mindestbestand → kritisch. Für viele Artikel auf einmal: Artikelliste als Excel exportieren, Spalten ergänzen, über *Excel-Import* einlesen.
+- **Kritisches Ersatzteil** markieren, **Verwendung/Anlage** (Tag-Nummer) eintragen, **Fotos und Datenblätter** anhängen.
+- **Archivieren** statt löschen: Artikel ohne Bestand verschwinden aus den Listen, die Historie bleibt.
+
+## Reservierungen und Ausleihen
+
+- **Reservieren** (beim Artikel oder unter *Reservierungen*): Teile für einen Auftrag oder eine Wartung zurücklegen. Reservierte Mengen zählen nicht als verfügbar. Bei der Entnahme die Reservierung wählen – sie wird erledigt.
+- **Ausleihe:** Bestand geht ab, unter *Ausleihen* sieht man, wer was seit wann hat (überfällige rot). **Zurückbuchen** legt es wieder auf den Platz.
+
+## Nachbestellen
+
+1. *Nachbestellung* zeigt alle Artikel auf/unter Meldebestand mit Mengenvorschlag.
+2. Auswählen → **Als Bestellung anlegen**.
+3. *Bestellungen* (nach Lieferant gruppiert): Bestellliste als Excel für den Einkauf, **als bestellt markieren**.
+4. Bei Lieferung **Wareneingang** – bucht auf den Lagerplatz und schließt die Position.
+
+## Inventur
+
+1. *Inventur → Neue Inventur*, Bereich wählen oder gesamtes Lager.
+2. Zählen am PC (Liste) oder am Handscanner (Platz scannen, Mengen eintragen).
+3. Administrator: **Inventur abschließen** bucht alle Differenzen.
+
+## Lagerplätze
+
+Übersicht nach Bereichen, Inhalt je Platz, Platz-Etiketten. Tippfehler aus dem Altsystem: Platz öffnen → **umbenennen** oder **zusammenführen** (bucht alles auf den richtigen Platz um).
+
+## Auswertungen
+
+Verbrauch je Artikel und Kostenstelle, Lagerwert, Bestand je Gruppe, Ladenhüter – jeweils als Excel.
+
+## Einstellungen (Administrator)
+
+Benutzer und Rollen (*Nur lesen*, *Lager*, *Administrator*), Etikettendrucker, tägliche Meldebestands-Mail, Datensicherung, Datenübernahme aus Casper, Handscanner-Zugang mit QR-Code, Schnittstelle (API) für andere Programme. *Protokoll* zeigt jede Änderung mit Benutzer und Zeit.

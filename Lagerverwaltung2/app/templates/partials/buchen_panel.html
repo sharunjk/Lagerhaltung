@@ -1,0 +1,71 @@
+{% from "_macros.html" import bintag, status %}
+{% if nicht_gefunden %}
+<div class="panel p-5 border-l-4 border-l-crit">
+  <p class="font-semibold">Artikel „{{ artikel }}“ nicht gefunden.</p>
+  <p class="text-muted text-sm mt-1">Nummer prüfen, <a class="text-primary font-semibold" href="/artikel?q={{ artikel|urlq }}">in der Artikelsuche nachsehen</a>{% if user.rolle != "lesen" %} oder <a class="text-primary font-semibold" href="/artikel/neu">neu anlegen</a>{% endif %}.</p>
+</div>
+{% elif a %}
+{% set mit_bestand = a.orte|selectattr(1, "gt", 0)|list %}
+{% set vorwahl = ort or ((mit_bestand|first or a.orte|first or ["", 0])[0]) %}
+<form method="post" action="/buchen" class="panel" x-data='{ort: {{ vorwahl|tojson }}}'>
+  <input type="hidden" name="artikel" value="{{ a.nummer }}"><input type="hidden" name="typ" value="{{ typ }}">
+  {% if reservierung %}<input type="hidden" name="reservierung_id" value="{{ reservierung }}">{% endif %}
+  <div class="flex flex-wrap items-start justify-between gap-3 px-5 py-4 border-b border-line">
+    <div class="flex gap-3 min-w-0">
+      {% if a.bild %}<img src="/anhang/{{ a.bild.id }}" alt="" class="w-14 h-14 rounded object-cover border border-line">{% endif %}
+      <div class="min-w-0"><a href="/artikel/{{ a.nummer|urlq }}" class="font-cond text-2xl font-bold hover:underline">{{ a.nummer }}</a>
+        <span class="text-lg ml-2">{{ a.bezeichnung }}</span>
+        <div class="mt-1 flex gap-3 items-center">{{ status(a.status) }}{% if a.reserviert %}<span class="text-sm text-warn">{{ a.reserviert|num }} reserviert</span>{% endif %}</div></div>
+    </div>
+    <div class="text-right"><div class="font-cond text-3xl font-bold">{{ a.bestand|num }} <span class="text-base font-sans text-muted">{{ a.einheit }}</span></div><div class="text-sm text-muted">Gesamtbestand</div></div>
+  </div>
+  <div class="p-5 space-y-5">
+    <div>
+      <div class="label">{{ "Von Lagerplatz" if typ == "umbuchung" else "Lagerplatz" }}</div>
+      {% if a.orte %}
+      <div class="flex flex-wrap gap-2 mb-2">
+        {% for o, n in a.orte %}
+        <button type="button" @click='ort = {{ o|tojson }}' class="rounded-md border-2 px-2 py-1.5 flex items-center gap-2" :class='ort === {{ o|tojson }} ? "border-primary bg-primary/10" : "border-line"'>
+          <span class="bintag">{{ o }}</span><span class="font-semibold tabular-nums">{{ n|num }}</span></button>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <input name="lagerort" x-model="ort" list="orte_liste" class="field max-w-xs font-semibold" maxlength="60" placeholder="Lagerplatz scannen oder eingeben" @keydown.enter.prevent="$refs.menge.focus()">
+      {% if typ in ("ausgang", "umbuchung", "ausleihe") and not mit_bestand %}<p class="text-sm text-warn mt-1">Für diesen Artikel ist kein Bestand vorhanden.</p>{% endif %}
+    </div>
+    {% if typ == "umbuchung" %}<div><label class="label" for="ziel">Nach Lagerplatz</label><input id="ziel" name="ziel" list="orte_liste" class="field max-w-xs font-semibold" maxlength="60" required placeholder="Ziel-Lagerplatz"></div>{% endif %}
+    {% if typ == "ausleihe" %}
+    <div class="grid sm:grid-cols-2 gap-3 max-w-xl">
+      <div><label class="label">Ausgeliehen an</label><input name="empfaenger" list="empf" required class="field" placeholder="Name / Firma"></div>
+      <div><label class="label">Rückgabe bis</label><input type="date" name="rueckgabe_bis" class="field"></div>
+    </div>
+    {% endif %}
+    <div class="flex flex-wrap items-end gap-3">
+      <div>
+        <label class="label" for="menge">{{ {"ausgang": "Entnahmemenge", "eingang": "Eingangsmenge", "umbuchung": "Menge", "inventur": "Gezählter Bestand am Platz", "ausleihe": "Menge"}[typ] }}</label>
+        <div class="flex items-stretch">
+          {% if typ != "inventur" %}<button type="button" class="btn rounded-r-none text-xl w-12" onclick="const m=this.nextElementSibling; m.value=Math.max(1,(parseFloat(m.value.replace(',','.'))||1)-1)">−</button>{% endif %}
+          <input id="menge" x-ref="menge" name="menge" inputmode="decimal" value="{{ '' if typ == 'inventur' else '1' }}" required data-fokus class="field w-28 h-12 text-center text-2xl font-semibold {{ 'rounded-none' if typ != 'inventur' }}">
+          {% if typ != "inventur" %}<button type="button" class="btn rounded-l-none text-xl w-12" onclick="const m=this.previousElementSibling; m.value=(parseFloat(m.value.replace(',','.'))||0)+1">+</button>{% endif %}
+        </div>
+      </div>
+      <button class="btn btn-primary btn-lg h-12 px-8" {% if user.rolle == "lesen" %}disabled{% endif %}>{{ {"ausgang": "Entnahme buchen", "eingang": "Eingang buchen", "umbuchung": "Umbuchen", "inventur": "Bestand setzen", "ausleihe": "Ausleihe buchen"}[typ] }}</button>
+    </div>
+    {% if typ in ("ausgang", "eingang", "ausleihe") %}
+    <details class="text-sm" {% if typ == "ausgang" %}open{% endif %}>
+      <summary class="cursor-pointer text-muted font-medium">Weitere Angaben (optional)</summary>
+      <div class="grid sm:grid-cols-3 gap-3 mt-3">
+        {% if typ != "ausleihe" %}<div><label class="label">{{ "Empfänger" if typ == "ausgang" else "Lieferant / Lieferschein" }}</label><input name="empfaenger" list="empf" class="field" maxlength="200"></div>{% endif %}
+        <div><label class="label">Kostenstelle</label><input name="kostenstelle" list="kst" class="field" maxlength="100"></div>
+        <div><label class="label">{{ "Verwendung / Auftrag" if typ != "eingang" else "Bemerkung" }}</label><input name="zweck" class="field" maxlength="300"></div>
+      </div>
+    </details>
+    {% endif %}
+  </div>
+  <datalist id="orte_liste">{% for o in vs.plaetze %}<option value="{{ o }}">{% endfor %}</datalist>
+  <datalist id="empf">{% for o in vs.empfaenger %}<option value="{{ o }}">{% endfor %}</datalist>
+  <datalist id="kst">{% for o in vs.kostenstellen %}<option value="{{ o }}">{% endfor %}</datalist>
+</form>
+{% else %}
+<div class="panel p-8 text-center text-muted"><p class="text-lg">Artikel scannen, um zu buchen.</p><p class="text-sm mt-1">Der Barcode auf dem Etikett enthält die Artikelnummer.</p></div>
+{% endif %}

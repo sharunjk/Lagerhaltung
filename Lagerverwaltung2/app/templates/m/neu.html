@@ -1,0 +1,35 @@
+{% extends "m/base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Neuer Artikel{% endblock %}
+{% block kopf %}Neuer Artikel{% endblock %}
+{% block content %}
+<form method="post" action="/m/neu" class="space-y-3">
+  <div><label class="label">Artikelnummer</label><div class="flex gap-2"><input id="n_nr" name="nummer" value="{{ nummer }}" required class="field h-14 text-xl font-semibold flex-1" data-weiter="n_bez">
+    <button type="button" onclick="LV.kamera('n_nr')" class="btn h-14 w-14">{{ icon("scan", "w-7 h-7") }}</button></div>
+    <p class="text-xs text-muted mt-1">Vorhandenen Barcode scannen oder die vorgeschlagene Nummer verwenden.</p></div>
+  <div><label class="label">Bezeichnung</label><input id="n_bez" name="bezeichnung" required class="field h-12" autofocus></div>
+  <div class="grid grid-cols-2 gap-2">
+    <div><label class="label">Gruppe</label><input name="kategorie" list="kat" class="field h-12"></div>
+    <div><label class="label">Typenbezeichnung</label><input name="typ" class="field h-12"></div>
+  </div>
+  <div><label class="label">Lieferant</label><input name="lieferant" list="lief" class="field h-12"></div>
+  <div class="grid grid-cols-2 gap-2">
+    <div><label class="label">Lagerplatz</label><div class="flex gap-1"><input id="n_platz" name="platz" value="{{ platz }}" list="plaetze" class="field h-12 flex-1" data-weiter="n_menge"><button type="button" onclick="LV.kamera('n_platz')" class="btn h-12 w-12">{{ icon("scan", "w-6 h-6") }}</button></div></div>
+    <div><label class="label">Menge</label><input id="n_menge" name="anfangsbestand" value="1" inputmode="decimal" class="field h-12 text-center text-xl font-bold"></div>
+  </div>
+  <div class="grid grid-cols-3 gap-2">
+    <div><label class="label">Melde&shy;bestand</label><input name="meldebestand" inputmode="decimal" class="field h-12"></div>
+    <div><label class="label">Mindest&shy;bestand</label><input name="mindestbestand" inputmode="decimal" class="field h-12"></div>
+    <div><label class="label">Einheit</label><input name="einheit" value="{{ cfg.lager.standard_einheit }}" list="einh" class="field h-12"></div>
+  </div>
+  <div><label class="label">Verwendung / Anlage</label><input name="verwendung" class="field h-12" placeholder="z. B. VV 1040 80"></div>
+  <label class="flex items-center gap-2 py-1"><input type="checkbox" name="kritisch"> Kritisches Ersatzteil</label>
+  <label class="flex items-center gap-2 py-1"><input type="checkbox" name="etikett" checked> Etikett drucken</label>
+  <button class="btn btn-primary w-full h-16 text-xl">Artikel anlegen</button>
+  <p class="text-sm text-muted">Foto danach auf der Artikelseite aufnehmen.</p>
+  <datalist id="plaetze">{% for o in vs.plaetze %}<option value="{{ o }}">{% endfor %}</datalist>
+  <datalist id="kat">{% for o in vs.kategorien %}<option value="{{ o }}">{% endfor %}</datalist>
+  <datalist id="einh">{% for o in vs.einheiten %}<option value="{{ o }}">{% endfor %}</datalist>
+  <datalist id="lief">{% for o in lieferanten %}<option value="{{ o }}">{% endfor %}</datalist>
+</form>
+{% endblock %}

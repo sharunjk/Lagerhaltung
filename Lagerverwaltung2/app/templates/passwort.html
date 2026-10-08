@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Passwort ändern{% endblock %}
+{% block content %}
+<h1 class="mb-6">Passwort ändern</h1>
+{% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm flash-fehler max-w-md">{{ fehler }}</div>{% endif %}
+<form method="post" class="panel p-6 space-y-4 max-w-md">
+  <div><label class="label">Aktuelles Passwort</label><input name="alt" type="password" class="field" required></div>
+  <div><label class="label">Neues Passwort (mind. 6 Zeichen)</label><input name="neu" type="password" class="field" required minlength="6"></div>
+  <div><label class="label">Neues Passwort wiederholen</label><input name="neu2" type="password" class="field" required minlength="6"></div>
+  <button class="btn btn-primary">Passwort ändern</button>
+</form>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% from "_macros.html" import icon, bintag, status %}
+{% set alle_spalten = [("orte", "Lagerplatz"), ("kategorie", "Gruppe"), ("typ", "Typenbezeichnung"), ("lieferant", "Lieferant"), ("hersteller", "Hersteller"),
+                       ("melde", "Melde / Min."), ("reserviert", "Reserviert"), ("verwendung", "Verwendung"), ("status", "Status")] %}
+{%- macro sortlink(key, label) -%}
+<a class="hover:text-ink" href="?q={{ q|urlq }}&filter={{ filter }}&kategorie={{ kategorie|urlq }}&platz={{ platz|urlq }}&archiv={{ archiv }}&sort={{ ('-' ~ key) if sort == key else key }}">{{ label }}{% if sort.lstrip('-') == key %} {{ "↓" if sort.startswith('-') else "↑" }}{% endif %}</a>
+{%- endmacro -%}
+<form method="post" action="/etiketten/sammeldruck" x-data="{sel: []}" class="panel overflow-hidden">
+  <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-line text-sm">
+    <span class="text-muted">{{ gesamt }} Artikel{% if seiten > 1 %}, Seite {{ seite }} von {{ seiten }}{% endif %}</span>
+    <div class="flex items-center gap-2">
+      <template x-if="sel.length"><span class="flex gap-2"><button class="btn btn-sm" name="ziel" value="drucker">{{ icon("print", "w-4 h-4") }}<span x-text="sel.length + ' Etiketten drucken'"></span></button>
+        <button class="btn btn-sm" name="ziel" value="browser" title="Über den Windows-Druckdialog drucken">über Browser</button></span></template>
+      <details class="relative">
+        <summary class="btn btn-sm list-none cursor-pointer">Spalten</summary>
+        <div class="absolute right-0 mt-1 w-56 panel shadow-lg p-3 z-20">
+          {% for key, lab in alle_spalten %}<label class="flex items-center gap-2 py-0.5"><input type="checkbox" form="spaltenform" name="spalten" value="{{ key }}" {% if key in spalten %}checked{% endif %}>{{ lab }}</label>{% endfor %}
+          <button form="spaltenform" class="btn btn-sm btn-primary mt-3 w-full">Übernehmen</button>
+        </div>
+      </details>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+  <table class="tbl">
+    <thead><tr>
+      <th class="w-8"><input type="checkbox" aria-label="Alle auswählen" @change="sel = $event.target.checked ? [...$root.querySelectorAll('input[name=nr]')].map(i => i.value) : []"></th>
+      <th>{{ sortlink("nr", "Nr.") }}</th><th>{{ sortlink("bez", "Bezeichnung") }}</th>
+      {% for key, lab in alle_spalten if key in spalten and key != "status" %}<th>{{ sortlink("kat", lab) if key == "kategorie" else lab }}</th>{% endfor %}
+      <th class="num">{{ sortlink("bestand", "Bestand") }}</th>
+      {% if "status" in spalten %}<th>{{ sortlink("status", "Status") }}</th>{% endif %}
+    </tr></thead>
+    <tbody>
+    {% for a in arts %}
+      <tr>
+        <td><input type="checkbox" name="nr" value="{{ a.nummer }}" x-model="sel" aria-label="Auswählen"></td>
+        <td class="whitespace-nowrap"><a href="/artikel/{{ a.nummer|urlq }}" class="font-semibold hover:underline">{{ a.nummer }}</a>{% if a.kritisch %}<span class="ml-1.5 text-crit" title="Kritisches Ersatzteil">●</span>{% endif %}</td>
+        <td class="max-w-[22rem]"><a href="/artikel/{{ a.nummer|urlq }}" class="hover:underline">{{ a.bezeichnung }}</a></td>
+        {% for key, lab in alle_spalten if key in spalten and key != "status" %}
+          {% if key == "orte" %}<td><div class="flex flex-wrap gap-1">{% for o, n in a.orte[:3] %}{{ bintag(o) }}{% else %}<span class="text-muted">–</span>{% endfor %}{% if a.orte|length > 3 %}<span class="text-muted text-xs self-center">+{{ a.orte|length - 3 }}</span>{% endif %}</div></td>
+          {% elif key == "melde" %}<td class="text-muted whitespace-nowrap">{{ a.meldebestand|num }} / {{ a.mindestbestand|num }}</td>
+          {% elif key == "reserviert" %}<td class="num">{{ a.reserviert|num if a.reserviert else "" }}</td>
+          {% elif key == "hersteller" %}<td>{{ a.hersteller or "" }}{% if a.hersteller_nr %}<div class="text-xs text-muted">{{ a.hersteller_nr }}</div>{% endif %}</td>
+          {% else %}<td class="max-w-[14rem] truncate">{{ a[key] or "" }}</td>{% endif %}
+        {% endfor %}
+        <td class="num font-semibold text-base whitespace-nowrap">{{ a.bestand|num }} <span class="text-xs text-muted font-normal">{{ a.einheit }}</span></td>
+        {% if "status" in spalten %}<td>{{ status(a.status) }}</td>{% endif %}
+      </tr>
+    {% else %}
+      <tr><td colspan="14" class="py-10 text-center text-muted">Keine Artikel gefunden. Suchbegriff oder Filter ändern{% if user.rolle != "lesen" %} oder <a href="/artikel/neu" class="text-primary font-semibold">neuen Artikel anlegen</a>{% endif %}.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if seiten > 1 %}
+  <div class="flex flex-wrap justify-center gap-1 p-3 border-t border-line">
+    {% for s in range(1, seiten + 1) %}<a href="?q={{ q|urlq }}&filter={{ filter }}&kategorie={{ kategorie|urlq }}&platz={{ platz|urlq }}&sort={{ sort }}&archiv={{ archiv }}&seite={{ s }}" class="btn btn-sm {% if s == seite %}btn-primary{% endif %}">{{ s }}</a>{% endfor %}
+  </div>
+  {% endif %}
+</form>
+<form id="spaltenform" method="post" action="/artikel/spalten" class="hidden"></form>

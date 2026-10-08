@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Lagerplatz {{ p.code }}{% endblock %}
+{% block content %}
+<a href="/lagerplaetze" class="text-sm text-muted hover:text-ink">Lagerplätze</a>
+<div class="flex flex-wrap items-center gap-4 mt-1 mb-6">
+  <span class="bintag text-3xl leading-[3rem] px-4">{{ p.code }}</span>
+  <div><div class="text-muted">{{ p.beschreibung or "" }}</div>{% if not p.aktiv %}<div class="text-sm text-warn font-medium">Deaktiviert</div>{% endif %}
+    <a class="text-sm text-primary" href="/bewegungen?platz={{ p.code|urlq }}">Buchungen an diesem Platz</a></div>
+</div>
+<div class="grid xl:grid-cols-[1fr_360px] gap-6">
+  <section class="panel overflow-hidden min-w-0">
+    <div class="px-4 py-3 border-b border-line flex items-center justify-between"><h2>Inhalt</h2><span class="text-sm text-muted">{{ rows|selectattr("menge")|list|length }} Artikel mit Bestand</span></div>
+    <table class="tbl">
+      <thead><tr><th>Artikel</th><th>Bezeichnung</th><th class="num">Menge</th><th></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr class="{{ 'text-muted' if not r.menge }}">
+          <td><a class="font-semibold hover:underline" href="/artikel/{{ r.nummer|urlq }}">{{ r.nummer }}</a></td><td>{{ r.bezeichnung }}</td>
+          <td class="num font-semibold">{{ r.menge|num }} <span class="text-xs font-normal text-muted">{{ r.einheit }}</span></td>
+          <td class="text-right whitespace-nowrap">{% if user.rolle != "lesen" %}<a class="btn btn-sm" href="/buchen?artikel={{ r.nummer|urlq }}&typ=ausgang&ort={{ p.code|urlq }}">Entnehmen</a> <a class="btn btn-sm" href="/buchen?artikel={{ r.nummer|urlq }}&typ=umbuchung&ort={{ p.code|urlq }}">Umbuchen</a>{% endif %}</td>
+        </tr>
+      {% else %}<tr><td colspan="4" class="py-8 text-center text-muted">Dieser Platz ist leer.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <aside class="space-y-6">
+    <section class="panel p-4">
+      <h2 class="mb-3">Platzetikett</h2>
+      <div class="flex justify-center bg-soft rounded p-4"><div class="border border-line bg-white">{{ svg|safe }}</div></div>
+      {% if user.rolle != "lesen" %}
+      <form method="post" action="/lagerplaetze/etikett" class="mt-3 space-y-2">
+        <input type="hidden" name="code" value="{{ p.code }}">
+        <div class="flex gap-2"><input name="text" class="field" value="{{ p.beschreibung or 'Lagerplatz' }}"><input type="number" name="anzahl" value="1" min="1" max="99" class="field w-20"></div>
+        <button class="btn btn-primary w-full">{{ icon("print", "w-4 h-4") }}Etikett drucken</button>
+      </form>
+      <a href="/etiketten/druckansicht?platz={{ p.code|urlq }}" class="text-xs text-primary mt-2 inline-block">Über den Browser drucken</a>
+      {% endif %}
+    </section>
+    {% if user.rolle != "lesen" %}
+    <form method="post" action="/lagerplaetze/speichern" class="panel p-4 space-y-3">
+      <h2>Platz bearbeiten</h2>
+      <input type="hidden" name="alt" value="{{ p.code }}">
+      <div><label class="label">Code</label><input name="code" class="field font-semibold" value="{{ p.code }}" required maxlength="60"><p class="text-xs text-muted mt-1">Umbenennen ändert den Code überall, auch in der Historie.</p></div>
+      <div><label class="label">Beschreibung</label><input name="beschreibung" class="field" value="{{ p.beschreibung or '' }}"></div>
+      <div><label class="label">Bereich</label><input name="bereich" class="field" value="{{ p.bereich or '' }}" placeholder="automatisch aus dem Code"></div>
+      <button class="btn w-full">Speichern</button>
+    </form>
+    {% endif %}
+    {% if user.rolle == "admin" %}
+    <form method="post" action="/lagerplaetze/zusammenfuehren" class="panel p-4 space-y-2" onsubmit="return confirm('Alle Bestände von {{ p.code }} auf den Zielplatz umbuchen?')">
+      <h2>Mit anderem Platz zusammenführen</h2>
+      <p class="text-sm text-muted">Bucht alle Bestände per Umbuchung auf den Zielplatz und deaktiviert {{ p.code }}.</p>
+      <input type="hidden" name="von" value="{{ p.code }}">
+      <div class="flex gap-2"><input name="nach" list="alle" class="field" required placeholder="Zielplatz"><button class="btn btn-danger">Zusammenführen</button></div>
+      <datalist id="alle">{% for o in alle %}<option value="{{ o }}">{% endfor %}</datalist>
+    </form>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

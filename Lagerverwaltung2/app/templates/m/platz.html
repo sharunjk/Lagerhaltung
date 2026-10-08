@@ -1,0 +1,12 @@
+{% extends "m/base.html" %}
+{% block title %}{{ p.code }}{% endblock %}
+{% block kopf %}Lagerplatz {{ p.code }}{% endblock %}
+{% block content %}
+<div class="mb-4 flex items-center justify-between gap-3"><div><span class="bintag text-2xl leading-[2.75rem] px-3">{{ p.code }}</span>{% if p.beschreibung %}<p class="text-muted mt-1">{{ p.beschreibung }}</p>{% endif %}</div>
+  {% if user.rolle != "lesen" %}<form method="post" action="/m/platz/etikett"><input type="hidden" name="code" value="{{ p.code }}"><button class="btn h-12">Platz-Etikett</button></form>{% endif %}</div>
+{% if user.rolle != "lesen" %}<div class="grid grid-cols-2 gap-2 mb-4"><a href="/m/neu?platz={{ p.code|urlq }}" class="btn h-12">Neuer Artikel hier</a><a href="/m/buchen?typ=eingang&platz={{ p.code|urlq }}" class="btn h-12">Eingang hier</a></div>{% endif %}
+<ul class="rounded-lg border border-line bg-surface divide-y divide-line">
+  {% for r in rows if r.menge %}<li><a href="/m/artikel/{{ r.nummer|urlq }}" class="flex items-center gap-3 px-4 py-3"><span class="flex-1 min-w-0"><span class="font-semibold">{{ r.nummer }}</span><span class="block text-sm text-muted truncate">{{ r.bezeichnung }}</span></span><span class="font-cond text-2xl font-bold">{{ r.menge|num }}</span></a></li>
+  {% else %}<li class="px-4 py-4 text-muted">Platz ist leer.</li>{% endfor %}
+</ul>
+{% endblock %}

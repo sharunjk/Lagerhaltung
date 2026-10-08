@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Inventur{% endblock %}
+{% block content %}
+<div class="grid xl:grid-cols-[1fr_340px] gap-6">
+  <div class="min-w-0">
+    <h1 class="mb-1">Inventur</h1>
+    <p class="text-muted mb-5">Zähllisten je Lagerbereich. Differenzen werden erst beim Abschließen als Inventurbuchung übernommen.</p>
+    <div class="panel overflow-hidden">
+      <table class="tbl">
+        <thead><tr><th>Inventur</th><th>Bereich</th><th>Fortschritt</th><th>Status</th><th>Angelegt</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td><a href="/inventur/{{ r.id }}" class="font-semibold hover:underline">{{ r.name }}</a></td>
+            <td>{% if r.bereich %}<span class="bintag">{{ r.bereich }}</span>{% else %}<span class="text-muted">Gesamtes Lager</span>{% endif %}</td>
+            <td><div class="flex items-center gap-2"><div class="w-28 h-2 rounded bg-soft overflow-hidden"><div class="h-full bg-primary" style="width: {{ (100 * r.gezaehlt / r.pos)|round|int if r.pos else 0 }}%"></div></div><span class="text-sm tabular-nums">{{ r.gezaehlt }}/{{ r.pos }}</span></div></td>
+            <td><span class="status {{ 'st-ok' if r.status == 'abgeschlossen' else 'text-primary' }}">{{ "Abgeschlossen" if r.status == "abgeschlossen" else "Läuft" }}</span></td>
+            <td class="text-sm text-muted">{{ r.erstellt_am|datum }}<div>{{ r.erstellt_von }}</div></td>
+          </tr>
+        {% else %}<tr><td colspan="5" class="py-10 text-center text-muted">Noch keine Inventur angelegt.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if user.rolle != "lesen" %}
+  <form method="post" action="/inventur/neu" class="panel p-4 space-y-3 self-start">
+    <h2>Neue Inventur</h2>
+    <div><label class="label">Name</label><input name="name" class="field" placeholder="Inventur {{ now().strftime('%d.%m.%Y') }}"></div>
+    <div><label class="label">Bereich</label><select name="bereich" class="field"><option value="">Gesamtes Lager</option>{% for b in bereiche %}<option>{{ b }}</option>{% endfor %}</select></div>
+    <p class="text-xs text-muted">Übernimmt alle Artikel mit Lagerplatz in diesem Bereich als Zählposition. Zählen geht auch am Handscanner (Scanner-Ansicht → Inventur).</p>
+    <button class="btn btn-primary w-full">Zählliste anlegen</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

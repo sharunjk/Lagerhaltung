@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, bintag, status %}
+{% block title %}Übersicht{% endblock %}
+{% block head %}<script src="/static/vendor/chart.umd.js" defer></script>{% endblock %}
+{% block content %}
+{% if leer %}
+<section class="panel p-8 mb-6 border-l-4 border-l-tag max-w-3xl">
+  <h1 class="mb-2">Willkommen in der Lagerverwaltung</h1>
+  <p class="text-muted mb-5">Noch sind keine Artikel vorhanden. Übernehmen Sie die Daten aus der bisherigen Casper-Lagerverwaltung oder legen Sie Artikel neu an.</p>
+  <div class="flex flex-wrap gap-2">
+    {% if user.rolle == "admin" %}<a href="/einstellungen?tab=uebernahme" class="btn btn-primary btn-lg">Daten aus Casper übernehmen</a>
+    <a href="/import" class="btn btn-lg">Excel-Import</a>{% endif %}
+    <a href="/artikel/neu" class="btn btn-lg">Ersten Artikel anlegen</a>
+  </div>
+</section>
+{% endif %}
+<div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+  <div>
+    <h1>Guten {{ "Morgen" if now().hour < 11 else ("Tag" if now().hour < 17 else "Abend") }}, {{ user.name }}</h1>
+    <p class="text-muted">{{ now().strftime("%d.%m.%Y") }}, {{ d.anzahl }} Artikel auf {{ d.plaetze }} Lagerplätzen{% if d.lagerwert %}, Lagerwert {{ d.lagerwert|eur }}{% endif %}</p>
+  </div>
+  <div class="flex gap-2">
+    <a href="/buchen?typ=ausgang" class="btn">Entnahme</a>
+    <a href="/buchen?typ=eingang" class="btn">Wareneingang</a>
+    <a href="/artikel/neu" class="btn">{{ icon("plus", "w-4 h-4") }}Neuer Artikel</a>
+  </div>
+</div>
+
+<section class="panel grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 divide-x divide-y xl:divide-y-0 divide-line mb-6">
+  {% set ueber = d.ausleihen|selectattr("ueberfaellig")|list %}
+  {% for wert, label, href, farbe in [(d.kritisch|length, "unter Mindestbestand", "/artikel?filter=kritisch", "text-crit" if d.kritisch else ""),
+                                       (d.melden|length, "unter Meldebestand", "/nachbestellung", "text-warn" if d.melden else ""),
+                                       (d.offene_bestellungen, "offene Bestellungen", "/bestellungen", ""),
+                                       (d.ausleihen|length, ("ausgeliehen, " ~ ueber|length ~ " überfällig") if ueber else "ausgeliehen", "/ausleihen", "text-crit" if ueber else ""),
+                                       (d.reservierungen, "Reservierungen", "/reservierungen", ""),
+                                       (d.heute, "Buchungen heute", "/bewegungen", "")] %}
+  <a href="{{ href }}" class="p-5 hover:bg-soft">
+    <div class="font-cond text-4xl font-bold {{ farbe }}">{{ wert }}</div>
+    <div class="text-sm text-muted">{{ label }}</div>
+  </a>
+  {% endfor %}
+</section>
+
+<div class="grid xl:grid-cols-[1.15fr_1fr] gap-6">
+  <section class="panel">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-line">
+      <h2>Nachbestellen</h2>
+      <a href="/nachbestellung" class="text-sm font-semibold text-primary">Bestellvorschlag öffnen</a>
+    </div>
+    {% set liste = (d.kritisch + d.melden)[:12] %}
+    {% if liste %}
+    <table class="tbl">
+      <thead><tr><th>Artikel</th><th>Lagerplatz</th><th class="num">Bestand</th><th class="num">Melde / Min.</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for a in liste %}
+        <tr>
+          <td><a href="/artikel/{{ a.nummer|urlq }}" class="font-semibold hover:underline">{{ a.nummer }}</a><div class="text-muted text-xs truncate max-w-[16rem]">{{ a.bezeichnung }}</div></td>
+          <td>{% for o, n in a.orte[:1] %}{{ bintag(o) }}{% endfor %}</td>
+          <td class="num font-semibold">{{ a.bestand|num }}</td>
+          <td class="num text-muted">{{ a.meldebestand|num }} / {{ a.mindestbestand|num }}</td>
+          <td>{{ status(a.status) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="px-4 py-8 text-muted">Kein Artikel liegt unter seinem Melde- oder Mindestbestand. Diese Grenzen pflegen Sie je Artikel (oder per Excel-Import); erst dann schlägt das System Nachbestellungen vor.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-line">
+      <h2>Letzte Buchungen</h2>
+      <span class="text-xs text-muted flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-ok animate-pulse"></span>aktualisiert alle {{ cfg.lager.live_abfrage_sekunden }} s</span>
+    </div>
+    <div id="live" hx-get="/live" hx-vals='js:{seit: window.lvSeit || 0}' hx-trigger="every {{ cfg.lager.live_abfrage_sekunden }}s" hx-swap="innerHTML">
+      {% with rows=letzte, seit=0 %}{% include "partials/live.html" %}{% endwith %}
+    </div>
+  </section>
+</div>
+
+<div class="grid xl:grid-cols-[1.15fr_1fr] gap-6 mt-6">
+  <section class="panel p-4">
+    <div class="flex items-center justify-between mb-3"><h2>Ein- und Ausgänge, letzte 30 Tage</h2>
+      <div class="flex gap-4 text-xs text-muted"><span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-ok"></span>Eingänge</span><span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-primary"></span>Entnahmen</span></div></div>
+    <div class="h-56"><canvas id="aktChart" aria-label="Buchungen pro Tag"></canvas></div>
+  </section>
+  <section class="panel">
+    <div class="px-4 py-3 border-b border-line"><h2>Meistentnommen, letzte 90 Tage</h2></div>
+    <table class="tbl"><tbody>
+      {% for t in d.top %}
+        <tr><td><a class="font-semibold hover:underline" href="/artikel/{{ t.artikel_nr|urlq }}">{{ t.artikel_nr }}</a></td><td class="text-muted truncate max-w-[18rem]">{{ t.bezeichnung or "" }}</td><td class="num font-semibold">{{ t.menge|num }}</td></tr>
+      {% else %}<tr><td class="text-muted py-6">Keine Entnahmen im Zeitraum.</td></tr>{% endfor %}
+    </tbody></table>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+window.lvSeit = {{ last_id }};
+document.addEventListener("DOMContentLoaded", () => {
+  const css = getComputedStyle(document.documentElement);
+  const c = (n, a=1) => `rgb(${css.getPropertyValue("--" + n).trim().replace(/ /g, ",")},${a})`;
+  new Chart(document.getElementById("aktChart"), {
+    type: "bar",
+    data: { labels: {{ d.verlauf|map(attribute=0)|map("datum", False)|list|tojson }}.map(s => s.slice(0,5)),
+            datasets: [{ label: "Eingänge", data: {{ d.verlauf|map(attribute=1)|list|tojson }}, backgroundColor: c("ok", .8), borderRadius: 2, maxBarThickness: 14 },
+                       { label: "Entnahmen", data: {{ d.verlauf|map(attribute=2)|list|tojson }}, backgroundColor: c("primary", .8), borderRadius: 2, maxBarThickness: 14 }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { stacked: true, grid: { display: false }, ticks: { color: c("muted"), maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } },
+                y: { stacked: true, beginAtZero: true, ticks: { precision: 0, color: c("muted") }, grid: { color: c("line") } } } }
+  });
+  document.body.addEventListener("htmx:afterSwap", e => {
+    if (e.target.id === "live") { const ul = e.target.querySelector("[data-last]"); if (ul) window.lvSeit = +ul.dataset.last; }
+  });
+});
+</script>
+{% endblock %}

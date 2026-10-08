@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Einstellungen{% endblock %}
+{% block content %}
+<h1 class="mb-4">Einstellungen</h1>
+<div class="seg mb-6 flex-wrap">
+  {% for t, lab in [("allgemein", "Allgemein"), ("handy", "Handscanner / Handy"), ("benutzer", "Benutzer"), ("drucker", "Etikettendrucker"), ("mail", "E-Mail"), ("backup", "Datensicherung"), ("uebernahme", "Datenübernahme"), ("api", "Schnittstelle")] %}
+  <a href="?tab={{ t }}" class="{{ 'an' if tab == t }}">{{ lab }}</a>
+  {% endfor %}
+</div>
+
+{% if tab == "allgemein" %}
+<form method="post" action="/einstellungen/allgemein" class="panel p-5 space-y-4 max-w-2xl">
+  <h2>Allgemein</h2>
+  <div><label class="label">Firmen- bzw. Lagername in der Kopfzeile</label><input name="firmenname" value="{{ cfg.server.firmenname }}" class="field"></div>
+  <div><label class="label">Standard-Einheit für neue Artikel</label><input name="standard_einheit" value="{{ cfg.lager.standard_einheit }}" class="field w-28"></div>
+  <label class="flex items-start gap-2"><input type="checkbox" name="negative_bestaende_erlauben" class="mt-1" {% if cfg.lager.negative_bestaende_erlauben %}checked{% endif %}><span>Negative Bestände erlauben<span class="block text-sm text-muted">Aus: Entnahmen über den vorhandenen Bestand werden abgelehnt.</span></span></label>
+  <label class="flex items-start gap-2"><input type="checkbox" name="lagerplaetze_automatisch_anlegen" class="mt-1" {% if cfg.lager.lagerplaetze_automatisch_anlegen %}checked{% endif %}><span>Unbekannte Lagerplätze beim Einbuchen automatisch anlegen<span class="block text-sm text-muted">Aus: Nur Plätze, die unter Lagerplätze angelegt sind, können bebucht werden (verhindert Tippfehler).</span></span></label>
+  <div><label class="label">Aktualisierung „Letzte Buchungen“ (Sekunden)</label><input name="live_abfrage_sekunden" type="number" min="3" value="{{ cfg.lager.live_abfrage_sekunden }}" class="field w-28"></div>
+  <div class="grid grid-cols-2 gap-3 max-w-sm">
+    <div><label class="label">Port (http)</label><input name="port" type="number" value="{{ cfg.server.port }}" class="field"></div>
+    <div><label class="label">Port (https, Handy-Kamera)</label><input name="https_port" type="number" value="{{ cfg.server.https_port }}" class="field"></div>
+  </div>
+  <button class="btn btn-primary">Speichern</button>
+</form>
+<section class="panel p-5 max-w-2xl mt-6 space-y-2">
+  <h2>Weitere Büro-PCs anbinden</h2>
+  <p class="text-sm">Auf anderen PCs im Firmennetz wird nichts installiert. Dieses Skript auf dem jeweiligen PC ausführen: Es legt dort eine Verknüpfung „Lagerverwaltung“ auf dem Desktop und im Startmenü an, die die Lagerverwaltung dieses Lager-PCs als eigenes Fenster öffnet.</p>
+  <a class="btn" href="/arbeitsplatz.bat">Verknüpfung für Arbeitsplatz-PCs herunterladen</a>
+</section>
+
+{% elif tab == "handy" %}
+{% set ip = adressen[0] if adressen else hostname %}
+{% set app_url = "https://" ~ ip ~ ":" ~ cfg.server.https_port ~ "/m" if cfg.server.https_port else "http://" ~ ip ~ ":" ~ cfg.server.port ~ "/m" %}
+<div class="grid xl:grid-cols-[1fr_380px] gap-6 max-w-6xl">
+  <section class="panel p-5 space-y-4">
+    <h2>Zebra TC21 / Smartphone als Scanner-App einrichten</h2>
+    <p class="text-sm">Einmal pro Gerät, etwa 5 Minuten. Das Gerät muss im Firmen-WLAN sein (gleiches Netz wie dieser PC). Ausführliche Anleitung mit Bildschirm-Hinweisen: Dokument „Zebra TC21 einrichten“.</p>
+    <ol class="text-sm space-y-3 list-decimal pl-5">
+      <li><b>Sicherheitszertifikat installieren</b> (damit die App ohne Warnung über https läuft): Auf dem Gerät in Chrome <b>http://{{ ip }}:{{ cfg.server.port }}/zertifikat.crt</b> öffnen und herunterladen. Dann <i>Einstellungen → Sicherheit → Verschlüsselung &amp; Anmeldedaten → Zertifikat installieren → CA-Zertifikat</i> → „Trotzdem installieren“ → Datei <i>Lagerverwaltung-CA.crt</i> wählen.</li>
+      <li><b>App öffnen:</b> In Chrome <b>{{ app_url }}</b> aufrufen (oder QR-Code rechts scannen) und anmelden.</li>
+      <li><b>Installieren:</b> Auf der Startseite „App installieren“ tippen bzw. Chrome-Menü ⋮ → „App installieren“ / „Zum Startbildschirm hinzufügen“. Die Lagerverwaltung erscheint als eigenes Symbol, startet ohne Adressleiste und funktioniert auch offline.</li>
+      <li><b>Scantaste (nur Zebra):</b> App <i>DataWedge</i> → Profil anlegen „Lager“ → <i>Zugeordnete Apps</i>: Chrome (com.android.chrome, alle Aktivitäten) → <i>Barcode-Eingang</i> an → <i>Tastatureingabe (Keystroke output)</i> an → <i>Basisdatenformatierung</i>: „ENTER-Taste senden“ an. Intent-Ausgabe aus.</li>
+    </ol>
+    <p class="text-sm text-muted">Zertifikat nicht installierbar (z. B. gesperrtes Firmengerät)? Alternative für die IT: In Chrome <i>chrome://flags</i> → „Insecure origins treated as secure“ → <b>http://{{ ip }}:{{ cfg.server.port }}</b> eintragen, aktivieren, Chrome neu starten; dann die http-Adresse verwenden. Ohne beides funktioniert die Scanner-Ansicht im Browser trotzdem – nur Installation als App, Offline-Modus und Kamera fehlen.</p>
+    <p class="text-sm">Adressen dieses PCs: {% for a in adressen %}<b>{{ a }}</b>{% if not loop.last %}, {% endif %}{% endfor %} (PC-Name {{ hostname }}). Damit sich die Adresse nicht ändert, sollte die IT dem PC eine feste IP geben.</p>
+  </section>
+  <section class="panel p-5 self-start">
+    <h2 class="mb-3">QR-Code: App öffnen</h2>
+    <div class="bg-white p-4 inline-block rounded border border-line"><svg viewBox="0 0 40 40" width="220" height="220">{{ qr(app_url)|safe }}</svg></div>
+    <p class="text-sm text-muted mt-2 break-all">{{ app_url }}</p>
+    <h2 class="mt-5 mb-3">QR-Code: Zertifikat</h2>
+    <div class="bg-white p-4 inline-block rounded border border-line"><svg viewBox="0 0 40 40" width="160" height="160">{{ qr("http://" ~ ip ~ ":" ~ cfg.server.port ~ "/zertifikat.crt")|safe }}</svg></div>
+    <p class="text-sm text-muted mt-2"><a class="text-primary" href="/zertifikat.crt">Zertifikat herunterladen</a></p>
+  </section>
+</div>
+{% elif tab == "benutzer" %}
+<div class="grid xl:grid-cols-[1fr_380px] gap-6">
+  <div class="panel overflow-hidden">
+    <table class="tbl">
+      <thead><tr><th>Benutzer</th><th>Rolle</th><th>Status</th><th>Letzte Anmeldung</th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        <tr x-data>
+          <td><button type="button" class="font-semibold hover:underline" @click='$dispatch("edit-user", {{ {"id": u.id, "username": u.username, "anzeigename": u.anzeigename, "rolle": u.rolle, "aktiv": u.aktiv or not u.pw_hash}|tojson }})'>{{ u.username }}</button><div class="text-xs text-muted">{{ u.anzeigename }}</div></td>
+          <td>{{ ROLLEN_NAMEN[u.rolle] }}</td>
+          <td>{% if u.aktiv %}<span class="status st-ok">Aktiv</span>{% elif not u.pw_hash %}<span class="status text-warn">Ohne Passwort</span>{% else %}<span class="status text-muted">Gesperrt</span>{% endif %}</td>
+          <td class="text-sm text-muted">{{ u.letzter_login|datum if u.letzter_login else "nie" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="text-sm text-muted px-4 py-3 border-t border-line">Rollen: <b>Nur lesen</b> sieht alles, bucht nichts. <b>Lager</b> bucht, legt Artikel an und bestellt. <b>Administrator</b> löscht, schließt Inventuren ab und verwaltet Einstellungen. Der Benutzername steht bei jeder Buchung in der Historie.</p>
+  </div>
+  <form method="post" action="/benutzer/speichern" class="panel p-4 space-y-3 self-start"
+        x-data="{u: {id: '', username: '', anzeigename: '', rolle: 'lager', aktiv: true}}" @edit-user.window="u = $event.detail">
+    <h2 x-text="u.id ? 'Benutzer bearbeiten' : 'Neuer Benutzer'"></h2>
+    <input type="hidden" name="id" :value="u.id">
+    <div><label class="label">Benutzername</label><input name="username" x-model="u.username" class="field" required maxlength="100"></div>
+    <div><label class="label">Anzeigename</label><input name="anzeigename" x-model="u.anzeigename" class="field"></div>
+    <div><label class="label">Rolle</label><select name="rolle" x-model="u.rolle" class="field">{% for r, n in ROLLEN_NAMEN.items() %}<option value="{{ r }}">{{ n }}</option>{% endfor %}</select></div>
+    <div><label class="label" x-text="u.id ? 'Neues Passwort (leer = unverändert)' : 'Passwort (mind. 6 Zeichen)'"></label><input name="passwort" type="password" class="field" autocomplete="new-password"></div>
+    <label class="flex items-center gap-2"><input type="checkbox" name="aktiv" x-model="u.aktiv"> Aktiv</label>
+    <div class="flex gap-2"><button class="btn btn-primary flex-1">Speichern</button><button type="button" class="btn" x-show="u.id" @click="u = {id: '', username: '', anzeigename: '', rolle: 'lager', aktiv: true}">Neu</button></div>
+  </form>
+</div>
+
+{% elif tab == "drucker" %}
+{% set d = cfg.drucker %}
+<div class="grid xl:grid-cols-[1fr_420px] gap-6 max-w-6xl">
+  <form method="post" action="/einstellungen/drucker" class="panel p-5 space-y-4" x-data="{modus: '{{ d.modus }}'}">
+    <h2>Etikettendrucker</h2>
+    <p class="text-sm text-muted">Für den HPRT HT100 (USB oder Netzwerk, 203 dpi). Die Etiketten werden direkt in der Druckersprache TSPL gesendet. Klappt das nicht, kann jedes Etikett auch „über den Browser“ mit dem normalen Windows-Druckertreiber gedruckt werden.</p>
+    <div class="seg">{% for m, lab in [("windows", "Windows-Drucker (USB)"), ("netzwerk", "Netzwerk (IP)"), ("datei", "Nur Datei (Test)")] %}<label><input type="radio" name="modus" value="{{ m }}" x-model="modus" class="sr-only"><span class="px-3 py-1.5 rounded block">{{ lab }}</span></label>{% endfor %}</div>
+    <div x-show="modus === 'windows'"><label class="label">Windows-Druckername</label>
+      <input name="name" list="drucker" value="{{ d.name }}" class="field">
+      <datalist id="drucker">{% for p in drucker_liste %}<option value="{{ p }}">{% endfor %}</datalist>
+      <p class="text-xs text-muted mt-1">{% if drucker_liste %}Installiert: {{ drucker_liste|join(", ") }}{% else %}Genau wie unter Windows „Drucker und Scanner“ angezeigt.{% endif %}</p></div>
+    <div x-show="modus === 'netzwerk'" class="grid grid-cols-[1fr_100px] gap-3"><div><label class="label">IP-Adresse</label><input name="host" value="{{ d.host }}" class="field" placeholder="192.168.1.50"></div><div><label class="label">Port</label><input name="port" value="{{ d.port }}" class="field"></div></div>
+    <div class="grid sm:grid-cols-2 gap-3">
+      <div><label class="label">Standardformat</label><select name="standard_format" class="field"><option value="45x23" {% if d.standard_format == "45x23" %}selected{% endif %}>45 × 23 mm</option><option value="60x20" {% if d.standard_format == "60x20" %}selected{% endif %}>60 × 20 mm</option></select></div>
+      <div><label class="label">Barcode</label><select name="barcode" class="field"><option value="128" {% if d.barcode == "128" %}selected{% endif %}>Code 128 (Strichcode)</option><option value="QR" {% if d.barcode == "QR" %}selected{% endif %}>QR-Code</option></select></div>
+      <div><label class="label">Versatz horizontal (mm)</label><input name="versatz_x_mm" value="{{ d.versatz_x_mm }}" class="field"></div>
+      <div><label class="label">Versatz vertikal (mm)</label><input name="versatz_y_mm" value="{{ d.versatz_y_mm }}" class="field"></div>
+      <div><label class="label">Druckdichte (0–15)</label><input name="dichte" type="number" min="0" max="15" value="{{ d.dichte }}" class="field"></div>
+      <div><label class="label">Geschwindigkeit (1–6)</label><input name="geschwindigkeit" type="number" min="1" max="6" value="{{ d.geschwindigkeit }}" class="field"></div>
+      <div><label class="label">Abstand zwischen Etiketten (mm)</label><input name="luecke_mm" value="{{ d.luecke_mm }}" class="field"></div>
+    </div>
+    <div class="flex gap-2"><button class="btn btn-primary" name="aktion" value="speichern">Speichern</button><button class="btn" name="aktion" value="test">{{ icon("print", "w-4 h-4") }}Speichern und Testetikett drucken</button></div>
+  </form>
+  <div class="panel p-5 self-start">
+    <h2 class="mb-3">Vorschau</h2>
+    <div class="flex justify-center bg-soft rounded p-6"><div class="border border-line bg-white shadow-sm">{{ svg|safe }}</div></div>
+    <p class="text-sm text-muted mt-3">Aufbau wie die bisherigen Etiketten: Barcode mit Artikelnummer, darunter Nummer und Bezeichnung zentriert.</p>
+  </div>
+</div>
+
+{% elif tab == "mail" %}
+{% set m = cfg.mail %}
+<form method="post" action="/einstellungen/mail" class="panel p-5 space-y-4 max-w-3xl">
+  <h2>Tägliche Meldebestands-Mail</h2>
+  <p class="text-sm text-muted">Einmal täglich eine Liste aller Artikel unter Melde- oder Mindestbestand, nur wenn es welche gibt.</p>
+  <label class="flex items-center gap-2"><input type="checkbox" name="aktiv" {% if m.aktiv %}checked{% endif %}> Mail täglich senden um <input name="uhrzeit" value="{{ m.uhrzeit }}" class="field w-24 py-1 inline-block"> Uhr</label>
+  <div><label class="label">Empfänger (mehrere mit Komma)</label><input name="empfaenger" value="{{ m.empfaenger }}" class="field" placeholder="einkauf@firma.de, lager@firma.de"></div>
+  <div class="grid sm:grid-cols-[1fr_110px] gap-3"><div><label class="label">SMTP-Server</label><input name="server" value="{{ m.server }}" class="field" placeholder="smtp.office365.com"></div><div><label class="label">Port</label><input name="port" value="{{ m.port }}" class="field"></div></div>
+  <div class="flex gap-6"><label class="flex items-center gap-2"><input type="checkbox" name="starttls" {% if m.starttls %}checked{% endif %}> STARTTLS</label><label class="flex items-center gap-2"><input type="checkbox" name="ssl" {% if m.ssl %}checked{% endif %}> SSL (Port 465)</label></div>
+  <div class="grid sm:grid-cols-2 gap-3">
+    <div><label class="label">Benutzer</label><input name="benutzer" value="{{ m.benutzer }}" class="field" autocomplete="off"></div>
+    <div><label class="label">Passwort {% if m.passwort %}(gespeichert){% endif %}</label><input name="passwort" type="password" class="field" autocomplete="new-password" placeholder="{{ 'unverändert lassen' if m.passwort else '' }}"></div>
+    <div class="sm:col-span-2"><label class="label">Absender</label><input name="absender" value="{{ m.absender }}" class="field" placeholder="lager@firma.de"></div>
+  </div>
+  <div class="flex gap-2"><button class="btn btn-primary" name="aktion" value="speichern">Speichern</button><button class="btn" name="aktion" value="test">Speichern und Test-Mail senden</button></div>
+</form>
+
+{% elif tab == "backup" %}
+{% set b = cfg.backup %}
+<div class="grid xl:grid-cols-2 gap-6 max-w-6xl">
+  <form method="post" action="/einstellungen/backup" class="panel p-5 space-y-4">
+    <h2>Automatische Datensicherung</h2>
+    <p class="text-sm text-muted">Sichert Datenbank, Fotos und Dokumente als ZIP-Datei.{% if letztes_backup %} Letzte automatische Sicherung: {{ letztes_backup }}.{% endif %}</p>
+    <label class="flex items-center gap-2"><input type="checkbox" name="aktiv" {% if b.aktiv %}checked{% endif %}> Täglich sichern um <input name="uhrzeit" value="{{ b.uhrzeit }}" class="field w-24 py-1 inline-block"> Uhr</label>
+    <div><label class="label">Ordner</label><input name="ordner" value="{{ b.ordner }}" class="field"><p class="text-xs text-muted mt-1">Relativ zum Programmordner oder absolut, z. B. ein Netzlaufwerk: \\server\backup\lager</p></div>
+    <div><label class="label">Aufbewahren (Tage)</label><input name="aufbewahren_tage" type="number" min="1" value="{{ b.aufbewahren_tage }}" class="field w-28"></div>
+    <div class="flex gap-2"><button class="btn btn-primary" name="aktion" value="speichern">Speichern</button><button class="btn" name="aktion" value="jetzt">Jetzt sichern</button></div>
+  </form>
+  <section class="panel overflow-hidden self-start">
+    <div class="px-4 py-3 border-b border-line"><h2>Vorhandene Sicherungen</h2></div>
+    <ul class="divide-y divide-line text-sm">{% for f in backups %}<li class="flex justify-between px-4 py-2"><a href="/einstellungen/backup/{{ f.name }}" class="text-primary">{{ f.name }}</a><span class="text-muted">{{ (f.stat().st_size / 1024)|round|int }} KB</span></li>{% else %}<li class="px-4 py-6 text-muted">Noch keine Sicherung vorhanden.</li>{% endfor %}</ul>
+  </section>
+</div>
+{% elif tab == "uebernahme" %}
+<div class="grid xl:grid-cols-2 gap-6 max-w-6xl">
+  <form method="post" action="/einstellungen/uebernahme" enctype="multipart/form-data" class="panel p-5 space-y-3" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Übernahme läuft …'">
+    <h2>Daten aus der Casper-Lagerverwaltung übernehmen</h2>
+    <p class="text-sm">Benötigt wird der SQL-Export der Datenbank <b>daten</b> aus HeidiSQL (Rechtsklick auf „daten“ → „Datenbank als SQL exportieren“, Daten: „Einfügen“). Übernommen werden Artikel, Lagerplätze mit Beständen, die komplette Buchungshistorie, Lieferanten (aus Freifeld „Lieferant“), Gruppen, Typenbezeichnungen und Benutzernamen.</p>
+    <p class="text-sm text-muted">Die Casper-Datenbank wird dabei nur gelesen. Benutzer aus dem Altsystem werden ohne Passwort und gesperrt angelegt – unter „Benutzer“ ein Passwort vergeben und aktivieren.</p>
+    <input type="file" name="datei" accept=".sql,.txt" required class="text-sm block file:btn file:btn-sm file:mr-2">
+    {% if hat_daten %}<label class="flex items-start gap-2 text-sm rounded-md border border-crit/40 bg-crit/5 p-3"><input type="checkbox" name="ersetzen" class="mt-0.5"><span><b>Vorhandene Daten ersetzen.</b> Alle Artikel, Bestände, Buchungen, Bestellungen und Inventuren in dieser Lagerverwaltung werden gelöscht und durch den Export ersetzt. Vorher wird automatisch gesichert.</span></label>{% endif %}
+    <button class="btn btn-primary">Übernahme starten</button>
+  </form>
+  {% set rep = request.session.get("uebernahme") %}
+  {% if rep %}
+  <section class="panel p-5">
+    <h2 class="mb-3">Ergebnis der letzten Übernahme</h2>
+    <dl class="grid grid-cols-2 gap-2 text-sm mb-4">
+      <dt class="text-muted">Artikel</dt><dd class="font-semibold">{{ rep.artikel }}</dd>
+      <dt class="text-muted">Lagerplätze</dt><dd class="font-semibold">{{ rep.lagerplaetze }}</dd>
+      <dt class="text-muted">Bestandszeilen</dt><dd class="font-semibold">{{ rep.bestandszeilen }} (Summe {{ rep.gesamtbestand|num }})</dd>
+      <dt class="text-muted">Buchungen</dt><dd class="font-semibold">{{ rep.bewegungen }}</dd>
+      <dt class="text-muted">Lieferanten</dt><dd class="font-semibold">{{ rep.lieferanten }}</dd>
+      <dt class="text-muted">Benutzer (gesperrt)</dt><dd class="font-semibold">{{ rep.benutzer|join(", ") or "–" }}</dd>
+    </dl>
+    {% if rep.hinweise %}<h3 class="font-semibold mb-1">Hinweise</h3><ul class="text-sm list-disc pl-5 space-y-1">{% for h in rep.hinweise %}<li>{{ h }}</li>{% endfor %}</ul>{% endif %}
+  </section>
+  {% endif %}
+</div>
+
+{% elif tab == "api" %}
+<div class="panel p-5 max-w-3xl space-y-3">
+  <h2>Schnittstelle (REST-API)</h2>
+  <p class="text-sm">Für andere Programme, z. B. eine Instandhaltungs-Software: Artikel und Bestände lesen, Buchungen und Reservierungen anlegen. Jeder Schlüssel gehört zu einem Benutzer; Buchungen erscheinen unter dessen Namen.</p>
+  {% set t = request.session.pop("neuer_token", None) %}
+  {% if t %}<div class="rounded-md border border-ok/40 bg-ok/10 p-3 text-sm"><b>Neuer Schlüssel (jetzt kopieren, wird nicht wieder angezeigt):</b><br><code class="break-all select-all">{{ t }}</code></div>{% endif %}
+  <table class="tbl"><thead><tr><th>Benutzer</th><th>Rolle</th><th>Schlüssel</th><th></th></tr></thead><tbody>
+  {% for u in users if u.aktiv %}<tr><td>{{ u.username }}</td><td>{{ ROLLEN_NAMEN[u.rolle] }}</td><td class="text-sm">{{ "vorhanden" if u.api_token else "–" }}</td>
+    <td class="text-right"><form method="post" action="/benutzer/{{ u.id }}/token" onsubmit="return confirm('Neuen Schlüssel erzeugen? Ein alter Schlüssel wird ungültig.')"><button class="btn btn-sm">Schlüssel erzeugen</button></form></td></tr>{% endfor %}
+  </tbody></table>
+  <pre class="text-xs bg-soft rounded p-3 overflow-x-auto">GET  /api/v1/artikel?q=Kugelhahn
+GET  /api/v1/artikel/20212
+GET  /api/v1/lagerplaetze
+GET  /api/v1/bewegungen?seit_id=0
+POST /api/v1/buchungen        {"typ": "ausgang", "artikel": "20212", "menge": 1, "lagerplatz": "C2-R7-4", "kostenstelle": "4711"}
+POST /api/v1/reservierungen   {"artikel": "20212", "menge": 2, "fuer": "Wartung P-1040"}
+Header: Authorization: Bearer &lt;Schlüssel&gt;      Beschreibung: /api/openapi.json</pre>
+</div>
+{% endif %}
+{% endblock %}

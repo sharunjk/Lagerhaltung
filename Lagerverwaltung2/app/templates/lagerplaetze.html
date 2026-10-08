@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Lagerplätze{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div><h1>Lagerplätze</h1><p class="text-muted">{{ anzahl }} Plätze{% if leere and not leer %}, davon {{ leere }} leer (ausgeblendet){% endif %}. Ein Klick zeigt, was dort liegt.</p></div>
+  <form class="flex gap-2"><input name="q" value="{{ q }}" class="field w-56" placeholder="Platz suchen"><label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="leer" value="1" {% if leer %}checked{% endif %} onchange="this.form.submit()">leere zeigen</label><button class="btn">Suchen</button></form>
+</div>
+{% set auffaellig = [] %}
+{% for b, orte in bereiche.items() %}{% for o in orte %}{% if not (o.code is match_platz) %}{% set _ = auffaellig.append(o) %}{% endif %}{% endfor %}{% endfor %}
+<div class="grid xl:grid-cols-[1fr_340px] gap-6">
+  <div class="space-y-5 min-w-0">
+  {% for b, orte in bereiche.items() %}
+    <section class="panel p-4">
+      <h2 class="mb-3">{{ b }} <span class="text-muted font-sans text-sm font-normal">{{ orte|length }} Plätze</span></h2>
+      <div class="flex flex-wrap gap-2">
+      {% for o in orte %}
+        <a href="/lagerplaetze/ansicht?code={{ o.code|urlq }}" class="flex items-center gap-2 rounded-md border border-line px-2 py-1.5 hover:border-primary {{ 'opacity-50' if not o.aktiv }}" title="{{ o.beschreibung or '' }}">
+          <span class="bintag {{ 'bintag-leer' if not o.artikel }}">{{ o.code }}</span><span class="text-sm text-muted tabular-nums">{{ o.artikel }} Art.</span></a>
+      {% endfor %}
+      </div>
+    </section>
+  {% else %}<div class="panel p-8 text-muted">Keine Lagerplätze gefunden.</div>{% endfor %}
+  </div>
+  <aside class="space-y-6">
+    {% if user.rolle != "lesen" %}
+    <form method="post" action="/lagerplaetze/speichern" class="panel p-4 space-y-3">
+      <h2>Lagerplatz anlegen</h2>
+      <p class="text-sm text-muted">Schema: Bereich-Regal-Fach, z. B. C2-R7-1, oder Bereich-Fläche, z. B. C1-F3.</p>
+      <div><label class="label">Code</label><input name="code" class="field font-semibold" required maxlength="60" placeholder="C2-R10-1"></div>
+      <div><label class="label">Beschreibung</label><input name="beschreibung" class="field" placeholder="z. B. Schwerlastregal Halle 2"></div>
+      <button class="btn btn-primary w-full">Anlegen</button>
+    </form>
+    {% endif %}
+    {% if auffaellig %}
+    <section class="panel p-4 border-l-4 border-l-warn">
+      <h2 class="mb-1">Abweichende Schreibweisen</h2>
+      <p class="text-sm text-muted mb-3">Diese Plätze passen nicht ins Schema (oft Tippfehler oder Freitext aus dem Altsystem). Öffnen, um sie umzubenennen oder mit einem richtigen Platz zusammenzuführen.</p>
+      <div class="flex flex-wrap gap-2">{% for o in auffaellig %}<a href="/lagerplaetze/ansicht?code={{ o.code|urlq }}" class="bintag">{{ o.code }}</a>{% endfor %}</div>
+    </section>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

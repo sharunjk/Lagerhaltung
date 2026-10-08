@@ -1,0 +1,12 @@
+{% extends "m/base.html" %}
+{% block title %}Reservierungen{% endblock %}
+{% block kopf %}Reservierte Teile entnehmen{% endblock %}
+{% block content %}
+{% for r in rows %}
+<a href="/m/buchen?typ=ausgang&artikel={{ r.nummer|urlq }}&reservierung={{ r.id }}" class="block rounded-lg border border-line bg-surface p-4 mb-2">
+  <div class="flex justify-between gap-2"><span><b>{{ r.nummer }}</b> {{ r.bezeichnung }}</span><b class="font-cond text-xl">{{ r.menge|num }}</b></div>
+  <div class="text-sm">für {{ r.fuer }}{% if r.person %}, {{ r.person }}{% endif %}{% if r.bis %}, bis {{ r.bis|datum }}{% endif %}</div>
+  <div class="flex flex-wrap gap-1 mt-1">{% for o, n in r.orte %}<span class="bintag">{{ o }}</span>{% else %}<span class="text-crit text-sm">kein Bestand</span>{% endfor %}</div>
+</a>
+{% else %}<p class="text-muted">Keine offenen Reservierungen.</p>{% endfor %}
+{% endblock %}

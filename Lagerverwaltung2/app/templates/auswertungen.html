@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, bintag %}
+{% block title %}Auswertungen<section class="panel overflow-hidden mt-6">
+  <div class="px-4 py-3 border-b border-line"><h2>Bestand nach Gruppe</h2></div>
+  <table class="tbl"><thead><tr><th>Gruppe</th><th class="num">Artikel</th><th class="num">Teile auf Lager</th><th class="num">Wert</th></tr></thead><tbody>
+  {% for name, w in kategorien %}<tr><td><a class="hover:underline" href="/artikel?kategorie={{ name|urlq if name != 'ohne Gruppe' else '' }}">{{ name }}</a></td><td class="num">{{ w[0] }}</td><td class="num">{{ w[1]|num }}</td><td class="num text-muted">{{ w[2]|eur if w[2] else "–" }}</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-end justify-between gap-3 mb-5">
+  <h1>Auswertungen</h1>
+  <form class="flex flex-wrap items-end gap-2">
+    <div><label class="label">Von</label><input type="date" name="von" value="{{ von }}" class="field"></div>
+    <div><label class="label">Bis</label><input type="date" name="bis" value="{{ bis }}" class="field"></div>
+    <input type="hidden" name="monate" value="{{ monate }}">
+    <button class="btn btn-primary">Anwenden</button>
+  </form>
+</div>
+<section class="panel grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-line mb-6">
+  <div class="p-5"><div class="font-cond text-3xl font-bold">{{ lagerwert|eur }}</div><div class="text-sm text-muted">Lagerwert{% if ohne_preis %}, {{ ohne_preis }} Artikel ohne Preis{% endif %}</div>
+    <a href="/auswertungen/lagerwert.xlsx" class="text-sm text-primary font-semibold">Liste als Excel</a></div>
+  <div class="p-5"><div class="font-cond text-3xl font-bold">{{ verbrauch_summe|num }}</div><div class="text-sm text-muted">entnommene Teile im Zeitraum</div></div>
+  <div class="p-5"><div class="font-cond text-3xl font-bold">{{ ladenhueter_n }}</div><div class="text-sm text-muted">Artikel ohne Bewegung seit {{ monate }} Monaten</div></div>
+</section>
+<div class="grid xl:grid-cols-2 gap-6">
+  <section class="panel overflow-hidden">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-line"><h2>Verbrauch je Artikel</h2><a class="btn btn-sm" href="/auswertungen/verbrauch.xlsx?von={{ von }}&bis={{ bis }}">{{ icon("download", "w-4 h-4") }}Excel</a></div>
+    <table class="tbl">
+      <thead><tr><th>Artikel</th><th class="num">Entnommen</th><th class="num">Eingang</th><th class="num">Wert</th></tr></thead>
+      <tbody>
+      {% for v in verbrauch %}
+        <tr><td><a class="font-semibold hover:underline" href="/artikel/{{ v.artikel_nr|urlq }}">{{ v.artikel_nr }}</a> <span class="text-muted text-sm">{{ v.bezeichnung or "" }}</span></td>
+          <td class="num font-semibold">{{ v.ausgang|num }}</td><td class="num text-muted">{{ v.eingang|num }}</td>
+          <td class="num text-muted">{{ (v.ausgang|float * v.preis|float)|eur if v.preis else "–" }}</td></tr>
+      {% else %}<tr><td colspan="4" class="py-8 text-center text-muted">Keine Ein- oder Ausgänge im Zeitraum.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <div class="space-y-6">
+    <section class="panel overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-line"><h2>Entnahmen je Kostenstelle</h2><a class="btn btn-sm" href="/auswertungen/kostenstellen.xlsx?von={{ von }}&bis={{ bis }}">Excel</a></div>
+      <table class="tbl"><tbody>
+      {% for k in kst %}<tr><td>{{ k.kostenstelle or "ohne Angabe" }}</td><td class="num font-semibold">{{ k.menge|num }}</td><td class="num text-muted">{{ k.buchungen }} Buchungen</td><td class="num text-muted">{{ k.wert|eur if k.wert else "" }}</td></tr>
+      {% else %}<tr><td class="py-6 text-muted">Keine Entnahmen im Zeitraum.</td></tr>{% endfor %}
+      </tbody></table>
+    </section>
+    <section class="panel overflow-hidden">
+      <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-line">
+        <h2>Ladenhüter</h2>
+        <form class="flex items-center gap-2 text-sm"><input type="hidden" name="von" value="{{ von }}"><input type="hidden" name="bis" value="{{ bis }}">
+          ohne Bewegung seit <select name="monate" class="field w-auto py-1" onchange="this.form.submit()">{% for m in [6, 12, 18, 24, 36] %}<option value="{{ m }}" {% if m == monate %}selected{% endif %}>{{ m }} Monaten</option>{% endfor %}</select>
+          <a class="btn btn-sm" href="/auswertungen/ladenhueter.xlsx?monate={{ monate }}">Excel</a></form>
+      </div>
+      <table class="tbl"><tbody>
+      {% for a in ladenhueter[:25] %}<tr><td><a class="font-semibold hover:underline" href="/artikel/{{ a.nummer|urlq }}">{{ a.nummer }}</a> <span class="text-muted text-sm">{{ a.bezeichnung or "" }}</span></td><td class="num">{{ a.bestand|num }}</td><td class="text-sm text-muted whitespace-nowrap">{{ a.letzte_bewegung|datum if a.letzte_bewegung else "nie" }}</td></tr>
+      {% else %}<tr><td class="py-6 text-muted">Keine Ladenhüter.</td></tr>{% endfor %}
+      </tbody></table>
+    </section>
+  </div>
+</div>
+{% endblock %}

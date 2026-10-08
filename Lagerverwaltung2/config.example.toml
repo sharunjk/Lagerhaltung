@@ -1,0 +1,32 @@
+# Konfiguration Lagerverwaltung
+# Fast alles ist auch in der Oberflaeche unter "Einstellungen" aenderbar.
+
+[server]
+host = "0.0.0.0"   # 0.0.0.0 = auch von Handscanner/anderen PCs erreichbar, 127.0.0.1 = nur dieser PC
+port = 8080        # normale Adresse: http://<PC>:8080
+https_port = 8443  # fuer Kamera-Scan am Smartphone: https://<PC>:8443   (0 = aus)
+firmenname = "CAPHENIA"
+
+[daten]
+datenbank = "daten/lager.db"   # die komplette Lagerdatenbank (eine Datei)
+anhaenge = "daten/anhaenge"    # Fotos und Dokumente
+
+[lager]
+negative_bestaende_erlauben = false
+lagerplaetze_automatisch_anlegen = true
+standard_einheit = "Stk"
+
+[drucker]
+modus = "windows"          # windows | netzwerk | datei
+name = "HPRT HT100"        # Druckername wie in Windows "Drucker und Scanner"
+standard_format = "45x23"  # 45x23 | 60x20
+barcode = "128"            # 128 | QR
+
+[backup]
+aktiv = true
+ordner = "backups"
+uhrzeit = "22:00"
+aufbewahren_tage = 30
+
+[mail]
+aktiv = false

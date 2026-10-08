@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Artikel{% endblock %}
+{% block content %}
+{% set qs = "q=" ~ (q|urlq) ~ "&filter=" ~ filter ~ "&kategorie=" ~ (kategorie|urlq) ~ "&platz=" ~ (platz|urlq) %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <h1>{{ "Archivierte Artikel" if archiv else "Artikel" }}</h1>
+  <div class="flex flex-wrap gap-2">
+    <a class="btn" href="?archiv={{ 0 if archiv else 1 }}">{{ "Aktive Artikel" if archiv else "Archiv" }}</a>
+    <a class="btn" href="/artikel/export.xlsx?{{ qs }}">{{ icon("download", "w-4 h-4") }}Excel</a>
+    {% if user.rolle != "lesen" %}<a class="btn btn-primary" href="/artikel/neu">{{ icon("plus", "w-4 h-4") }}Neuer Artikel</a>{% endif %}
+  </div>
+</div>
+<form id="filter" class="flex flex-wrap items-center gap-3 mb-4" hx-get="/artikel" hx-target="#tabelle" hx-trigger="input changed delay:250ms from:#q, change" hx-push-url="true">
+  <div class="relative w-full sm:w-80">
+    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">{{ icon("search", "w-4 h-4") }}</span>
+    <input id="q" name="q" value="{{ q }}" class="field pl-9" placeholder="Nummer, Bezeichnung, Typ, Hersteller, Platz" autocomplete="off">
+  </div>
+  <div class="seg flex-wrap" role="radiogroup" aria-label="Filter">
+    {% for val, lab in [("", "Alle"), ("melden", "Nachbestellen"), ("kritisch", "Kritisch"), ("leer", "Ohne Bestand"), ("reserviert", "Reserviert"), ("ersatzteil", "Kritische Ersatzteile")] %}
+    <label><input type="radio" name="filter" value="{{ val }}" class="sr-only" {% if filter == val %}checked{% endif %}><span class="px-3 py-1.5 rounded block">{{ lab }}</span></label>
+    {% endfor %}
+  </div>
+  {% if kategorien %}
+  <select name="kategorie" class="field w-auto max-w-[14rem]"><option value="">Alle Gruppen</option>{% for k in kategorien %}<option {% if k == kategorie %}selected{% endif %}>{{ k }}</option>{% endfor %}</select>
+  {% endif %}
+  {% if platz %}<input type="hidden" name="platz" value="{{ platz }}"><a href="/artikel" class="bintag">{{ platz }} ✕</a>{% endif %}
+  <input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="archiv" value="{{ archiv }}">
+</form>
+<div id="tabelle">{% include "partials/artikel_tabelle.html" %}</div>
+{% endblock %}

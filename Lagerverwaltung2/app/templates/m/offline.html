@@ -1,0 +1,80 @@
+{% extends "m/base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Offline erfassen{% endblock %}
+{% block kopf %}Offline erfassen{% endblock %}
+{% block content %}
+<div x-data="offlineApp()" x-init="init()" class="space-y-4">
+  <div class="rounded-lg border p-3 text-sm" :class="online ? 'border-ok/40 bg-ok/10' : 'border-warn/40 bg-warn/10'">
+    <b x-text="online ? 'Verbindung zum Lager-PC besteht.' : 'Keine Verbindung – Buchungen werden im Gerät gespeichert.'"></b>
+    <span class="block text-muted" x-text="stand ? 'Artikeldaten vom ' + stand : 'Artikeldaten noch nicht geladen – einmal mit Verbindung öffnen.'"></span>
+  </div>
+
+  <div class="flex gap-1.5 overflow-x-auto -mx-4 px-4">
+    {% for t, lab in TYPEN.items() %}<button type="button" @click="typ='{{ t }}'" class="shrink-0 rounded-full px-4 py-2 text-sm font-semibold border" :class="typ==='{{ t }}' ? 'bg-ink text-surface border-ink' : 'border-line bg-surface'">{{ lab }}</button>{% endfor %}
+  </div>
+
+  <form @submit.prevent="speichern()" class="space-y-3">
+    <div>
+      <label class="label" for="o_artikel">1. Artikel scannen</label>
+      <div class="flex gap-2"><input id="o_artikel" x-model.trim="artikel" @keydown.enter.prevent="$refs.platz.focus()" @change="suchen()" @input.debounce.300ms="suchen()" autocomplete="off" class="field h-14 text-xl font-semibold flex-1" placeholder="Artikelnummer" autofocus>
+        <button type="button" onclick="LV.kamera('o_artikel')" class="btn h-14 w-14">{{ icon("scan", "w-7 h-7") }}</button></div>
+      <template x-if="treffer"><div class="mt-2 rounded-lg border border-line bg-surface p-3">
+        <div class="font-semibold" x-text="treffer.b"></div>
+        <div class="flex flex-wrap gap-2 mt-2"><template x-for="o in treffer.o" :key="o[0]"><button type="button" @click="platz=o[0]; $refs.menge.focus()" class="rounded-md border-2 px-2 py-1.5 flex gap-2 items-center" :class="platz===o[0] ? 'border-primary bg-primary/10' : 'border-line'"><span class="bintag" x-text="o[0]"></span><span class="font-semibold" x-text="fmt(o[1])"></span></button></template></div>
+        <p class="text-xs text-muted mt-1">Bestand laut letztem Abgleich</p></div></template>
+      <p x-show="artikel && !treffer && stand" class="text-sm text-warn mt-1">Artikel nicht im gespeicherten Katalog – wird trotzdem gespeichert und beim Übertragen geprüft.</p>
+    </div>
+    <div><label class="label" for="o_platz">2. Lagerplatz</label>
+      <div class="flex gap-2"><input id="o_platz" x-ref="platz" x-model.trim="platz" @keydown.enter.prevent="typ==='umbuchung' ? $refs.ziel.focus() : $refs.menge.focus()" list="o_plaetze" autocomplete="off" class="field h-14 text-xl font-semibold flex-1" placeholder="Platz scannen">
+        <button type="button" onclick="LV.kamera('o_platz')" class="btn h-14 w-14">{{ icon("scan", "w-7 h-7") }}</button></div></div>
+    <div x-show="typ==='umbuchung'"><label class="label">Nach Lagerplatz</label><input x-ref="ziel" x-model.trim="ziel" @keydown.enter.prevent="$refs.menge.focus()" list="o_plaetze" class="field h-14 text-xl font-semibold" placeholder="Zielplatz scannen"></div>
+    <div><label class="label" x-text="typ==='inventur' ? '3. Gezählter Bestand' : '3. Menge'"></label>
+      <div class="flex"><button type="button" class="btn rounded-r-none text-3xl w-16 h-16" @click="menge=Math.max(0,(+String(menge).replace(',','.')||1)-1)">−</button>
+        <input x-ref="menge" x-model="menge" inputmode="decimal" class="field rounded-none h-16 text-center text-3xl font-bold flex-1" @focus="$el.select()">
+        <button type="button" class="btn rounded-l-none text-3xl w-16 h-16" @click="menge=(+String(menge).replace(',','.')||0)+1">+</button></div></div>
+    <div x-show="typ==='ausgang'"><label class="label">Kostenstelle / Empfänger (optional)</label><div class="grid grid-cols-2 gap-2"><input x-model="kostenstelle" class="field h-12" placeholder="Kostenstelle"><input x-model="empfaenger" class="field h-12" placeholder="Empfänger"></div></div>
+    <button class="btn btn-primary w-full h-16 text-xl">Speichern</button>
+  </form>
+  <datalist id="o_plaetze"><template x-for="p in plaetze"><option :value="p"></option></template></datalist>
+
+  <section>
+    <div class="flex items-center justify-between mb-2"><h2>Warteschlange</h2><button type="button" class="btn btn-sm" @click="LV.queue.sync().then(laden)">Jetzt übertragen</button></div>
+    <ul class="rounded-lg border border-line bg-surface divide-y divide-line">
+      <template x-for="q in liste" :key="q.uuid"><li class="px-3 py-2.5">
+        <div class="flex justify-between gap-2"><span class="font-semibold" x-text="(typen[q.typ]||q.typ) + ' ' + q.artikel"></span><span x-text="fmt(q.menge) + ' @ ' + q.lagerort + (q.ziel ? ' → ' + q.ziel : '')"></span></div>
+        <div class="text-xs" :class="q.status==='fehler' ? 'text-crit font-semibold' : 'text-muted'" x-text="q.status==='fehler' ? q.fehler : 'wartet auf Übertragung, erfasst ' + new Date(q.erfasst).toLocaleString('de-DE')"></div>
+        <div class="flex gap-2 mt-1" x-show="q.status==='fehler'"><button type="button" class="btn btn-sm" @click="q.status='offen'; LV.queue.setzen(q).then(()=>LV.queue.sync()).then(laden)">Erneut senden</button>
+          <button type="button" class="btn btn-sm btn-danger" @click="if(confirm('Buchung verwerfen?')) LV.queue.loeschen(q.uuid).then(laden)">Verwerfen</button></div>
+      </li></template>
+      <li class="px-3 py-3 text-sm text-muted" x-show="!liste.length">Keine offenen Buchungen.</li>
+    </ul>
+  </section>
+</div>
+<script>
+function offlineApp() {
+  return {
+    typ: new URLSearchParams(location.search).get("typ") || "ausgang", artikel: "", platz: "", ziel: "", menge: 1, kostenstelle: "", empfaenger: "",
+    katalog: null, stand: "", plaetze: [], treffer: null, liste: [], online: navigator.onLine,
+    typen: {{ TYPEN|tojson }},
+    fmt(v) { const n = +String(v).replace(",", "."); return isNaN(n) ? v : (Math.round(n * 1000) / 1000).toString().replace(".", ","); },
+    async init() {
+      window.addEventListener("online", () => this.online = true); window.addEventListener("offline", () => this.online = false);
+      document.addEventListener("lv-sync", () => this.laden());
+      if (navigator.onLine) await LV.katalog.laden();
+      const d = await LV.katalog.daten(); if (d) { this.katalog = d.artikel; this.stand = d.stand; this.plaetze = d.plaetze; }
+      this.online = await LV.erreichbar(); this.laden();
+    },
+    suchen() { this.treffer = this.katalog && this.artikel ? this.katalog[this.artikel] || null : null;
+      if (this.treffer && !this.platz) { const m = this.treffer.o.find(o => o[1] > 0) || this.treffer.o[0]; if (m && this.typ !== "eingang") this.platz = m[0]; } },
+    async laden() { this.liste = (await LV.queue.alle()).sort((a, b) => a.erfasst < b.erfasst ? 1 : -1); },
+    async speichern() {
+      if (!this.artikel || !this.platz || this.menge === "" || (this.typ === "umbuchung" && !this.ziel)) { LV.meldung("Bitte Artikel, Lagerplatz und Menge angeben.", false); return; }
+      await LV.queue.add({ typ: this.typ, artikel: this.artikel, lagerort: this.platz, ziel: this.ziel, menge: String(this.menge), kostenstelle: this.kostenstelle, empfaenger: this.empfaenger });
+      LV.meldung("Gespeichert: " + this.artikel, true);
+      this.artikel = ""; this.platz = ""; this.ziel = ""; this.menge = 1; this.treffer = null;
+      document.getElementById("o_artikel").focus(); this.laden(); LV.queue.sync().then(() => this.laden());
+    },
+  };
+}
+</script>
+{% endblock %}

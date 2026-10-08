@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_macros.html" import bintag %}
+{% block title %}Reservierungen{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div><h1>Reservierungen</h1><p class="text-muted">Teile, die für einen Auftrag oder eine Wartung zurückgelegt sind. Reservierte Mengen zählen nicht als verfügbar.</p></div>
+  <div class="seg"><a href="?status=offen" class="{{ 'an' if status == 'offen' }}">Offen</a><a href="?status=alle" class="{{ 'an' if status != 'offen' }}">Alle</a></div>
+</div>
+<div class="grid xl:grid-cols-[1fr_340px] gap-6">
+<div class="panel overflow-hidden min-w-0">
+  <table class="tbl">
+    <thead><tr><th>Artikel</th><th>Für</th><th>Bis</th><th class="num">Menge</th><th class="num">Bestand</th><th>Lagerplatz</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr class="{{ 'opacity-50' if r.status != 'offen' }}">
+        <td><a href="/artikel/{{ r.nummer|urlq }}" class="font-semibold hover:underline">{{ r.nummer }}</a><div class="text-xs text-muted">{{ r.bezeichnung }}</div></td>
+        <td>{{ r.fuer }}{% if r.person %}<div class="text-xs text-muted">{{ r.person }}</div>{% endif %}</td>
+        <td class="whitespace-nowrap {{ 'text-crit font-semibold' if r.bis and r.bis < heute and r.status == 'offen' }}">{{ r.bis|datum if r.bis else "–" }}</td>
+        <td class="num font-semibold">{{ r.menge|num }}</td>
+        <td class="num {{ 'text-crit' if r.bestand < r.menge }}">{{ r.bestand|num }}</td>
+        <td>{% for o, n in r.orte[:1] %}{{ bintag(o) }}{% endfor %}</td>
+        <td class="text-right whitespace-nowrap">{% if r.status == "offen" and user.rolle != "lesen" %}
+          <a class="btn btn-sm btn-primary" href="/buchen?artikel={{ r.nummer|urlq }}&typ=ausgang&reservierung={{ r.id }}">Entnehmen</a>
+          <form method="post" action="/reservierungen/{{ r.id }}/status" class="inline"><input type="hidden" name="status" value="storniert"><button class="btn btn-sm">Aufheben</button></form>
+          {% else %}<span class="text-xs text-muted">{{ r.status }}</span>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="py-10 text-center text-muted">Keine Reservierungen.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if user.rolle != "lesen" %}
+<form method="post" action="/reservierungen/neu" class="panel p-4 space-y-3 self-start">
+  <h2>Neue Reservierung</h2>
+  <div><label class="label">Artikelnummer</label><input name="artikel_nr" required class="field"></div>
+  <div><label class="label">Menge</label><input name="menge" value="1" inputmode="decimal" required class="field w-24"></div>
+  <div><label class="label">Für (Auftrag, Anlage, Wartung)</label><input name="fuer" required class="field"></div>
+  <div><label class="label">Person</label><input name="person" class="field"></div>
+  <div><label class="label">Bis</label><input type="date" name="bis" class="field"></div>
+  <button class="btn btn-primary w-full">Reservieren</button>
+</form>
+{% endif %}
+</div>
+{% endblock %}

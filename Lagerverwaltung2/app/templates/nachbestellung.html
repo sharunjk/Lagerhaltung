@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, bintag, status %}
+{% block title %}Nachbestellung{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div><h1>Nachbestellung</h1><p class="text-muted">Artikel auf oder unter dem Meldebestand. Mengen prüfen, auswählen und als Bestellposition übernehmen.</p></div>
+  <a href="/bestellungen" class="btn">{{ icon("cart", "w-4 h-4") }}Offene Bestellungen</a>
+</div>
+{% if ohne_werte %}<p class="mb-4 text-sm rounded-md border border-warn/40 bg-warn/10 text-warn px-4 py-3">{{ ohne_werte }} Artikel haben weder Melde- noch Mindestbestand und werden hier nie vorgeschlagen. Werte pflegen Sie am Artikel oder für viele auf einmal per <a href="/import" class="underline font-semibold">Excel-Import</a>.</p>{% endif %}
+{% if arts %}
+<form method="post" action="/bestellungen/anlegen" class="panel overflow-hidden">
+  <div class="overflow-x-auto">
+  <table class="tbl">
+    <thead><tr><th class="w-8"><input type="checkbox" checked onchange="this.closest('form').querySelectorAll('input[name=aid]').forEach(i => i.checked = this.checked)" aria-label="Alle"></th>
+      <th>Artikel</th><th>Lagerplatz</th><th class="num">Bestand</th><th class="num">Melde / Min.</th><th class="num">Bestellt</th><th>Lieferant</th><th>Status</th><th class="num">Bestellmenge</th></tr></thead>
+    <tbody>
+    {% for a in arts %}
+      <tr>
+        <td><input type="checkbox" name="aid" value="{{ a.id }}" {% if not a.offen %}checked{% endif %}></td>
+        <td><a href="/artikel/{{ a.nummer|urlq }}" class="font-semibold hover:underline">{{ a.nummer }}</a><div class="text-xs text-muted truncate max-w-[18rem]">{{ a.bezeichnung }}</div></td>
+        <td>{% for o, n in a.orte[:1] %}{{ bintag(o) }}{% endfor %}</td>
+        <td class="num font-semibold">{{ a.bestand|num }}</td>
+        <td class="num text-muted">{{ a.meldebestand|num }} / {{ a.mindestbestand|num }}</td>
+        <td class="num">{% if a.offen %}<span class="text-primary font-semibold">{{ a.offen|num }}</span>{% else %}<span class="text-muted">–</span>{% endif %}</td>
+        <td class="text-sm">{{ a.lieferant or "–" }}{% if a.lieferant_artnr %}<div class="text-xs text-muted">{{ a.lieferant_artnr }}</div>{% endif %}</td>
+        <td>{{ status(a.status) }}</td>
+        <td class="num"><input name="menge_{{ a.id }}" value="{{ a.vorschlag|num }}" inputmode="decimal" class="field w-20 text-right inline-block py-1"></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-line">
+    <p class="text-sm text-muted">Vorschlag: gepflegte Bestellmenge, sonst bis zum doppelten Meldebestand auffüllen, abzüglich bereits bestellter Menge.</p>
+    {% if user.rolle != "lesen" %}<button class="btn btn-primary">Ausgewählte als Bestellung anlegen</button>{% endif %}
+  </div>
+</form>
+{% else %}
+<div class="panel p-10 text-center"><p class="text-lg">Nichts nachzubestellen.</p><p class="text-muted mt-1">Alle Artikel mit gepflegtem Meldebestand liegen darüber.</p></div>
+{% endif %}
+{% endblock %}

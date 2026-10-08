@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_macros.html" import bintag %}
+{% block title %}Ausleihen{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div><h1>Ausleihen</h1><p class="text-muted">Werkzeuge und Teile, die verliehen sind und zurückkommen sollen.</p></div>
+  {% if user.rolle != "lesen" %}<a href="/buchen?typ=ausleihe" class="btn btn-primary">Neue Ausleihe</a>{% endif %}
+</div>
+<div class="panel overflow-hidden">
+  <table class="tbl">
+    <thead><tr><th>Artikel</th><th>An</th><th>Seit</th><th>Zurück bis</th><th>Von Platz</th><th class="num">Offen</th><th>Rückgabe</th></tr></thead>
+    <tbody>
+    {% for x in rows %}
+      <tr class="{{ 'bg-crit/5' if x.ueberfaellig }}">
+        <td><a href="/artikel/{{ x.artikel_nr|urlq }}" class="font-semibold hover:underline">{{ x.artikel_nr }}</a><div class="text-xs text-muted">{{ x.bezeichnung }}</div></td>
+        <td class="font-medium">{{ x.empfaenger }}{% if x.zweck %}<div class="text-xs text-muted">{{ x.zweck }}</div>{% endif %}</td>
+        <td class="whitespace-nowrap">{{ x.zeit|datum(False) }}</td>
+        <td class="whitespace-nowrap {{ 'text-crit font-semibold' if x.ueberfaellig }}">{{ x.rueckgabe_bis|datum if x.rueckgabe_bis else "–" }}{% if x.ueberfaellig %} überfällig{% endif %}</td>
+        <td>{{ bintag(x.lagerplatz) if x.lagerplatz }}</td>
+        <td class="num font-semibold">{{ x.offen|num }} {{ x.einheit }}</td>
+        <td>{% if user.rolle != "lesen" %}<form method="post" action="/ausleihen/{{ x.id }}/rueckgabe" class="flex gap-1.5">
+          <input name="menge" value="{{ x.offen|num }}" inputmode="decimal" class="field py-1 w-16 text-right"><input name="platz" value="{{ x.lagerplatz or '' }}" class="field py-1 w-28" placeholder="Platz"><button class="btn btn-sm btn-primary">Zurückbuchen</button></form>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="py-10 text-center text-muted">Nichts ausgeliehen.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

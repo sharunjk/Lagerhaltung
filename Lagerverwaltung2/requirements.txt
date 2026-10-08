@@ -1,0 +1,10 @@
+fastapi>=0.115
+uvicorn>=0.30
+jinja2>=3.1
+sqlalchemy>=2.0
+python-multipart>=0.0.9
+itsdangerous>=2.1
+openpyxl>=3.1
+segno>=1.6
+cryptography>=42
+colorama>=0.4

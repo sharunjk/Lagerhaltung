@@ -1,0 +1,16 @@
+{% from "_macros.html" import bintag, status %}
+{% if treffer %}
+<div class="panel shadow-lg overflow-hidden">
+  {% for a in treffer %}
+  <a href="/artikel/{{ a.nummer|urlq }}" class="flex items-center gap-3 px-4 py-2.5 hover:bg-soft border-b border-line last:border-0">
+    <span class="font-semibold w-20 shrink-0">{{ a.nummer }}</span>
+    <span class="flex-1 truncate">{{ a.bezeichnung or "" }}</span>
+    {% for o, n in a.orte[:1] %}<span class="bintag">{{ o or "–" }}</span>{% endfor %}
+    <span class="w-10 text-right tabular-nums font-semibold">{{ a.bestand|num }}</span>
+  </a>
+  {% endfor %}
+  <a href="/artikel?q={{ q|urlq }}" class="block px-4 py-2 text-sm text-primary font-semibold bg-soft">Alle Treffer für „{{ q }}“ anzeigen</a>
+</div>
+{% elif q|length >= 2 %}
+<div class="panel shadow-lg px-4 py-3 text-sm text-muted">Kein Artikel gefunden. Enter drücken, um nach Lagerplatz oder Artikelnummer zu suchen.</div>
+{% endif %}

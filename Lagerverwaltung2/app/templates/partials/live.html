@@ -1,0 +1,19 @@
+{% from "_macros.html" import bintag, bew_menge %}
+<ul class="divide-y divide-line" data-last="{{ last_id }}">
+{% for r in rows %}
+  <li class="flex items-center gap-3 px-4 py-2.5 {% if seit and r.id > seit %}bg-tag/15{% endif %}">
+    <span class="w-14 shrink-0 text-right tabular-nums">{{ bew_menge(r) }}</span>
+    <div class="min-w-0 flex-1">
+      <a href="/artikel/{{ r.artikel_nr|urlq }}" class="font-semibold hover:underline">{{ r.artikel_nr }}</a>
+      <span class="text-muted truncate">{{ r.bezeichnung or "" }}</span>
+      <div class="text-xs text-muted flex flex-wrap gap-x-3"><span>{{ r.typ|typ_text }}{% if r.text and r.typ != "info" %} ({{ r.text }}){% elif r.typ == "info" %}: {{ r.text }}{% endif %}</span><span>{{ r.benutzer }}</span>{% if r.quelle == "mobil" %}<span class="text-primary">Handscanner</span>{% elif r.quelle == "offline" %}<span class="text-primary">Handscanner (offline)</span>{% elif r.quelle == "api" %}<span class="text-primary">Schnittstelle</span>{% endif %}</div>
+    </div>
+    <div class="text-right shrink-0">
+      {% if r.lagerplatz %}{{ bintag(r.lagerplatz) }}{% endif %}
+      <div class="text-xs text-muted mt-0.5">{{ r.zeit|datum }}</div>
+    </div>
+  </li>
+{% else %}
+  <li class="px-4 py-6 text-muted">Noch keine Buchungen.</li>
+{% endfor %}
+</ul>

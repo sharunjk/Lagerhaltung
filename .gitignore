@@ -1,18 +1,16 @@
-# Echtdaten und Fremddokumente des Altsystems nicht einchecken
-casper/**/*.CSV
-casper/**/*.csv
-casper/**/*.pdf
-*.sql.gz
-dumps/
-
-# Python / Node
+# Windows-Bibliotheken (nur im Auslieferungs-ZIP) und lokale Laufzeitdaten
+Lagerverwaltung2/lib/
+Lagerverwaltung2/python/
+Lagerverwaltung2/daten/
+Lagerverwaltung2/backups/
+Lagerverwaltung2/logs/
+Lagerverwaltung2/druckausgabe/
+Lagerverwaltung2/config.toml
+Lagerverwaltung2/.secret_key
 __pycache__/
+.pytest_cache/
 *.pyc
-.venv/
-node_modules/
-dist/
-build/
-
-# Lokale Konfiguration mit Passwörtern
-config.toml
-.env
+# Echtdaten nie einchecken
+*.sql
+!Lagerverwaltung2/tests/**/*.sql
+*.zip

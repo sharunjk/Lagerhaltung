@@ -1,0 +1,13 @@
+{% extends "_auth.html" %}
+{% block title %}Anmelden{% endblock %}
+{% block form %}
+<h1 class="mb-1">Anmelden</h1>
+<p class="text-muted mb-6">Lagerverwaltung {{ cfg.server.firmenname }}</p>
+{% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm flash-fehler">{{ fehler }}</div>{% endif %}
+<form method="post" action="/login" class="space-y-4">
+  <input type="hidden" name="weiter" value="{{ weiter }}">
+  <div><label class="label" for="u">Benutzername</label><input id="u" name="username" class="field" value="{{ username or '' }}" autofocus autocomplete="username" required></div>
+  <div><label class="label" for="p">Passwort</label><input id="p" name="passwort" type="password" class="field" autocomplete="current-password"></div>
+  <button class="btn btn-primary btn-lg w-full">Anmelden</button>
+</form>
+{% endblock %}

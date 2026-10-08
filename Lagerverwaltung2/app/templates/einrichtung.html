@@ -1,0 +1,14 @@
+{% extends "_auth.html" %}
+{% block title %}Einrichtung{% endblock %}
+{% block form %}
+<h1 class="mb-1">Ersten Administrator anlegen</h1>
+<p class="text-muted mb-6">Die Datenbank ist verbunden. Legen Sie jetzt das erste Benutzerkonto an. Der Benutzername erscheint bei Ihren Buchungen in der Bewegungshistorie – auch auf dem Handscanner.</p>
+{% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm flash-fehler">{{ fehler }}</div>{% endif %}
+<form method="post" action="/einrichtung" class="space-y-4">
+  <div><label class="label" for="u">Benutzername</label><input id="u" name="username" class="field" value="{{ username or 'Administrator' }}" required maxlength="100"></div>
+  <div><label class="label" for="a">Anzeigename</label><input id="a" name="anzeigename" class="field" value="{{ anzeigename or '' }}" placeholder="z. B. Vor- und Nachname"></div>
+  <div><label class="label" for="p">Passwort (mind. 6 Zeichen)</label><input id="p" name="passwort" type="password" class="field" required minlength="6"></div>
+  <div><label class="label" for="p2">Passwort wiederholen</label><input id="p2" name="passwort2" type="password" class="field" required minlength="6"></div>
+  <button class="btn btn-primary btn-lg w-full">Administrator anlegen</button>
+</form>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "m/base.html" %}
+{% from "_macros.html" import icon, status %}
+{% block title %}{{ TYPEN[typ] }}{% endblock %}
+{% block kopf %}{{ TYPEN[typ] }}{% endblock %}
+{% block content %}
+<div class="flex gap-1.5 overflow-x-auto -mx-4 px-4 pb-3 mb-2">
+  {% for t, lab in TYPEN.items() %}<a href="/m/buchen?typ={{ t }}{% if a %}&artikel={{ a.nummer|urlq }}{% endif %}" class="shrink-0 rounded-full px-4 py-2 text-sm font-semibold border {{ 'bg-ink text-surface border-ink' if t == typ else 'border-line bg-surface' }}">{{ lab }}</a>{% endfor %}
+</div>
+{% if letzte and not a %}
+<form method="post" action="/m/rueckgaengig" class="rounded-lg border border-line bg-surface p-3 mb-3 flex items-center gap-3" onsubmit="return confirm('Letzte Buchung zurücknehmen?')">
+  <span class="flex-1 text-sm"><span class="text-muted">Zuletzt:</span> {{ letzte.text }}</span><button class="btn btn-sm">Rückgängig</button>
+</form>
+{% endif %}
+{% if not a %}
+<form method="get" action="/m/buchen" class="space-y-3">
+  <input type="hidden" name="typ" value="{{ typ }}">
+  <label class="label" for="artikel">1. Artikel scannen</label>
+  <div class="flex gap-2">
+    <input id="artikel" name="artikel" value="{{ artikel }}" autofocus autocomplete="off" inputmode="text" class="field h-16 text-2xl font-semibold flex-1" placeholder="Artikelnummer">
+    <button type="button" onclick="LV.kamera('artikel')" class="btn h-16 w-16" aria-label="Mit Kamera scannen">{{ icon("scan", "w-8 h-8") }}</button>
+  </div>
+  {% if nicht_gefunden %}<div class="rounded-lg border border-crit p-3"><p class="text-crit font-semibold">Artikel „{{ artikel }}“ nicht gefunden.</p>
+    <div class="grid grid-cols-2 gap-2 mt-2"><a class="btn h-12" href="/m/suche?q={{ artikel|urlq }}">Suchen</a>{% if user.rolle != "lesen" %}<a class="btn btn-primary h-12" href="/m/neu?nummer={{ artikel|urlq }}">Neu anlegen</a>{% endif %}</div></div>{% endif %}
+  <button class="btn btn-primary btn-lg w-full h-14">Weiter</button>
+</form>
+{% else %}
+{% set mit_bestand = a.orte|selectattr(1, "gt", 0)|list %}
+{% set vorwahl = platz or ((mit_bestand|first or a.orte|first or ["", 0])[0] if typ != "eingang" or a.orte else "") %}
+<div class="rounded-lg border border-line bg-surface p-4 mb-4 flex gap-3">
+  {% if a.bild %}<img src="/anhang/{{ a.bild.id }}" alt="" class="w-16 h-16 rounded object-cover">{% endif %}
+  <div class="flex-1 min-w-0">
+    <div class="flex items-baseline justify-between gap-2"><span class="font-cond text-2xl font-bold">{{ a.nummer }}</span><span class="font-cond text-2xl font-bold">{{ a.bestand|num }} <span class="text-sm font-sans text-muted">{{ a.einheit }}</span></span></div>
+    <div class="text-base">{{ a.bezeichnung }}</div>
+    <div class="mt-1 flex gap-3 text-sm">{{ status(a.status) }}{% if a.reserviert %}<span class="text-warn">{{ a.reserviert|num }} reserviert</span>{% endif %}</div>
+  </div>
+</div>
+<form method="post" action="/m/buchen" class="space-y-4" data-offline x-data='{ort: {{ vorwahl|tojson }}}'>
+  <input type="hidden" name="artikel" value="{{ a.nummer }}"><input type="hidden" name="typ" value="{{ typ }}">
+  {% if res %}<input type="hidden" name="reservierung_id" value="{{ res.id }}"><div class="rounded-lg border border-primary bg-primary/10 p-3 text-sm">Reservierung: <b>{{ res.menge|num }}</b> für {{ res.fuer }} – wird mit der Entnahme erledigt.</div>{% endif %}
+  <div>
+    <label class="label" for="lagerort">2. {{ "Von Lagerplatz" if typ == "umbuchung" else "Lagerplatz" }}</label>
+    {% if a.orte %}<div class="grid grid-cols-2 gap-2 mb-2">
+      {% for o, n in a.orte[:8] %}<button type="button" @click='ort = {{ o|tojson }}; $refs.menge.focus()' class="rounded-md border-2 px-3 py-2.5 flex items-center justify-between gap-2" :class='ort === {{ o|tojson }} ? "border-primary bg-primary/10" : "border-line bg-surface"'>
+        <span class="bintag">{{ o }}</span><span class="font-semibold tabular-nums">{{ n|num }}</span></button>{% endfor %}
+    </div>{% endif %}
+    <div class="flex gap-2">
+      <input id="lagerort" name="lagerort" x-model="ort" list="orte" autocomplete="off" data-weiter="{{ 'ziel' if typ == 'umbuchung' else 'menge' }}" class="field h-14 text-xl font-semibold flex-1" placeholder="Platz scannen"
+             {% if not vorwahl %}autofocus{% endif %} @keydown.enter.prevent="document.getElementById($el.dataset.weiter).focus()">
+      <button type="button" onclick="LV.kamera('lagerort')" class="btn h-14 w-14" aria-label="Platz mit Kamera scannen">{{ icon("scan", "w-7 h-7") }}</button>
+    </div>
+  </div>
+  {% if typ == "umbuchung" %}
+  <div><label class="label" for="ziel">Nach Lagerplatz</label>
+    <div class="flex gap-2"><input id="ziel" name="ziel" list="orte" autocomplete="off" data-weiter="menge" required class="field h-14 text-xl font-semibold flex-1" placeholder="Zielplatz scannen" @keydown.enter.prevent="$refs.menge.focus()">
+      <button type="button" onclick="LV.kamera('ziel')" class="btn h-14 w-14">{{ icon("scan", "w-7 h-7") }}</button></div></div>
+  {% endif %}
+  {% if typ == "ausleihe" %}
+  <div><label class="label">Ausgeliehen an</label><input name="empfaenger" list="empf" required class="field h-12"></div>
+  <div><label class="label">Rückgabe bis</label><input type="date" name="rueckgabe_bis" class="field h-12"></div>
+  {% endif %}
+  <div>
+    <label class="label" for="menge">{{ "3. Gezählter Bestand am Platz" if typ == "inventur" else "3. Menge" }}</label>
+    <div class="flex items-stretch">
+      <button type="button" class="btn rounded-r-none text-3xl w-16 h-16" onclick="const m=document.getElementById('menge'); m.value=Math.max(0,(parseFloat(m.value.replace(',','.'))||1)-1)">−</button>
+      <input id="menge" x-ref="menge" name="menge" inputmode="decimal" value="{{ '' if typ == 'inventur' else (res.menge|num if res else '1') }}" required class="field rounded-none h-16 text-center text-3xl font-bold flex-1" {% if vorwahl %}autofocus{% endif %} onfocus="this.select()">
+      <button type="button" class="btn rounded-l-none text-3xl w-16 h-16" onclick="const m=document.getElementById('menge'); m.value=(parseFloat(m.value.replace(',','.'))||0)+1">+</button>
+    </div>
+  </div>
+  <button class="btn btn-primary w-full h-16 text-xl" {% if user.rolle == "lesen" %}disabled{% endif %}>{{ {"ausgang": "Entnahme buchen", "eingang": "Eingang buchen", "umbuchung": "Umbuchen", "inventur": "Bestand setzen", "ausleihe": "Ausleihe buchen"}[typ] }}</button>
+  {% if typ in ("ausgang", "eingang") %}
+  <details class="rounded-lg border border-line bg-surface p-3">
+    <summary class="font-semibold text-sm text-muted">Weitere Angaben (optional)</summary>
+    <div class="space-y-3 mt-3">
+      <div><label class="label">{{ "Empfänger" if typ == "ausgang" else "Lieferant / Lieferschein" }}</label><input name="empfaenger" list="empf" class="field h-12"></div>
+      <div><label class="label">Kostenstelle</label><input name="kostenstelle" list="kst" class="field h-12"></div>
+      <div><label class="label">{{ "Verwendung / Auftrag" if typ == "ausgang" else "Bemerkung" }}</label><input name="zweck" class="field h-12"></div>
+    </div>
+  </details>
+  {% endif %}
+  <a href="/m/buchen?typ={{ typ }}" class="btn w-full h-12">Anderer Artikel</a>
+  <datalist id="orte">{% for o in vs.plaetze %}<option value="{{ o }}">{% endfor %}</datalist>
+  <datalist id="empf">{% for o in vs.empfaenger %}<option value="{{ o }}">{% endfor %}</datalist>
+  <datalist id="kst">{% for o in vs.kostenstellen %}<option value="{{ o }}">{% endfor %}</datalist>
+</form>
+{% endif %}
+{% endblock %}

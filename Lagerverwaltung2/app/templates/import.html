@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Excel-Import{% endblock %}
+{% block content %}
+<h1 class="mb-1">Excel-Import</h1>
+<p class="text-muted mb-5 max-w-3xl">Viele Artikel auf einmal anlegen oder ändern. Bestehende Artikelnummern werden aktualisiert, neue angelegt. Bestände ändert der Import nur als Anfangsbestand bei neuen Artikeln. Für die Übernahme aus Casper gibt es unter Einstellungen → Datenübernahme einen eigenen Weg. Vor dem Speichern sehen Sie eine Vorschau.</p>
+{% if not zeilen %}
+<div class="grid lg:grid-cols-2 gap-6 max-w-4xl">
+  <section class="panel p-5"><h2 class="mb-2">1. Vorlage herunterladen</h2><p class="text-sm text-muted mb-3">Spalten: Artikelnummer, Bezeichnung, Typenbezeichnung, Gruppe, Melde-/Mindestbestand, Bestellmenge, Einheit, Lieferant, Hersteller, Preis, Kritisch, Verwendung, Lagerplatz, Anfangsbestand. Nicht benötigte Spalten einfach weglassen. Leere Artikelnummer = nächste freie Nummer. Tipp: Artikelliste als Excel exportieren, Melde-/Mindestbestände ergänzen und hier wieder einlesen.</p><a href="/import/vorlage.xlsx" class="btn">{{ icon("download", "w-4 h-4") }}Vorlage (.xlsx)</a></section>
+  <form method="post" action="/import/pruefen" enctype="multipart/form-data" class="panel p-5"><h2 class="mb-2">2. Datei prüfen</h2>
+    <input type="file" name="datei" accept=".xlsx" required class="text-sm block mb-3 file:btn file:btn-sm file:mr-2"><button class="btn btn-primary">Vorschau anzeigen</button></form>
+</div>
+{% else %}
+<div class="panel overflow-hidden">
+  <div class="px-4 py-3 border-b border-line flex flex-wrap justify-between gap-2 items-center">
+    <span>{{ zeilen|length }} Zeilen, davon {{ zeilen|selectattr("_aktion", "eq", "neu")|list|length }} neu{% if fehlerhaft %}, <span class="text-crit font-semibold">{{ fehlerhaft }} fehlerhaft (werden übersprungen)</span>{% endif %}</span>
+    <div class="flex gap-2"><a href="/import" class="btn">Andere Datei</a>
+      <form method="post" action="/import/ausfuehren" onsubmit="return confirm('Import jetzt ausführen?')"><input type="hidden" name="payload" value="{{ payload }}"><button class="btn btn-primary">Import ausführen</button></form></div>
+  </div>
+  <div class="overflow-x-auto max-h-[70vh]">
+  <table class="tbl">
+    <thead class="sticky top-0 bg-surface"><tr><th>Aktion</th><th>Nr.</th><th>Bezeichnung</th><th>Gruppe</th><th>Melde</th><th>Min.</th><th>Lieferant</th><th>Lagerplatz</th><th>Anfang</th><th>Hinweis</th></tr></thead>
+    <tbody>
+    {% for z in zeilen %}
+      <tr class="{{ 'bg-crit/5' if z._fehler }}">
+        <td>{% if z._fehler %}<span class="text-crit font-semibold">Fehler</span>{% elif z._aktion == "neu" %}<span class="text-ok font-semibold">Neu</span>{% else %}<span class="text-primary font-semibold">Ändern</span>{% endif %}</td>
+        <td class="font-semibold">{{ z.nummer }}{% if z._auto %}<span class="text-xs text-muted"> (auto)</span>{% endif %}</td>
+        <td>{{ z.bezeichnung or "" }}</td><td>{{ z.kategorie or "" }}</td><td>{{ z.meldebestand or "" }}</td><td>{{ z.mindestbestand or "" }}</td><td>{{ z.lieferant or "" }}</td>
+        <td>{% if z.lagerplatz %}<span class="bintag">{{ z.lagerplatz }}</span>{% endif %}</td><td>{{ z.anfangsbestand or "" }}</td>
+        <td class="text-xs {{ 'text-crit' if z._fehler else 'text-muted' }}">{{ z._fehler|join(", ") }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

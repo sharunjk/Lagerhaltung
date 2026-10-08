@@ -1,0 +1,43 @@
+{% extends "m/base.html" %}
+{% from "_macros.html" import icon, bew_menge %}
+{% block kopf %}Lager {{ cfg.server.firmenname }}{% endblock %}
+{% block content %}
+<form action="/scan" method="get" class="flex gap-2 mb-5">
+  <input type="hidden" name="m" value="1">
+  <input id="scan" name="code" autofocus autocomplete="off" class="field h-14 text-lg font-semibold flex-1" placeholder="Artikel oder Platz scannen">
+  <button type="button" onclick="LV.kamera('scan')" class="btn h-14 w-14" aria-label="Mit Kamera scannen">{{ icon("scan", "w-7 h-7") }}</button>
+</form>
+<div class="grid grid-cols-2 gap-3">
+  {% for href, lab, sub, cls in [("/m/buchen?typ=ausgang", "Entnahme", "Teil aus dem Lager nehmen", "bg-primary text-white border-primary"),
+                                 ("/m/buchen?typ=eingang", "Eingang", "Ware einlagern", ""),
+                                 ("/m/korb", "Sammel­entnahme", ("Liste: " ~ korb ~ " Pos.") if korb else "mehrere Teile auf einmal", ""),
+                                 ("/m/buchen?typ=umbuchung", "Umbuchen", "auf anderen Platz", ""),
+                                 ("/m/buchen?typ=inventur", "Zählen", "Bestand am Platz korrigieren", ""),
+                                 ("/m/neu", "Neuer Artikel", "anlegen, einlagern, Etikett", ""),
+                                 ("/m/reservierungen", "Reserviert", reserviert ~ " offen", ""),
+                                 ("/m/wareneingang", "Waren­eingang", bestellt ~ " Bestellungen", ""),
+                                 ("/m/buchen?typ=ausleihe", "Ausleihe", "Werkzeug verleihen", ""),
+                                 ("/m/rueckgabe", "Rückgabe", ausleihen ~ " ausgeliehen", ""),
+                                 ("/m/offline", "Offline erfassen", "ohne WLAN buchen", ""),
+                                 ("/m/suche", "Suchen", "Artikel finden", "")] %}
+  <a href="{{ href }}" class="rounded-lg border border-line p-4 min-h-[6rem] flex flex-col justify-between {{ cls or 'bg-surface' }}">
+    <span class="font-cond text-xl font-bold leading-tight">{{ lab }}</span><span class="text-sm {{ 'text-white/80' if cls else 'text-muted' }}">{{ sub }}</span></a>
+  {% endfor %}
+</div>
+<div id="installieren" class="hidden mt-4 rounded-lg border border-primary bg-primary/10 p-4">
+  <p class="font-semibold mb-2">Als App auf diesem Gerät installieren?</p>
+  <button type="button" class="btn btn-primary w-full h-12" onclick="LV.installieren()">App installieren</button>
+</div>
+{% if inventuren %}
+<h2 class="mt-6 mb-2">Laufende Inventur</h2>
+{% for i in inventuren %}<a href="/m/inventur/{{ i.id }}" class="block rounded-lg border border-line bg-surface p-4 mb-2 font-semibold">{{ i.name }}<span class="block text-sm font-normal text-muted">Platz scannen und zählen</span></a>{% endfor %}
+{% endif %}
+<h2 class="mt-6 mb-2">Meine letzten Buchungen</h2>
+<ul class="rounded-lg border border-line bg-surface divide-y divide-line">
+{% for r in letzte %}
+  <li class="flex items-center gap-3 px-3 py-2.5"><span class="w-12 text-right">{{ bew_menge(r) }}</span>
+    <a href="/m/artikel/{{ r.artikel_nr|urlq }}" class="flex-1 min-w-0"><span class="font-semibold">{{ r.artikel_nr }}</span> <span class="text-sm text-muted">{{ r.typ|typ_text }}</span><span class="block text-xs text-muted truncate">{{ r.bezeichnung or "" }}</span></a>
+    <span class="text-xs text-muted text-right">{{ r.zeit.strftime("%H:%M") if r.zeit and r.zeit.date() == now().date() else (r.zeit|datum(False)) }}</span></li>
+{% else %}<li class="px-3 py-4 text-muted text-sm">Noch keine Buchungen.</li>{% endfor %}
+</ul>
+{% endblock %}

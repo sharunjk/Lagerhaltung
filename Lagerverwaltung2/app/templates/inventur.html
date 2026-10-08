@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, bintag %}
+{% block title %}{{ inv.name }}{% endblock %}
+{% block content %}
+<a href="/inventur" class="text-sm text-muted hover:text-ink">Inventur</a>
+<div class="flex flex-wrap items-center justify-between gap-3 mt-1 mb-5">
+  <div><h1>{{ inv.name }}</h1><p class="text-muted">{{ "Abgeschlossen am " ~ (inv.abgeschlossen_am|datum) if inv.status == "abgeschlossen" else "Gezählte Mengen eintragen und speichern – am PC oder am Handscanner unter Scanner-Ansicht → Inventur." }}</p></div>
+  <div class="flex gap-2">
+    <a href="?nur_offen={{ 0 if nur_offen else 1 }}" class="btn">{{ "Alle Positionen" if nur_offen else "Nur ungezählte" }}</a>
+    <a href="/inventur/{{ inv.id }}/zaehlliste.xlsx" class="btn">{{ icon("download", "w-4 h-4") }}Zählliste</a>
+    <button onclick="window.print()" class="btn">{{ icon("print", "w-4 h-4") }}Drucken</button>
+  </div>
+</div>
+<form method="post" action="/inventur/{{ inv.id }}/zaehlen" class="panel overflow-hidden">
+  <div class="overflow-x-auto">
+  <table class="tbl">
+    <thead><tr><th>Lagerplatz</th><th>Artikel</th><th class="num">Soll</th><th class="num">Aktuell</th><th class="num">Gezählt</th><th class="num">Differenz</th><th>Gezählt von</th></tr></thead>
+    <tbody>
+    {% set ns = namespace(ort=None) %}
+    {% for p in pos %}
+      {% set aktuell = p.aktuell or 0 %}
+      <tr class="{{ 'border-t-2 border-line' if ns.ort is not none and ns.ort != p.code }}">
+        <td>{% if ns.ort != p.code %}{{ bintag(p.code) }}{% endif %}{% set ns.ort = p.code %}</td>
+        <td><span class="font-semibold">{{ p.nummer }}</span> <span class="text-muted">{{ p.bezeichnung }}</span></td>
+        <td class="num text-muted">{{ p.soll|num }}</td>
+        <td class="num {{ 'text-warn font-semibold' if p.soll is not none and aktuell != p.soll }}" title="Bestand jetzt (kann sich seit Anlage geändert haben)">{{ aktuell|num }}</td>
+        <td class="num">{% if inv.status == "offen" and user.rolle != "lesen" %}<input name="ist_{{ p.id }}" value="{{ p.ist|num if p.ist is not none else '' }}" inputmode="decimal" class="field w-20 py-1 text-right inline-block font-semibold">{% else %}{{ p.ist|num }}{% endif %}</td>
+        <td class="num font-semibold">{% if p.ist is not none %}{% set d = p.ist - aktuell %}<span class="{{ 'text-ok' if d > 0 else ('text-crit' if d < 0 else 'text-muted') }}">{{ ('+' if d > 0 else '') ~ (d|num) }}</span>{% endif %}</td>
+        <td class="text-xs text-muted">{{ p.gezaehlt_von or "" }}</td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="py-8 text-center text-muted">Keine Positionen.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if inv.status == "offen" and user.rolle != "lesen" %}
+  <div class="border-t border-line p-4 flex flex-wrap items-end gap-3 bg-soft no-print">
+    <div><label class="label">Zusätzlich gefunden: Artikel</label><input name="neu_artikel" class="field w-32"></div>
+    <div><label class="label">Lagerplatz</label><input name="neu_lagerort" class="field w-32"></div>
+    <div><label class="label">Menge</label><input name="neu_ist" inputmode="decimal" class="field w-20"></div>
+    <button class="btn btn-primary ml-auto">Zählungen speichern</button>
+  </div>
+  {% endif %}
+</form>
+{% if inv.status == "offen" and user.rolle == "admin" %}
+<form method="post" action="/inventur/{{ inv.id }}/abschliessen" class="mt-4 no-print" onsubmit="return confirm('Inventur abschließen? Alle Differenzen zum aktuellen Bestand werden als Inventurbuchung übernommen.')">
+  <button class="btn btn-danger">Inventur abschließen und Differenzen buchen</button>
+</form>
+{% endif %}
+{% endblock %}

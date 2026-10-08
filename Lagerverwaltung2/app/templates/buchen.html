@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, bew_menge %}
+{% block title %}Buchen{% endblock %}
+{% block content %}
+<div class="grid xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+  <div class="min-w-0">
+    <h1 class="mb-4">Buchen</h1>
+    <form id="kopf" class="panel p-5" hx-get="/buchen/panel" hx-target="#panel" hx-trigger="submit, change from:input[name=typ]" onsubmit="return false">
+      <div class="seg mb-5 flex-wrap" role="radiogroup" aria-label="Buchungsart">
+        {% for val, lab in TYPEN.items() %}
+        <label class="!p-0"><input type="radio" name="typ" value="{{ val }}" class="sr-only" {% if typ == val %}checked{% endif %}><span class="block px-5 py-2.5 rounded text-base">{{ lab }}</span></label>
+        {% endfor %}
+      </div>
+      <label class="label" for="artikel">Artikel scannen oder Nummer eingeben</label>
+      <div class="flex gap-2">
+        <div class="relative flex-1">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">{{ icon("scan", "w-6 h-6") }}</span>
+          <input id="artikel" name="artikel" value="{{ artikel }}" class="field h-14 pl-12 text-xl font-semibold" autocomplete="off" {% if not a %}autofocus{% endif %} placeholder="z. B. 20212">
+        </div>
+        <button class="btn btn-lg">Laden</button>
+      </div>
+      <input type="hidden" name="ort" value="{{ ort }}">
+    </form>
+    <div id="panel" class="mt-4">{% include "partials/buchen_panel.html" %}</div>
+  </div>
+  <aside>
+    <section class="panel">
+      <div class="px-4 py-3 border-b border-line"><h2>Ihre letzten Buchungen</h2></div>
+      <ul class="divide-y divide-line text-sm">
+      {% for r in letzte %}
+        <li class="px-4 py-2.5 flex items-center gap-3">
+          <span class="w-12 text-right">{{ bew_menge(r) }}</span>
+          <div class="flex-1 min-w-0"><a href="/artikel/{{ r.artikel_nr|urlq }}" class="font-semibold hover:underline">{{ r.artikel_nr }}</a> <span class="text-muted">{{ r.typ|typ_text }}</span><div class="text-xs text-muted truncate">{{ r.bezeichnung or "" }}</div></div>
+          <span class="text-xs text-muted text-right">{{ r.zeit|datum }}</span>
+        </li>
+      {% else %}<li class="px-4 py-6 text-muted">Noch keine Buchungen unter Ihrem Namen.</li>{% endfor %}
+      </ul>
+    </section>
+    <p class="text-sm text-muted mt-4 px-1">Mit dem Scanner zuerst den Artikel scannen, dann den Lagerplatz-Barcode ins Platzfeld. <span class="kbd">Enter</span> bucht. Am Handy oder Handscanner geht es schneller über die <a href="/m" class="text-primary font-semibold">Scanner-Ansicht</a>.</p>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener("htmx:afterSwap", e => { if (e.target.id === "panel") { const m = e.target.querySelector("[data-fokus]"); if (m) { m.focus(); m.select && m.select(); } } });
+document.addEventListener("DOMContentLoaded", () => { const m = document.querySelector("#panel [data-fokus]"); if (m) m.focus(); });
+</script>
+{% endblock %}

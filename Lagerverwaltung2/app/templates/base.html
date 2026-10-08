@@ -1,0 +1,106 @@
+{% from "_macros.html" import icon %}
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Lager{% endblock %} – {{ cfg.server.firmenname }} Lagerverwaltung</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23FFC72C'/><path d='M8 10v12M12 10v12M15 10v12M19 10v12M23 10v12' stroke='%2318222E' stroke-width='2'/></svg>">
+  <link rel="stylesheet" href="/static/app.css?v={{ request.app.state.version }}">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#1C2A38">
+  <script>try{const t=localStorage.getItem("lv-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/vendor/alpine.min.js" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen" hx-boost="false">
+{% if user %}
+<div class="flex min-h-screen">
+  <aside class="no-print hidden lg:flex w-60 shrink-0 flex-col bg-nav text-navink sticky top-0 h-screen">
+    <a href="/" class="flex items-center gap-3 px-5 h-16 border-b border-white/10">
+      <span class="grid place-items-center w-9 h-9 rounded bg-tag text-tagink">{{ icon("scan", "w-6 h-6") }}</span>
+      <span class="leading-tight"><span class="block font-cond font-bold text-white text-lg">Lagerverwaltung</span><span class="block text-xs">{{ cfg.server.firmenname }}</span></span>
+    </a>
+    <nav class="flex-1 overflow-y-auto p-3 space-y-0.5">
+      {% set nav = [("/", "home", "Übersicht"), ("/buchen", "scan", "Buchen"), ("/artikel", "box", "Artikel"), ("/bewegungen", "history", "Bewegungen"),
+                    ("/lagerplaetze", "shelf", "Lagerplätze"), ("/nachbestellung", "cart", "Nachbestellung"), ("/bestellungen", "cart", "Bestellungen"),
+                    ("/reservierungen", "list", "Reservierungen"), ("/ausleihen", "history", "Ausleihen"),
+                    ("/inventur", "clipboard", "Inventur"), ("/auswertungen", "chart", "Auswertungen"), ("/lieferanten", "truck", "Lieferanten")] %}
+      {% for href, ic, label in nav %}
+      <a href="{{ href }}" class="navlink {% if (href == '/' and pfad == '/') or (href != '/' and pfad.startswith(href)) %}aktiv{% endif %}">{{ icon(ic) }}{{ label }}</a>
+      {% endfor %}
+      {% if user.rolle == "admin" %}
+      <div class="pt-4 mt-4 border-t border-white/10 space-y-0.5">
+        <a href="/import" class="navlink {% if pfad.startswith('/import') %}aktiv{% endif %}">{{ icon("upload") }}Excel-Import</a>
+        <a href="/protokoll" class="navlink {% if pfad.startswith('/protokoll') %}aktiv{% endif %}">{{ icon("log") }}Protokoll</a>
+        <a href="/einstellungen" class="navlink {% if pfad.startswith('/einstellungen') %}aktiv{% endif %}">{{ icon("settings") }}Einstellungen</a>
+      </div>
+      {% endif %}
+    </nav>
+    <div class="p-3 border-t border-white/10 text-sm">
+      <div class="px-3 pb-2"><span class="text-white font-semibold">{{ user.name }}</span><span class="block text-xs">{{ ROLLEN_NAMEN[user.rolle] }}</span></div>
+      <div class="flex gap-1">
+        <a href="/passwort" class="navlink flex-1 text-xs">Passwort</a>
+        <button type="button" class="navlink" title="Hell/Dunkel umschalten" onclick="lvTheme()">{{ icon("moon") }}</button>
+        <a href="/logout" class="navlink" title="Abmelden">{{ icon("logout") }}</a>
+      </div>
+    </div>
+  </aside>
+
+  <div class="flex-1 min-w-0 flex flex-col">
+    <header class="no-print sticky top-0 z-20 bg-bg/95 backdrop-blur border-b border-line">
+      <div class="flex items-center gap-3 px-4 lg:px-8 h-16">
+        <details class="lg:hidden relative">
+          <summary class="btn list-none">Menü</summary>
+          <div class="absolute left-0 mt-2 w-60 rounded-lg bg-nav p-2 shadow-xl z-30">
+            {% for href, ic, label in nav %}<a href="{{ href }}" class="navlink">{{ icon(ic) }}{{ label }}</a>{% endfor %}
+            {% if user.rolle == "admin" %}<a href="/einstellungen" class="navlink">{{ icon("settings") }}Einstellungen</a>{% endif %}
+            <a href="/logout" class="navlink">{{ icon("logout") }}Abmelden</a>
+          </div>
+        </details>
+        <form action="/scan" method="get" class="relative flex-1 max-w-2xl" x-data="{offen:false}" @click.outside="offen=false">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">{{ icon("scan", "w-5 h-5") }}</span>
+          <input id="scanfeld" name="code" autocomplete="off" class="field pl-10 pr-16 h-11 text-base"
+                 placeholder="Artikel oder Lagerplatz scannen bzw. suchen"
+                 hx-get="/suche" hx-trigger="input changed delay:250ms" hx-target="#suchergebnis" hx-swap="innerHTML" hx-vals='js:{q: document.getElementById("scanfeld").value}'
+                 @focus="offen=true" @input="offen=true" @keydown.escape="offen=false; $el.blur()">
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 kbd hidden sm:inline-block">F2</span>
+          <div id="suchergebnis" x-show="offen" class="absolute left-0 right-0 mt-1 z-30"></div>
+        </form>
+        <a href="/m" class="btn hidden md:inline-flex" title="Ansicht für Handscanner und Smartphone">Scanner-Ansicht</a>
+        <a href="/buchen" class="btn btn-primary hidden sm:inline-flex">{{ icon("scan", "w-4 h-4") }}Buchen</a>
+      </div>
+    </header>
+
+    <main class="flex-1 px-4 lg:px-8 py-6 max-w-[1500px] w-full">
+      {% for f in flashes %}
+      <div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-{{ f.art }}" role="status">{{ f.text }}</div>
+      {% endfor %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% else %}
+  {% block nologin %}{% endblock %}
+{% endif %}
+<script>
+function lvTheme(){const d=document.documentElement.classList.toggle("dark");try{localStorage.setItem("lv-theme",d?"dark":"light")}catch(e){}}
+// Scanner-Erkennung: Barcode-Scanner tippen sehr schnell und schließen mit Enter ab.
+(function(){
+  let buf="", last=0;
+  document.addEventListener("keydown", function(e){
+    if (e.key === "F2") { e.preventDefault(); const f=document.getElementById("scanfeld"); if(f){f.focus(); f.select();} return; }
+    const t=e.target, inField = t && (t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.tagName==="SELECT"||t.isContentEditable);
+    if (inField) return;
+    const now=Date.now();
+    if (now-last>60) buf="";
+    last=now;
+    if (e.key==="Enter" && buf.length>=3) { e.preventDefault(); window.location="/scan?code="+encodeURIComponent(buf); buf=""; return; }
+    if (e.key.length===1) buf+=e.key;
+  });
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

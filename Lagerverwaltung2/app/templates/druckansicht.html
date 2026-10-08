@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>Etiketten drucken</title>
+<style>
+  @page { size: {{ breite }}mm {{ hoehe }}mm; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  .etikett-seite { width: {{ breite }}mm; height: {{ hoehe }}mm; page-break-after: always; overflow: hidden; }
+  .etikett-seite svg { width: {{ breite }}mm; height: {{ hoehe }}mm; display: block; }
+  .hinweis { font: 14px Arial, sans-serif; padding: 12px; background: #fff7d6; border-bottom: 1px solid #e5d48a; }
+  @media print { .hinweis { display: none; } }
+</style></head>
+<body>
+<div class="hinweis">{{ svgs|length }} Etikett(en). Im Druckdialog den Etikettendrucker wählen, Papierformat {{ breite }} × {{ hoehe }} mm, Ränder „Keine“, Skalierung 100 %. <button onclick="window.print()">Drucken</button></div>
+{% for s in svgs %}<div class="etikett-seite">{{ s|safe }}</div>{% endfor %}
+<script>setTimeout(() => window.print(), 400);</script>
+</body></html>

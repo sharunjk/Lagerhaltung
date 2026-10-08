@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Protokoll{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div><h1>Protokoll</h1><p class="text-muted">Alle Änderungen über diese Oberfläche, mit Benutzer und Zeitpunkt.</p></div>
+  <form class="flex gap-2"><input name="q" value="{{ q }}" class="field w-64" placeholder="Benutzer, Aktion, Artikel"><button class="btn">Suchen</button></form>
+</div>
+<div class="panel overflow-hidden">
+  <table class="tbl">
+    <thead><tr><th>Zeit</th><th>Benutzer</th><th>Aktion</th><th>Objekt</th><th>Details</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr><td class="whitespace-nowrap text-sm">{{ r.zeit|datum }}</td><td>{{ r.benutzer }}</td><td class="font-medium">{{ r.aktion }}</td><td>{{ r.objekt or "" }}</td>
+        <td class="text-xs text-muted max-w-[32rem] break-words">{{ r.details or "" }}</td></tr>
+    {% else %}<tr><td colspan="5" class="py-8 text-center text-muted">Keine Einträge.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {% if seiten > 1 %}<div class="flex justify-center gap-2 p-3 border-t border-line text-sm">{% if seite > 1 %}<a class="btn btn-sm" href="?q={{ q|urlq }}&seite={{ seite - 1 }}">Neuere</a>{% endif %}<span class="text-muted self-center">Seite {{ seite }} / {{ seiten }}</span>{% if seite < seiten %}<a class="btn btn-sm" href="?q={{ q|urlq }}&seite={{ seite + 1 }}">Ältere</a>{% endif %}</div>{% endif %}
+</div>
+{% endblock %}

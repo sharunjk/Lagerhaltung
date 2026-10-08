@@ -1,0 +1,25 @@
+{% extends "m/base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}{{ inv.name }}{% endblock %}
+{% block kopf %}{{ inv.name }}{% endblock %}
+{% block content %}
+{% if inv.status != "offen" %}<p class="text-muted">Diese Inventur ist abgeschlossen.</p>
+{% elif not platz %}
+<p class="text-sm text-muted mb-3">Noch {{ offen }} Positionen ungezählt. Lagerplatz scannen, dann die Mengen eintragen.</p>
+<form method="get" class="flex gap-2"><input id="platz" name="platz" autofocus class="field h-16 text-2xl font-semibold flex-1" placeholder="Lagerplatz scannen"><button type="button" onclick="LV.kamera('platz')" class="btn h-16 w-16">{{ icon("scan", "w-8 h-8") }}</button></form>
+{% else %}
+<form method="post" class="space-y-3">
+  <input type="hidden" name="platz" value="{{ platz }}">
+  <div class="flex items-center justify-between"><span class="bintag text-xl leading-10 px-3">{{ platz }}</span><a href="/m/inventur/{{ inv.id }}" class="text-sm text-primary font-semibold">anderer Platz</a></div>
+  {% for p in pos %}
+  <div class="rounded-lg border border-line bg-surface p-3 flex items-center gap-3">
+    <div class="flex-1 min-w-0"><div class="font-semibold">{{ p.nummer }}</div><div class="text-sm text-muted truncate">{{ p.bezeichnung }}</div><div class="text-xs text-muted">Soll {{ p.soll|num }}{% if p.ist is not none %}, gezählt {{ p.ist|num }}{% endif %}</div></div>
+    <input name="ist_{{ p.id }}" value="{{ p.ist|num if p.ist is not none else '' }}" inputmode="decimal" class="field h-14 w-24 text-center text-2xl font-bold" {% if loop.first %}autofocus{% endif %}>
+  </div>
+  {% else %}<p class="text-muted">Für diesen Platz sind keine Positionen in der Zählliste.</p>{% endfor %}
+  <details class="rounded-lg border border-line bg-surface p-3"><summary class="font-semibold text-sm">Weiteren Artikel auf diesem Platz gefunden</summary>
+    <div class="flex gap-2 mt-3"><input id="neu" name="neu_artikel" data-weiter="neu_ist" class="field h-12 flex-1" placeholder="Artikel scannen"><button type="button" onclick="LV.kamera('neu')" class="btn h-12 w-12">{{ icon("scan", "w-6 h-6") }}</button><input id="neu_ist" name="neu_ist" inputmode="decimal" class="field h-12 w-20" placeholder="Menge"></div></details>
+  <button class="btn btn-primary w-full h-16 text-xl">Zählung speichern</button>
+</form>
+{% endif %}
+{% endblock %}

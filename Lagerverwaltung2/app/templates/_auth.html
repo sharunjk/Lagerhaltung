@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block nologin %}
+<div class="min-h-screen grid lg:grid-cols-[1fr_minmax(420px,520px)]">
+  <div class="hidden lg:flex flex-col justify-between bg-nav text-navink p-12">
+    <div class="flex items-center gap-3">
+      <span class="bintag text-lg px-2">C2-R7-1</span><span class="font-cond text-white text-xl font-semibold">{{ cfg.server.firmenname }}</span>
+    </div>
+    <div>
+      <p class="font-cond text-white text-5xl font-semibold leading-[1.05] max-w-lg">Ersatzteile finden, buchen, nachbestellen.</p>
+      <p class="mt-5 max-w-md text-navink">Bestände je Lagerplatz, Scannerbuchung und Nachbestellung an einem Ort. Buchungen vom Handscanner erscheinen hier automatisch.</p>
+    </div>
+    <svg viewBox="0 0 400 60" class="w-80 opacity-40" aria-hidden="true">{% for i in range(0, 60) %}<rect x="{{ i * 6.6 }}" y="0" width="{{ [1.2, 2.6, 1.2, 3.8, 1.2, 2][i % 6] }}" height="60" fill="currentColor"/>{% endfor %}</svg>
+  </div>
+  <div class="flex items-center justify-center p-6">
+    <div class="w-full max-w-sm">
+      {% for f in flashes %}<div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-{{ f.art }}">{{ f.text }}</div>{% endfor %}
+      {% block form %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% endblock %}

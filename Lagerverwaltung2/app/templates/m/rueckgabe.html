@@ -1,0 +1,12 @@
+{% extends "m/base.html" %}
+{% block title %}Rückgabe{% endblock %}
+{% block kopf %}Rückgabe{% endblock %}
+{% block content %}
+{% for x in rows %}
+<form method="post" action="/m/rueckgabe/{{ x.id }}" class="rounded-lg border {{ 'border-crit' if x.ueberfaellig else 'border-line' }} bg-surface p-4 mb-3 space-y-2">
+  <div class="flex justify-between gap-2"><span class="font-semibold">{{ x.artikel_nr }} <span class="font-normal">{{ x.bezeichnung }}</span></span><span class="font-cond text-xl font-bold">{{ x.offen|num }}</span></div>
+  <div class="text-sm text-muted">an {{ x.empfaenger }}, seit {{ x.zeit|datum(False) }}{% if x.rueckgabe_bis %}, zurück bis {{ x.rueckgabe_bis|datum }}{% endif %}</div>
+  {% if user.rolle != "lesen" %}<div class="flex gap-2"><input name="menge" value="{{ x.offen|num }}" inputmode="decimal" class="field h-12 w-20 text-center"><input name="platz" value="{{ x.lagerplatz or '' }}" class="field h-12 flex-1" placeholder="Platz"><button class="btn btn-primary h-12">Zurück</button></div>{% endif %}
+</form>
+{% else %}<p class="text-muted">Nichts ausgeliehen.</p>{% endfor %}
+{% endblock %}

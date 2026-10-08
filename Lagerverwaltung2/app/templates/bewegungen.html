@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, bintag, bew_menge %}
+{% block title %}Bewegungen{% endblock %}
+{% block content %}
+{% set qs = "q=" ~ (q|urlq) ~ "&typ=" ~ typ ~ "&benutzer=" ~ (benutzer|urlq) ~ "&platz=" ~ (platz|urlq) ~ "&von=" ~ von ~ "&bis=" ~ bis %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <h1>Bewegungen</h1>
+  <div class="flex gap-2"><a class="btn" href="/bewegungen/export.xlsx?{{ qs }}">{{ icon("download", "w-4 h-4") }}Excel</a><a class="btn" href="/bewegungen/export.csv?{{ qs }}">CSV</a></div>
+</div>
+<form class="panel p-4 grid sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-4 items-end">
+  <div class="lg:col-span-2"><label class="label">Suche</label><input name="q" value="{{ q }}" class="field" placeholder="Artikel, Empfänger, Kostenstelle, Text"></div>
+  <div><label class="label">Art</label><select name="typ" class="field"><option value="">Alle</option>{% for k, v in TYP_TEXT.items() %}<option value="{{ k }}" {% if typ == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></div>
+  <div><label class="label">Benutzer</label><select name="benutzer" class="field"><option value="">Alle</option>{% for n in nutzer %}<option {% if benutzer == n %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+  <div><label class="label">Von</label><input type="date" name="von" value="{{ von }}" class="field"></div>
+  <div><label class="label">Bis</label><input type="date" name="bis" value="{{ bis }}" class="field"></div>
+  <input type="hidden" name="platz" value="{{ platz }}">
+  <div class="lg:col-span-6 flex gap-2"><button class="btn btn-primary">Filtern</button><a href="/bewegungen" class="btn">Zurücksetzen</a>{% if platz %}<span class="bintag self-center">{{ platz }}</span>{% endif %}</div>
+</form>
+<div class="panel overflow-hidden">
+  <div class="px-4 py-2.5 border-b border-line text-sm text-muted">{{ total }} Buchungen{% if seiten > 1 %}, Seite {{ seite }} von {{ seiten }}{% endif %}</div>
+  <div class="overflow-x-auto">
+  <table class="tbl">
+    <thead><tr><th>Nr.</th><th>Zeit</th><th>Artikel</th><th>Art</th><th>Lagerplatz</th><th class="num">Menge</th><th class="num">danach</th><th>Benutzer</th><th>Info</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr class="{{ 'opacity-50' if r.storniert_durch }}">
+        <td class="text-muted text-xs">{{ r.id }}</td>
+        <td class="whitespace-nowrap">{{ r.zeit|datum }}</td>
+        <td><a href="/artikel/{{ r.artikel_nr|urlq }}" class="font-semibold hover:underline">{{ r.artikel_nr }}</a><div class="text-xs text-muted truncate max-w-[16rem]">{{ r.bezeichnung or "(gelöscht)" }}</div></td>
+        <td>{{ r.typ|typ_text }}</td>
+        <td>{% if r.lagerplatz %}{{ bintag(r.lagerplatz) }}{% endif %}</td>
+        <td class="num">{{ bew_menge(r) }}</td>
+        <td class="num text-muted">{{ r.bestand_nachher|num if r.bestand_nachher is not none else "" }}</td>
+        <td>{{ r.benutzer }}{% if r.quelle in ("mobil", "offline") %}<div class="text-xs text-primary">Handscanner{{ " (offline)" if r.quelle == "offline" }}</div>{% elif r.quelle == "import" %}<div class="text-xs text-muted">Altsystem</div>{% elif r.quelle == "api" %}<div class="text-xs text-primary">Schnittstelle</div>{% endif %}</td>
+        <td class="text-xs text-muted max-w-[16rem]">{{ [r.empfaenger, r.kostenstelle, r.zweck, r.text]|select|join(", ") }}{% if r.storniert_durch %} (storniert durch #{{ r.storniert_durch }}){% endif %}</td>
+        <td class="text-right">{% if user.rolle != "lesen" and not r.storniert_durch and not r.storno_von and r.typ in ("eingang", "ausgang") and r.lagerplatz and r.quelle != "import" %}
+          <form method="post" action="/bewegungen/{{ r.id }}/storno" onsubmit="return confirm('Buchung #{{ r.id }} durch Gegenbuchung stornieren?')"><button class="btn btn-sm">Storno</button></form>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="10" class="py-10 text-center text-muted">Keine Buchungen für diese Filter.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if seiten > 1 %}
+  <div class="flex justify-center items-center gap-2 p-3 border-t border-line text-sm">
+    {% if seite > 1 %}<a class="btn btn-sm" href="?{{ qs }}&seite={{ seite - 1 }}">Neuere</a>{% endif %}<span class="text-muted">Seite {{ seite }} / {{ seiten }}</span>{% if seite < seiten %}<a class="btn btn-sm" href="?{{ qs }}&seite={{ seite + 1 }}">Ältere</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

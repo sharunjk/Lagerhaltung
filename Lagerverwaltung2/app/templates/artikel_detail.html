@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, bintag, status, bew_menge %}
+{% block title %}{{ a.nummer }} {{ a.bezeichnung }}{% endblock %}
+{% block head %}<script src="/static/vendor/chart.umd.js" defer></script>{% endblock %}
+{% block content %}
+{% set ln = user.rolle != "lesen" %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-6">
+  <div class="flex gap-4 min-w-0">
+    {% if a.bild %}<a href="/anhang/{{ a.bild.id }}" target="_blank" class="shrink-0"><img src="/anhang/{{ a.bild.id }}" alt="" class="w-20 h-20 object-cover rounded-lg border border-line"></a>{% endif %}
+    <div class="min-w-0">
+      <a href="/artikel" class="text-sm text-muted hover:text-ink">Artikel</a>
+      <h1 class="mt-1 flex flex-wrap items-baseline gap-x-3"><span>{{ a.nummer }}</span><span class="font-sans font-medium text-xl text-muted">{{ a.bezeichnung }}</span></h1>
+      <div class="mt-2 flex flex-wrap items-center gap-3">{{ status(a.status) }}
+        {% if a.kritisch %}<span class="status st-kritisch">Kritisches Ersatzteil</span>{% endif %}
+        {% if not a.aktiv %}<span class="status text-muted">Archiviert</span>{% endif %}
+        {% if a.kategorie %}<a class="text-sm text-muted hover:underline" href="/artikel?kategorie={{ a.kategorie|urlq }}">{{ a.kategorie }}</a>{% endif %}
+        {% if a.typ %}<span class="text-sm text-muted">{{ a.typ }}</span>{% endif %}</div>
+    </div>
+  </div>
+  {% if ln and a.aktiv %}
+  <div class="flex flex-wrap gap-2 no-print">
+    <a href="/buchen?artikel={{ a.nummer|urlq }}&typ=ausgang" class="btn btn-primary">Entnehmen</a>
+    <a href="/buchen?artikel={{ a.nummer|urlq }}&typ=eingang" class="btn">Einbuchen</a>
+    <a href="/buchen?artikel={{ a.nummer|urlq }}&typ=umbuchung" class="btn">Umbuchen</a>
+    <a href="/buchen?artikel={{ a.nummer|urlq }}&typ=ausleihe" class="btn">Ausleihen</a>
+    <a href="/artikel/{{ a.nummer|urlq }}/bearbeiten" class="btn">{{ icon("edit", "w-4 h-4") }}Bearbeiten</a>
+    <a href="/artikel/neu?kopie={{ a.nummer|urlq }}" class="btn" title="Als Vorlage für einen neuen Artikel">{{ icon("copy", "w-4 h-4") }}Kopieren</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="grid xl:grid-cols-[1fr_380px] gap-6">
+  <div class="space-y-6 min-w-0">
+    <section class="panel">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-line">
+        <h2>Bestand nach Lagerplatz</h2>
+        <span class="font-cond text-3xl font-bold">{{ a.bestand|num }}<span class="text-base font-sans font-medium text-muted ml-1">{{ a.einheit }}</span></span>
+      </div>
+      {% if a.orte %}
+      <ul class="divide-y divide-line">
+        {% for o, n in a.orte %}
+        <li class="flex items-center gap-4 px-4 py-3">
+          <span class="w-40">{{ bintag(o) }}</span>
+          <span class="font-cond text-2xl font-semibold tabular-nums w-20 {{ 'text-muted' if n == 0 }}">{{ n|num }}</span>
+          {% if ln and a.aktiv %}<span class="ml-auto flex gap-1.5 no-print">
+            <a class="btn btn-sm" href="/buchen?artikel={{ a.nummer|urlq }}&typ=ausgang&ort={{ o|urlq }}">Entnehmen</a>
+            <a class="btn btn-sm" href="/buchen?artikel={{ a.nummer|urlq }}&typ=inventur&ort={{ o|urlq }}">Zählen</a></span>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="px-4 py-6 text-muted">Noch kein Lagerplatz. Mit „Einbuchen“ legen Sie Bestand auf einen Platz.</p>{% endif %}
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-px bg-line border-t border-line text-sm">
+        {% for lab, val in [("Verfügbar", a.verfuegbar|num), ("Reserviert", a.reserviert|num), ("Meldebestand", a.meldebestand|num), ("Mindestbestand", a.mindestbestand|num),
+                            ("Lagerwert", (a.bestand * a.preis)|eur if a.preis else "–")] %}
+        <div class="bg-surface px-4 py-2.5"><div class="text-muted">{{ lab }}</div><div class="font-semibold">{{ val }}</div></div>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% if a.bestellungen %}
+    <section class="panel px-4 py-3 border-l-4 border-l-primary">
+      <h2 class="mb-1">Offene Bestellung</h2>
+      {% for b in a.bestellungen %}<p class="text-sm">{{ b.menge|num }} {{ a.einheit }}, Status {{ b.status }}{% if b.bestellnummer %}, Bestellnr. {{ b.bestellnummer }}{% endif %}, angelegt {{ b.erstellt_am|datum }}. <a class="text-primary font-semibold" href="/bestellungen">Zu den Bestellungen</a></p>{% endfor %}
+    </section>
+    {% endif %}
+
+    {% if a.reservierungen or a.ausleihen or ln %}
+    <section class="panel">
+      <div class="px-4 py-3 border-b border-line"><h2>Reservierungen und Ausleihen</h2></div>
+      <ul class="divide-y divide-line text-sm">
+        {% for r in a.reservierungen %}<li class="px-4 py-2.5 flex flex-wrap gap-x-4"><span class="font-semibold">{{ r.menge|num }} reserviert</span><span>für {{ r.fuer }}</span>{% if r.person %}<span class="text-muted">{{ r.person }}</span>{% endif %}{% if r.bis %}<span class="text-muted">bis {{ r.bis|datum }}</span>{% endif %}
+          {% if ln %}<a class="ml-auto text-primary font-semibold" href="/buchen?artikel={{ a.nummer|urlq }}&typ=ausgang&reservierung={{ r.id }}">Entnehmen</a>{% endif %}</li>{% endfor %}
+        {% for x in a.ausleihen %}<li class="px-4 py-2.5 flex flex-wrap gap-x-4 {{ 'text-crit' if x.ueberfaellig }}"><span class="font-semibold">{{ x.offen|num }} ausgeliehen</span><span>an {{ x.empfaenger }}</span><span class="text-muted">seit {{ x.zeit|datum(False) }}</span>{% if x.rueckgabe_bis %}<span>zurück bis {{ x.rueckgabe_bis|datum }}</span>{% endif %}</li>{% endfor %}
+      </ul>
+      {% if ln and a.aktiv %}
+      <form method="post" action="/reservierungen/neu" class="flex flex-wrap items-end gap-2 px-4 py-3 border-t border-line bg-soft">
+        <input type="hidden" name="artikel_nr" value="{{ a.nummer }}">
+        <div class="w-20"><label class="label">Menge</label><input name="menge" value="1" inputmode="decimal" class="field py-1.5"></div>
+        <div class="flex-1 min-w-[10rem]"><label class="label">Reservieren für</label><input name="fuer" required class="field py-1.5" placeholder="Auftrag, Anlage, Wartung …"></div>
+        <div class="w-36"><label class="label">Bis</label><input type="date" name="bis" class="field py-1.5"></div>
+        <button class="btn">Reservieren</button>
+      </form>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <div class="px-4 py-3 border-b border-line"><h2>Artikeldaten</h2></div>
+      <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 p-4 text-sm">
+        {% for lab, val in [("Typenbezeichnung", a.typ), ("Gruppe", a.kategorie), ("Hersteller", (a.hersteller or "") ~ (" (" ~ a.hersteller_nr ~ ")" if a.hersteller_nr else "")),
+                            ("Lieferant", (a.lieferant or "") ~ ("  Art.-Nr. " ~ a.lieferant_artnr if a.lieferant_artnr else "")), ("Preis", (a.preis|eur ~ " je " ~ a.einheit) if a.preis else None),
+                            ("Bestellmenge", a.bestellmenge|num if a.bestellmenge else None)] %}
+        <div><dt class="text-muted">{{ lab }}</dt><dd class="font-medium">{{ val or "–" }}</dd></div>
+        {% endfor %}
+        {% if a.verwendung %}<div class="sm:col-span-2"><dt class="text-muted">Verwendung / Anlage</dt><dd class="font-medium whitespace-pre-line">{{ a.verwendung }}</dd></div>{% endif %}
+        {% if a.notiz %}<div class="sm:col-span-2"><dt class="text-muted">Notiz</dt><dd class="whitespace-pre-line">{{ a.notiz }}</dd></div>{% endif %}
+      </dl>
+    </section>
+
+    <section class="panel">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-line"><h2>Bewegungen</h2><a href="/bewegungen?q={{ a.nummer|urlq }}" class="text-sm font-semibold text-primary">{{ hist_total }} insgesamt</a></div>
+      <div class="overflow-x-auto">
+      <table class="tbl">
+        <thead><tr><th>Zeit</th><th>Art</th><th>Lagerplatz</th><th class="num">Menge</th><th class="num">danach</th><th>Benutzer</th><th>Info</th><th></th></tr></thead>
+        <tbody>
+        {% for r in hist %}
+          <tr class="{{ 'opacity-50' if r.storniert_durch }}">
+            <td class="whitespace-nowrap">{{ r.zeit|datum }}</td>
+            <td>{{ r.typ|typ_text }}</td>
+            <td>{% if r.lagerplatz %}{{ bintag(r.lagerplatz) }}{% endif %}</td>
+            <td class="num">{{ bew_menge(r) }}</td>
+            <td class="num text-muted">{{ r.bestand_nachher|num if r.bestand_nachher is not none else "" }}</td>
+            <td>{{ r.benutzer }}</td>
+            <td class="text-xs text-muted max-w-[16rem]">{{ [r.empfaenger, r.kostenstelle, r.zweck, r.text]|select|join(", ") }}{% if r.storniert_durch %} (storniert){% endif %}</td>
+            <td class="text-right">{% if ln and not r.storniert_durch and not r.storno_von and r.typ in ("eingang", "ausgang") and r.lagerplatz and r.quelle != "import" %}
+              <form method="post" action="/bewegungen/{{ r.id }}/storno" onsubmit="return confirm('Buchung #{{ r.id }} durch Gegenbuchung stornieren?')"><button class="btn btn-sm">Storno</button></form>{% endif %}</td>
+          </tr>
+        {% else %}<tr><td colspan="8" class="text-muted py-6">Keine Bewegungen.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </section>
+  </div>
+
+  <aside class="space-y-6">
+    <section class="panel p-4">
+      <h2 class="mb-3">Etikett</h2>
+      <div class="flex justify-center bg-soft rounded p-4"><div class="shadow-sm border border-line bg-white">{{ etikett_svg|safe }}</div></div>
+      {% if ln %}
+      <form method="post" action="/artikel/{{ a.nummer|urlq }}/etikett" class="flex items-end gap-2 mt-3 no-print">
+        <div class="w-20"><label class="label">Anzahl</label><input type="number" name="anzahl" min="1" max="99" value="1" class="field"></div>
+        <div class="flex-1"><label class="label">Format</label><select name="format" class="field"><option value="">Standard ({{ cfg.drucker.standard_format }})</option><option value="45x23">45 × 23 mm</option><option value="60x20">60 × 20 mm</option></select></div>
+        <button class="btn btn-primary {{ 'ring-4 ring-tag' if zeige_etikett }}">{{ icon("print", "w-4 h-4") }}Drucken</button>
+      </form>
+      <a href="/etiketten/druckansicht?nr={{ a.nummer|urlq }}" class="text-xs text-primary mt-2 inline-block">Über den Browser drucken</a>
+      {% endif %}
+    </section>
+    <section class="panel p-4">
+      <h2 class="mb-3">Bestandsverlauf</h2>
+      {% if verlauf|length > 2 %}<div class="h-44"><canvas id="verlauf"></canvas></div>{% else %}<p class="text-sm text-muted">Noch zu wenige Buchungen für einen Verlauf.</p>{% endif %}
+    </section>
+    <section class="panel p-4" id="anhaenge">
+      <h2 class="mb-3">Fotos und Dokumente</h2>
+      {% set bilder = a.anhaenge|selectattr("ist_bild")|list %}
+      {% if bilder %}<div class="grid grid-cols-3 gap-2 mb-3">{% for b in bilder %}<a href="/anhang/{{ b.id }}" target="_blank"><img src="/anhang/{{ b.id }}" alt="{{ b.dateiname }}" class="aspect-square object-cover rounded border border-line w-full"></a>{% endfor %}</div>{% endif %}
+      <ul class="text-sm divide-y divide-line">{% for d in a.anhaenge if not d.ist_bild %}<li class="flex items-center gap-2 py-1.5"><a class="flex-1 truncate text-primary hover:underline" href="/anhang/{{ d.id }}" target="_blank">{{ d.dateiname }}</a><span class="text-xs text-muted">{{ (d.groesse / 1024)|round|int }} KB</span></li>{% endfor %}</ul>
+      {% if a.anhaenge and ln %}
+      <details class="text-sm mt-2"><summary class="cursor-pointer text-muted">Anhänge verwalten</summary>
+        <ul class="mt-2 space-y-1">{% for d in a.anhaenge %}<li class="flex items-center gap-2"><span class="flex-1 truncate">{{ d.dateiname }}</span><form method="post" action="/anhang/{{ d.id }}/loeschen" onsubmit="return confirm('Anhang löschen?')"><button class="btn btn-sm btn-danger">Löschen</button></form></li>{% endfor %}</ul>
+      </details>{% endif %}
+      {% if ln %}
+      <form method="post" action="/artikel/{{ a.nummer|urlq }}/anhang" enctype="multipart/form-data" class="mt-3 flex gap-2">
+        <input type="file" name="datei" required class="text-sm flex-1 min-w-0 file:btn file:btn-sm file:mr-2"><button class="btn btn-sm">{{ icon("upload", "w-4 h-4") }}Hochladen</button>
+      </form>{% endif %}
+    </section>
+    {% if user.rolle == "admin" %}
+    <form method="post" action="/artikel/{{ a.nummer|urlq }}/archivieren" class="no-print">
+      <input type="hidden" name="zurueck" value="{{ 0 if a.aktiv else 1 }}">
+      <button class="btn {{ 'btn-danger' if a.aktiv }} w-full" {% if a.aktiv %}onclick="return confirm('Artikel archivieren? Er verschwindet aus den Listen, die Historie bleibt erhalten.')"{% endif %}>{{ "Artikel archivieren" if a.aktiv else "Artikel wieder aktivieren" }}</button>
+    </form>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if verlauf|length > 2 %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const css = getComputedStyle(document.documentElement);
+  const c = (n, a=1) => `rgb(${css.getPropertyValue("--" + n).trim().replace(/ /g, ",")},${a})`;
+  new Chart(document.getElementById("verlauf"), {
+    type: "line",
+    data: { labels: {{ verlauf|map(attribute=0)|list|tojson }}, datasets: [{ data: {{ verlauf|map(attribute=1)|list|tojson }}, stepped: true,
+      borderColor: c("primary"), backgroundColor: c("primary", .12), fill: true, pointRadius: 0, borderWidth: 2 }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: c("muted"), maxTicksLimit: 4, maxRotation: 0 }, grid: { display: false } },
+                y: { beginAtZero: true, ticks: { precision: 0, color: c("muted") }, grid: { color: c("line") } } } }
+  });
+});
+</script>
+{% endif %}
+{% endblock %}
