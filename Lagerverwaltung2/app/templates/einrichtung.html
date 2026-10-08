@@ -7,8 +7,8 @@
 <form method="post" action="/einrichtung" class="space-y-4">
   <div><label class="label" for="u">Benutzername</label><input id="u" name="username" class="field" value="{{ username or 'Administrator' }}" required maxlength="100"></div>
   <div><label class="label" for="a">Anzeigename</label><input id="a" name="anzeigename" class="field" value="{{ anzeigename or '' }}" placeholder="z. B. Vor- und Nachname"></div>
-  <div><label class="label" for="p">Passwort (mind. 6 Zeichen)</label><input id="p" name="passwort" type="password" class="field" required minlength="6"></div>
-  <div><label class="label" for="p2">Passwort wiederholen</label><input id="p2" name="passwort2" type="password" class="field" required minlength="6"></div>
+  <div><label class="label" for="p">Passwort (mind. {{ min_passwort }} Zeichen)</label><input id="p" name="passwort" type="password" class="field" required minlength="{{ min_passwort }}"></div>
+  <div><label class="label" for="p2">Passwort wiederholen</label><input id="p2" name="passwort2" type="password" class="field" required minlength="{{ min_passwort }}"></div>
   <button class="btn btn-primary btn-lg w-full">Administrator anlegen</button>
 </form>
 {% endblock %}

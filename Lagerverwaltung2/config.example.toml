@@ -3,8 +3,9 @@
 
 [server]
 host = "0.0.0.0"   # 0.0.0.0 = auch von Handscanner/anderen PCs erreichbar, 127.0.0.1 = nur dieser PC
-port = 8080        # normale Adresse: http://<PC>:8080
-https_port = 8443  # fuer Kamera-Scan am Smartphone: https://<PC>:8443   (0 = aus)
+port = 8080        # Adresse am Lager-PC: http://localhost:8080
+https_port = 8443  # Handscanner, Smartphones, andere PCs: https://<PC>:8443   (0 = aus)
+http_nur_lokal = true  # true = http://...:8080 nur am Lager-PC selbst (localhost); andere Geraete nur verschluesselt ueber https
 firmenname = "CAPHENIA"
 
 [daten]

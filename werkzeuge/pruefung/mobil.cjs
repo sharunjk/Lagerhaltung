@@ -18,7 +18,7 @@ const SEITEN = ["/m", "/m/buchen?typ=ausgang", "/m/buchen?typ=ausgang&artikel=10
   page.on("console", (m) => { if (m.type() === "error") fehler.push(`${page.url()} console: ${m.text()}`); });
   await page.goto(BASE + "/login");
   await page.fill("input[name=username]", "lager");
-  await page.fill("input[name=passwort]", "geheim1");
+  await page.fill("input[name=passwort]", "Demo-Passwort-1");
   await Promise.all([page.waitForNavigation(), page.click("button[type=submit], form button")]);
   const ergebnis = { start: page.url(), seiten: [] };
   for (const s of SEITEN) {

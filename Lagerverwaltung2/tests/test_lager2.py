@@ -169,10 +169,10 @@ def test_web_mobil_api(app_env):
     from app.main import create_app
     cfg, eng = app_env
     app = create_app(cfg, start_scheduler=False)
-    with TestClient(app) as c:
+    with TestClient(app, client=("127.0.0.1", 50000)) as c:  # Ersteinrichtung nur am Lager-PC
         assert "Ersten Administrator" in c.get("/", follow_redirects=True).text
-        c.post("/einrichtung", data=dict(username="admin", anzeigename="Admin", passwort="geheim1", passwort2="geheim1"))
-        r = c.post("/login", data=dict(username="admin", passwort="geheim1", weiter="/"), follow_redirects=True)
+        c.post("/einrichtung", data=dict(username="admin", anzeigename="Admin", passwort="geheim-12345", passwort2="geheim-12345"))
+        r = c.post("/login", data=dict(username="admin", passwort="geheim-12345", weiter="/"), follow_redirects=True)
         assert "Willkommen" in r.text
         r = c.post("/einstellungen/uebernahme", files={"datei": ("daten.sql", MINI_DUMP.encode(), "text/plain")}, follow_redirects=True)
         assert "Übernommen: 2 Artikel" in r.text
@@ -217,9 +217,9 @@ def test_handheld_funktionen(app_env):
     from app.main import create_app
     cfg, eng = app_env
     app = create_app(cfg, start_scheduler=False)
-    with TestClient(app) as c:
-        c.post("/einrichtung", data=dict(username="admin", anzeigename="Admin", passwort="geheim1", passwort2="geheim1"))
-        c.post("/login", data=dict(username="admin", passwort="geheim1", weiter="/m"))
+    with TestClient(app, client=("127.0.0.1", 50000)) as c:  # Ersteinrichtung nur am Lager-PC
+        c.post("/einrichtung", data=dict(username="admin", anzeigename="Admin", passwort="geheim-12345", passwort2="geheim-12345"))
+        c.post("/login", data=dict(username="admin", passwort="geheim-12345", weiter="/m"))
         # PWA-Hülle
         m = c.get("/m/manifest.webmanifest").json()
         assert m["display"] == "standalone" and m["start_url"] == "/m"

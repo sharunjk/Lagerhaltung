@@ -31,18 +31,20 @@
 
 {% elif tab == "handy" %}
 {% set ip = adressen[0] if adressen else hostname %}
-{% set app_url = "https://" ~ ip ~ ":" ~ cfg.server.https_port ~ "/m" if cfg.server.https_port else "http://" ~ ip ~ ":" ~ cfg.server.port ~ "/m" %}
+{% set basis = "https://" ~ ip ~ ":" ~ cfg.server.https_port if cfg.server.https_port else "http://" ~ ip ~ ":" ~ cfg.server.port %}
+{% set app_url = basis ~ "/m" %}
+{% set zert_url = basis ~ "/zertifikat.crt" %}
 <div class="grid xl:grid-cols-[1fr_380px] gap-6 max-w-6xl">
   <section class="panel p-5 space-y-4">
     <h2>Zebra TC21 / Smartphone als Scanner-App einrichten</h2>
     <p class="text-sm">Einmal pro Gerät, etwa 5 Minuten. Das Gerät muss im Firmen-WLAN sein (gleiches Netz wie dieser PC). Ausführliche Anleitung mit Bildschirm-Hinweisen: Dokument „Zebra TC21 einrichten“.</p>
     <ol class="text-sm space-y-3 list-decimal pl-5">
-      <li><b>Sicherheitszertifikat installieren</b> (damit die App ohne Warnung über https läuft): Auf dem Gerät in Chrome <b>http://{{ ip }}:{{ cfg.server.port }}/zertifikat.crt</b> öffnen und herunterladen. Dann <i>Einstellungen → Sicherheit → Verschlüsselung &amp; Anmeldedaten → Zertifikat installieren → CA-Zertifikat</i> → „Trotzdem installieren“ → Datei <i>Lagerverwaltung-CA.crt</i> wählen.</li>
+      <li><b>Sicherheitszertifikat installieren</b> (damit die App ohne Warnung über https läuft): Auf dem Gerät in Chrome <b>{{ zert_url }}</b> öffnen (oder QR-Code „Zertifikat“ scannen). Chrome warnt beim ersten Mal „Verbindung nicht privat“ – <i>Erweitert → Weiter zu {{ ip }}</i> tippen, die Datei wird heruntergeladen. Dann <i>Einstellungen → Sicherheit → Verschlüsselung &amp; Anmeldedaten → Zertifikat installieren → CA-Zertifikat</i> → „Trotzdem installieren“ → Datei <i>Lagerverwaltung-CA.crt</i> wählen.</li>
       <li><b>App öffnen:</b> In Chrome <b>{{ app_url }}</b> aufrufen (oder QR-Code rechts scannen) und anmelden.</li>
       <li><b>Installieren:</b> Auf der Startseite „App installieren“ tippen bzw. Chrome-Menü ⋮ → „App installieren“ / „Zum Startbildschirm hinzufügen“. Die Lagerverwaltung erscheint als eigenes Symbol, startet ohne Adressleiste und funktioniert auch offline.</li>
       <li><b>Scantaste (nur Zebra):</b> App <i>DataWedge</i> → Profil anlegen „Lager“ → <i>Zugeordnete Apps</i>: Chrome (com.android.chrome, alle Aktivitäten) → <i>Barcode-Eingang</i> an → <i>Tastatureingabe (Keystroke output)</i> an → <i>Basisdatenformatierung</i>: „ENTER-Taste senden“ an. Intent-Ausgabe aus.</li>
     </ol>
-    <p class="text-sm text-muted">Zertifikat nicht installierbar (z. B. gesperrtes Firmengerät)? Alternative für die IT: In Chrome <i>chrome://flags</i> → „Insecure origins treated as secure“ → <b>http://{{ ip }}:{{ cfg.server.port }}</b> eintragen, aktivieren, Chrome neu starten; dann die http-Adresse verwenden. Ohne beides funktioniert die Scanner-Ansicht im Browser trotzdem – nur Installation als App, Offline-Modus und Kamera fehlen.</p>
+    <p class="text-sm text-muted">Zertifikat nicht installierbar (z. B. gesperrtes Firmengerät)? Dann bitte die IT, das Zertifikat über die Geräteverwaltung zu verteilen. Es gilt nur für interne Adressen dieses PCs und kann keine anderen Webseiten beglaubigen.{% if cfg.server.http_nur_lokal %} Unverschlüsseltes http ist aus Sicherheitsgründen nur am Lager-PC selbst erreichbar.{% endif %}</p>
     <p class="text-sm">Adressen dieses PCs: {% for a in adressen %}<b>{{ a }}</b>{% if not loop.last %}, {% endif %}{% endfor %} (PC-Name {{ hostname }}). Damit sich die Adresse nicht ändert, sollte die IT dem PC eine feste IP geben.</p>
   </section>
   <section class="panel p-5 self-start">
@@ -50,7 +52,7 @@
     <div class="bg-white p-4 inline-block rounded border border-line"><svg viewBox="0 0 40 40" width="220" height="220">{{ qr(app_url)|safe }}</svg></div>
     <p class="text-sm text-muted mt-2 break-all">{{ app_url }}</p>
     <h2 class="mt-5 mb-3">QR-Code: Zertifikat</h2>
-    <div class="bg-white p-4 inline-block rounded border border-line"><svg viewBox="0 0 40 40" width="160" height="160">{{ qr("http://" ~ ip ~ ":" ~ cfg.server.port ~ "/zertifikat.crt")|safe }}</svg></div>
+    <div class="bg-white p-4 inline-block rounded border border-line"><svg viewBox="0 0 40 40" width="160" height="160">{{ qr(zert_url)|safe }}</svg></div>
     <p class="text-sm text-muted mt-2"><a class="text-primary" href="/zertifikat.crt">Zertifikat herunterladen</a></p>
   </section>
 </div>
@@ -79,7 +81,7 @@
     <div><label class="label">Benutzername</label><input name="username" x-model="u.username" class="field" required maxlength="100"></div>
     <div><label class="label">Anzeigename</label><input name="anzeigename" x-model="u.anzeigename" class="field"></div>
     <div><label class="label">Rolle</label><select name="rolle" x-model="u.rolle" class="field">{% for r, n in ROLLEN_NAMEN.items() %}<option value="{{ r }}">{{ n }}</option>{% endfor %}</select></div>
-    <div><label class="label" x-text="u.id ? 'Neues Passwort (leer = unverändert)' : 'Passwort (mind. 6 Zeichen)'"></label><input name="passwort" type="password" class="field" autocomplete="new-password"></div>
+    <div><label class="label" x-text="u.id ? 'Neues Passwort (leer = unverändert)' : 'Passwort (mind. 10 Zeichen)'"></label><input name="passwort" type="password" class="field" autocomplete="new-password"></div>
     <label class="flex items-center gap-2"><input type="checkbox" name="aktiv" x-model="u.aktiv"> Aktiv</label>
     <div class="flex gap-2"><button class="btn btn-primary flex-1">Speichern</button><button type="button" class="btn" x-show="u.id" @click="u = {id: '', username: '', anzeigename: '', rolle: 'lager', aktiv: true}">Neu</button></div>
   </form>

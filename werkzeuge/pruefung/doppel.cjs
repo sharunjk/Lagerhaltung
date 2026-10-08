@@ -5,7 +5,7 @@ const n = () => +execFileSync("python3", ["-c", "import sqlite3,sys;print(sqlite
 (async () => {
   const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 360, height: 720 }, isMobile: true, hasTouch: true });
   const p = await ctx.newPage();
-  await p.goto(BASE + "/login"); await p.fill("input[name=username]", "lager"); await p.fill("input[name=passwort]", "geheim1");
+  await p.goto(BASE + "/login"); await p.fill("input[name=username]", "lager"); await p.fill("input[name=passwort]", "Demo-Passwort-1");
   await Promise.all([p.waitForNavigation(), p.click("form button")]);
   await p.goto(BASE + "/m/buchen?typ=ausgang&artikel=10003", { waitUntil: "networkidle" });
   const vorher = n();

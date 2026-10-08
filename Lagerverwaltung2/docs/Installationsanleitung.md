@@ -1,10 +1,10 @@
-# Lagerverwaltung 2.2.1 – Installation
+# Lagerverwaltung 2.2.2 – Installation
 
 Eigenständige Lagerverwaltung mit eigener Datenbank. Sie braucht weder Casper noch MySQL noch den MIS Communicator. Die bisherigen Daten werden einmalig aus einem HeidiSQL-Export übernommen. Dauer: etwa 20 Minuten.
 
 ## Was Sie brauchen
 
-- Das Paket `Lagerverwaltung_v2.2.1.zip`
+- Das Paket `Lagerverwaltung_v2.2.2.zip`
 - Die Datei **python-3.12.10-embed-amd64.zip** von python.org (*Downloads → Windows → Python 3.12.10 → „Windows embeddable package (64-bit)“*). Keine Installation, keine Adminrechte nötig.
 - Den SQL-Export der Casper-Datenbank (HeidiSQL → Rechtsklick auf `daten` → *Datenbank als SQL exportieren*, Daten: „Einfügen“). Frisch exportieren, damit die letzten Buchungen enthalten sind.
 - Für Handscanner/Smartphones und andere PCs: einmalig Adminrechte für die Firewall-Freigabe (IT)
@@ -13,15 +13,17 @@ Die Lagerverwaltung kann auf dem bisherigen Lager-PC oder auf jedem anderen Wind
 
 ## 1. Installieren
 
-1. `Lagerverwaltung_v2.2.1.zip` nach `C:\` entpacken. Es entsteht `C:\Lagerverwaltung2`.
+1. `Lagerverwaltung_v2.2.2.zip` nach `C:\` entpacken. Es entsteht `C:\Lagerverwaltung2`.
 2. `python-3.12.10-embed-amd64.zip` **ungeöffnet** in `C:\Lagerverwaltung2` legen.
 3. Doppelklick auf `windows\1_EINRICHTEN.bat`. Erwartet: `OK: Lagerverwaltung ist startbereit.`
-4. Rechtsklick auf `windows\FIREWALL_FREIGEBEN_als_Admin.bat` → *Als Administrator ausführen* (für Handscanner, Smartphones und andere PCs). Erwartet: `Firewall-Regel "Lagerverwaltung" fuer TCP-Port(s) 8080,8443 angelegt`. Die Regel gilt für die Netzwerkprofile *Domäne* und *Privat* – ist das Firmennetz am Lager-PC als *Öffentlich* eingestuft, bitte die IT das Profil ändern lassen.
+4. Rechtsklick auf `windows\FIREWALL_FREIGEBEN_als_Admin.bat` → *Als Administrator ausführen* (für Handscanner, Smartphones und andere PCs). Erwartet: `Firewall-Regel "Lagerverwaltung" fuer TCP-Port(s) 8443 angelegt`. Geöffnet wird nur der verschlüsselte Port 8443 – `http://…:8080` ist aus Sicherheitsgründen nur am Lager-PC selbst erreichbar (`http_nur_lokal = true` in `config.toml`). Die Regel gilt für die Netzwerkprofile *Domäne* und *Privat* – ist das Firmennetz am Lager-PC als *Öffentlich* eingestuft, bitte die IT das Profil ändern lassen.
 5. Doppelklick auf das neue Symbol **Lagerverwaltung** auf dem Desktop (auch im Startmenü). Die Lagerverwaltung öffnet sich als eigenes Programmfenster – ohne Adressleiste und Browser-Tabs. Beim ersten Mal startet sie dabei im Hintergrund, das dauert ein paar Sekunden.
 
 ## 2. Ersten Administrator anlegen
 
-Beim ersten Aufruf erscheint *Ersten Administrator anlegen*. Benutzername und Passwort wählen (z. B. „Sharun“).
+Beim ersten Aufruf erscheint *Ersten Administrator anlegen*. Benutzername und Passwort (mindestens 10 Zeichen) wählen. Das geht nur direkt am Lager-PC – von anderen Geräten aus ist die Einrichtung gesperrt.
+
+Alle Passwörter brauchen mindestens 10 Zeichen. Nach 5 falschen Passwörtern für ein Konto (bzw. 20 von einem Gerät) ist die Anmeldung von diesem Gerät 15 Minuten gesperrt.
 
 ## 3. Daten aus Casper übernehmen
 
@@ -51,12 +53,12 @@ Die Lagerverwaltung besteht aus zwei Teilen: dem **Hintergrunddienst** auf dem L
 - Fenster schließen beendet nur das Fenster. Der Hintergrunddienst läuft weiter, damit Handscanner und andere PCs weiterarbeiten können.
 - Verknüpfung verloren? `windows\VERKNUEPFUNG_ERSTELLEN.bat` legt sie neu an.
 
-**Weitere Büro-PCs:** Dort wird nichts installiert. Unter *Einstellungen → Allgemein → „Verknüpfung für Arbeitsplatz-PCs herunterladen“* gibt es ein kleines Skript; auf dem jeweiligen PC doppelklicken – danach hat auch dieser PC ein Symbol *Lagerverwaltung*, das die Lagerverwaltung des Lager-PCs als eigenes Fenster öffnet.
+**Weitere Büro-PCs:** Dort wird nichts installiert. Unter *Einstellungen → Allgemein → „Verknüpfung für Arbeitsplatz-PCs herunterladen“* gibt es ein kleines Skript; auf dem jeweiligen PC doppelklicken (keine Adminrechte nötig). Es installiert das Zertifikat der Lagerverwaltung für den angemeldeten Windows-Benutzer – die Sicherheitsabfrage von Windows mit *Ja* bestätigen – und legt ein Symbol *Lagerverwaltung* an, das die Lagerverwaltung des Lager-PCs verschlüsselt (https) als eigenes Fenster öffnet.
 
 ## 7. Dauerbetrieb
 
 - **Ohne Adminrechte:** `windows\3_AUTOSTART_EIN.bat` – startet unsichtbar bei jeder Anmeldung am PC.
-- **Mit Adminrechten (empfohlen):** Rechtsklick auf `windows\DIENST_EINRICHTEN_als_Admin.bat` → *Als Administrator ausführen* – startet beim Hochfahren, auch ohne Anmeldung. Das Skript entfernt dabei einen vorher eingerichteten Benutzer-Autostart, damit nicht zwei Instanzen laufen.
+- **Mit Adminrechten (empfohlen):** Rechtsklick auf `windows\DIENST_EINRICHTEN_als_Admin.bat` → *Als Administrator ausführen* – startet beim Hochfahren, auch ohne Anmeldung. Die Lagerverwaltung läuft dann unter dem eingeschränkten Windows-Konto *NETZWERKDIENST* (keine Administratorrechte, Schreibzugriff nur auf `daten`, `logs`, `backups`, `druckausgabe` und `config.toml`). Danach einmal ein Testetikett drucken – der Drucker muss in Windows für alle Benutzer eingerichtet sein. Das Skript entfernt dabei einen vorher eingerichteten Benutzer-Autostart, damit nicht zwei Instanzen laufen.
 
 Nur eine der beiden Varianten verwenden.
 
@@ -95,7 +97,9 @@ Dieselben Schritte stehen in jeder Sicherung in `LIESMICH.txt`.
 | Seite lädt nicht | Läuft das Fenster bzw. der Autostart? Protokoll: `logs\lagerverwaltung.log`. |
 | Handy/Handscanner erreicht die Seite nicht | Firewall-Freigabe ausgeführt? Gerät im selben Netz (Firmen-WLAN, nicht Gäste-WLAN)? Adresse aus *Einstellungen → Handscanner / Handy* verwenden. |
 | Port 8080 belegt | *Einstellungen → Allgemein* oder `config.toml` (Abschnitt `[server]`): anderen Port eintragen, Lagerverwaltung neu starten und `FIREWALL_FREIGEBEN_als_Admin.bat` erneut ausführen (liest die Ports aus `config.toml`). |
-| Handy meldet nach IP-Wechsel des Lager-PCs „Verbindung nicht privat“ | Lagerverwaltung neu starten – das HTTPS-Zertifikat wird beim Start für die aktuellen Adressen neu ausgestellt. Das Zertifikat auf den Geräten muss nicht neu installiert werden. |
+| Handy meldet nach IP-Wechsel des Lager-PCs „Verbindung nicht privat“ | Lagerverwaltung neu starten – das HTTPS-Zertifikat wird beim Start für die aktuellen Adressen neu ausgestellt. Das Zertifikat auf den Geräten muss nicht neu installiert werden. Nach einer **Umbenennung des PCs** gilt der neue Name erst mit einem neuen Zertifikat; bis dahin die IP-Adresse verwenden. |
+| „Zu viele Fehlversuche“ | 15 Minuten warten oder die Lagerverwaltung neu starten (hebt alle Sperren auf). |
+| Update von 2.2.1 oder älter | Beim ersten Start wird das Zertifikat der Lagerverwaltung durch eine beschränkte Version ersetzt (siehe *Technik*). Auf Handhelds und Büro-PCs das Zertifikat einmal neu installieren bzw. das Arbeitsplatz-Skript erneut ausführen. |
 | Skript meldet „Keine Administratorrechte“ | Rechtsklick auf die Datei → *Als Administrator ausführen*. |
 | Etikett wird nicht gedruckt | Druckername exakt wie in Windows? Drucker an, Etiketten kalibriert? Sonst „Über den Browser drucken“. |
 | „database is locked“ im Protokoll | Kommt nur vor, wenn jemand die Datei `daten\lager.db` mit einem anderen Programm geöffnet hat. Programm schließen. |

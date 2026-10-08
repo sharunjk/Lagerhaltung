@@ -3,7 +3,7 @@ const BASE = process.argv[2];
 (async () => {
   const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 360, height: 720 }, isMobile: true });
   const p = await ctx.newPage();
-  await p.goto(BASE + "/login"); await p.fill("input[name=username]", "lager"); await p.fill("input[name=passwort]", "geheim1");
+  await p.goto(BASE + "/login"); await p.fill("input[name=username]", "lager"); await p.fill("input[name=passwort]", "Demo-Passwort-1");
   await Promise.all([p.waitForNavigation(), p.click("form button")]);
   const arts = []; for (let i = 9; i < 40; i++) arts.push([String(10000 + i), `C2-R${i % 9 + 1}-${i % 5}`]);
   let letzte = 0;

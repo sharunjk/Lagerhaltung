@@ -13,15 +13,15 @@ Einmal pro Gerät, etwa 10 Minuten. Die Adressen und QR-Codes für Ihr Netz steh
 
 ## Schritt 1: Sicherheitszertifikat installieren
 
-Damit Chrome die Lagerverwaltung als sichere App akzeptiert (nötig für Installation und Offline-Modus), wird einmal das Zertifikat des Lager-PCs installiert. Es enthält keine Zugangsdaten und gilt nur für diesen PC.
+Damit Chrome die Lagerverwaltung als sichere App akzeptiert (nötig für Installation und Offline-Modus), wird einmal das Zertifikat des Lager-PCs installiert. Es enthält keine Zugangsdaten und gilt nur für interne Adressen dieses PCs – es kann keine anderen Webseiten beglaubigen.
 
-1. Chrome öffnen, Adresse eingeben: `http://192.168.1.20:8080/zertifikat.crt` – oder den QR-Code „Zertifikat“ am PC mit der Kamera-App scannen. Die Datei *Lagerverwaltung-CA.crt* wird heruntergeladen.
+1. Chrome öffnen, Adresse eingeben: `https://192.168.1.20:8443/zertifikat.crt` – oder den QR-Code „Zertifikat“ am PC mit der Kamera-App scannen. Chrome warnt dabei einmal „Verbindung nicht privat“ (das Zertifikat ist ja noch nicht installiert): *Erweitert → Weiter zu 192.168.1.20*. Die Datei *Lagerverwaltung-CA.crt* wird heruntergeladen.
 2. *Einstellungen* → *Sicherheit* (bzw. *Sicherheit & Standort*) → *Verschlüsselung & Anmeldedaten* → *Zertifikat installieren* → **CA-Zertifikat** → „Trotzdem installieren“.
 3. Gerätesperre (PIN) bestätigen, Datei *Lagerverwaltung-CA.crt* aus „Downloads“ wählen.
 
 Android zeigt danach dauerhaft einen Hinweis „Netzwerk wird möglicherweise überwacht“ – das ist bei selbst installierten Zertifikaten normal.
 
-**Geht nicht (Gerät von der IT gesperrt)?** Alternative: In Chrome `chrome://flags` öffnen, nach „Insecure origins treated as secure“ suchen, `http://192.168.1.20:8080` eintragen, auf *Enabled* stellen, *Relaunch*. Dann in Schritt 2 die **http**-Adresse verwenden.
+**Geht nicht (Gerät von der IT gesperrt)?** Dann die IT bitten, die Datei *Lagerverwaltung-CA.crt* über die Geräteverwaltung zu verteilen. Unverschlüsseltes http ist aus Sicherheitsgründen nur am Lager-PC selbst erreichbar.
 
 ## Schritt 2: App öffnen und installieren
 

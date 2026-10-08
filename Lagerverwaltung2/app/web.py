@@ -16,6 +16,64 @@ from .services.queries import TYP_TEXT
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 ROLLEN = {"lesen": 0, "lager": 1, "admin": 2}
+MIN_PASSWORT = 10  # Mindestlänge für neue Passwörter
+
+
+def ist_lokal(request: Request) -> bool:
+    """Anfrage kommt vom Lager-PC selbst (Browser auf diesem PC)."""
+    return (request.client.host if request.client else "") in ("127.0.0.1", "::1", "localhost")
+
+
+class Anmeldesperre:
+    """Begrenzt Fehlversuche bei der Anmeldung (Schutz gegen Durchprobieren von Passwörtern im Firmennetz).
+
+    Je Gerät (IP) und Benutzername höchstens ``JE_KONTO`` Fehlversuche, je Gerät insgesamt höchstens ``JE_GERAET``
+    innerhalb von ``FENSTER`` Sekunden. Danach ist die Anmeldung bis zum Ablauf des Fensters gesperrt.
+    Der Zustand liegt nur im Speicher – ein Neustart hebt Sperren auf.
+    """
+    JE_KONTO = 5
+    JE_GERAET = 20
+    FENSTER = 15 * 60
+
+    def __init__(self):
+        import threading
+        from collections import defaultdict, deque
+        self._fehl: dict[tuple, deque] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def _schluessel(self, ip: str, name: str):
+        return (("konto", ip, name.strip().lower()), self.JE_KONTO), (("geraet", ip), self.JE_GERAET)
+
+    def _aufraeumen(self, jetzt: float) -> None:
+        for k in [k for k, q in self._fehl.items() if not q or q[-1] <= jetzt - self.FENSTER]:
+            del self._fehl[k]
+
+    def sperre_sekunden(self, ip: str, name: str) -> int:
+        """0 = Anmeldung erlaubt, sonst verbleibende Sperrzeit in Sekunden."""
+        import time
+        jetzt = time.monotonic()
+        with self._lock:
+            rest = 0
+            for k, grenze in self._schluessel(ip, name):
+                q = self._fehl.get(k)
+                while q and q[0] <= jetzt - self.FENSTER:
+                    q.popleft()
+                if q and len(q) >= grenze:
+                    rest = max(rest, int(q[0] + self.FENSTER - jetzt) + 1)
+            return rest
+
+    def fehlschlag(self, ip: str, name: str) -> None:
+        import time
+        jetzt = time.monotonic()
+        with self._lock:
+            self._aufraeumen(jetzt)
+            for k, _ in self._schluessel(ip, name):
+                self._fehl[k].append(jetzt)
+
+    def erfolg(self, ip: str, name: str) -> None:
+        with self._lock:
+            self._fehl.pop(self._schluessel(ip, name)[0][0], None)
+
 ROLLEN_NAMEN = {"admin": "Administrator", "lager": "Lager", "lesen": "Nur lesen"}
 
 

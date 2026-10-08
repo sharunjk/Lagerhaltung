@@ -15,7 +15,8 @@ CONFIG_PATH = Path(os.environ.get("LV_CONFIG", BASE_DIR / "config.toml"))
 class ServerCfg:
     host: str = "0.0.0.0"
     port: int = 8080
-    https_port: int = 8443  # für Kamera-Scan am Smartphone (Browser verlangt HTTPS); 0 = aus
+    https_port: int = 8443  # für Handhelds, Smartphones und andere PCs; 0 = aus
+    http_nur_lokal: bool = True  # HTTP (unverschlüsselt) nur für den Browser auf diesem PC; alle anderen Geräte über HTTPS
     secret_key: str = ""
     firmenname: str = "CAPHENIA"
 

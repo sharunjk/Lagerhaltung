@@ -12,7 +12,7 @@ const schritt = (name, ok, info = "") => { log.push({ name, ok, info }); console
 async function login(page, user = "lager") {
   await page.goto(BASE + "/login");
   await page.fill("input[name=username]", user);
-  await page.fill("input[name=passwort]", "geheim1");
+  await page.fill("input[name=passwort]", "Demo-Passwort-1");
   await Promise.all([page.waitForNavigation(), page.click("form button")]);
 }
 // wie ein Handscanner: Artikel scannen + Enter, Platz scannen + Enter, Menge eintippen

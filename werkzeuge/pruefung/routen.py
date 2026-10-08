@@ -31,7 +31,7 @@ C.CONFIG_PATH = Path(tmp) / "config.toml"
 app = create_app(cfg, start_scheduler=False)
 with db.schreiben() as con:
     for r in ("lesen", "lager", "admin"):
-        con.execute(insert(users).values(username=r, anzeigename=r, pw_hash=hash_pw("geheim1"), rolle=r, aktiv=True, api_token=f"tok_{r}"))
+        con.execute(insert(users).values(username=r, anzeigename=r, pw_hash=hash_pw("Demo-Passwort-1"), rolle=r, aktiv=True, api_token=f"tok_{r}"))
     Lager(con, "admin").artikel_anlegen({"nummer": "10001", "bezeichnung": "Test"}, "C1-R1-1", 5)
 
 SAMPLE = {"nr": "10001", "fmt": "csv", "art": "verbrauch", "name": "x.zip", "uid": "999"}
@@ -62,7 +62,7 @@ clients = {}
 for r in (None, "lesen", "lager", "admin"):
     c = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
     if r:
-        assert c.post("/login", data={"username": r, "passwort": "geheim1"}).status_code == 303
+        assert c.post("/login", data={"username": r, "passwort": "Demo-Passwort-1"}).status_code == 303
     clients[r] = c
 
 rows = []

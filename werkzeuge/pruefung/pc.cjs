@@ -22,7 +22,7 @@ const SEITEN = ["/", "/artikel", "/artikel?filter=melden", "/artikel?q=zzzz", "/
       page.on("response", (r) => { if (r.status() >= 500) fehler.push(`${r.url()} HTTP ${r.status()}`); });
       await page.goto(BASE + "/login");
       await page.fill("input[name=username]", "admin");
-      await page.fill("input[name=passwort]", "geheim1");
+      await page.fill("input[name=passwort]", "Demo-Passwort-1");
       await Promise.all([page.waitForNavigation(), page.click("form button")]);
       for (const s of SEITEN) {
         const r = await page.goto(BASE + s, { waitUntil: "networkidle" });

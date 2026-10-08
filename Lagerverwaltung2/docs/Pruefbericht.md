@@ -277,6 +277,28 @@ Nur am echten Lager-PC (Windows 10/11), HT100 und TC21 prüfbar:
 11. Zweiter Büro-PC: `Lagerverwaltung_Arbeitsplatz.bat` aus *Einstellungen → Allgemein*.
 12. Benutzer sperren bzw. Rolle ändern → wirkt sofort auf dem TC21.
 
+## Nachtrag: Härtung 2.2.2
+
+Auf Wunsch nach der Prüfung umgesetzt, um den Betrieb im Firmennetz abzusichern. Jede Maßnahme ist durch Tests abgesichert. Insgesamt sind es 69 Tests, alle grün, auch mit dem echten Export.
+
+| Maßnahme | Umsetzung | Beleg |
+|---|---|---|
+| Zertifizierungsstelle beschränkt | `NameConstraints` (kritisch): nur 10/8, 172.16/12, 192.168/16, 127/8, 169.254/16 und die Namen des PCs. Öffentliche IPs kommen nicht ins Serverzertifikat. Eine alte, unbeschränkte CA wird beim Start ersetzt (`*.alt`) | `test_ca_nur_fuer_interne_adressen`: Ein mit dem CA-Schlüssel gefälschtes Zertifikat für `mail.firma.de` wird mit „no permitted name constraints matched SAN“ abgelehnt. Gleiches gilt für `8.8.8.8`. `test_alte_unbeschraenkte_ca_wird_ersetzt` |
+| Anmeldeversuche begrenzt | 5 Fehlversuche je Konto und Gerät, 20 je Gerät, danach 15 Minuten Sperre (HTTP 429). Gilt auch für „Passwort ändern“ | `test_anmeldeversuche_begrenzt`, `test_anmeldesperre_geraetegrenze_und_ablauf`. Im Browser ist der 6. Versuch mit richtigem Passwort „Zu viele Fehlversuche“ |
+| Passwörter ≥ 10 Zeichen | Gilt für Ersteinrichtung, Benutzerverwaltung und „Passwort ändern“. Bestehende kürzere Passwörter funktionieren, führen nach der Anmeldung aber direkt zu „Passwort ändern“ | `test_passwort_mindestens_10_zeichen` |
+| HTTP nur am Lager-PC | `http_nur_lokal = true`: HTTP lauscht auf `127.0.0.1`, HTTPS im Netz. Die Firewall öffnet nur 8443 | `test_http_nur_lokal`. Echter Start: 8080 über die Netzadresse ergibt `ConnectionRefused`, 8443 ergibt 200 |
+| Cookie über HTTPS nur verschlüsselt | Sitzungs-Cookie über HTTPS mit `Secure; HttpOnly; SameSite=Lax`, über `http://localhost` ohne `Secure` | `test_cookie_ueber_https_nur_verschluesselt`. Im Browser: HTTPS `secure=true`, localhost `secure=false` |
+| Dienst ohne SYSTEM | Aufgabe unter NETZWERKDIENST (SID `S-1-5-20`, sprachunabhängig), `RunLevel Limited`. Schreibrechte nur auf `daten`, `logs`, `backups`, `druckausgabe`, `config.toml` | Code-Review. Vor Ort testen: Start nach Neustart, Etikettendruck, Sicherung |
+| Zusätzlich: Ersteinrichtung nur lokal | `/einrichtung` von anderen Geräten ergibt 403 | `test_ersteinrichtung_nur_am_lager_pc`. Echter Start: über die Netzadresse 403 |
+| Zusätzlich: Büro-PCs über HTTPS | Das Arbeitsplatz-Skript installiert das CA-Zertifikat nur für den angemeldeten Benutzer (`Cert:\CurrentUser\Root`, keine Adminrechte) und öffnet `https://…:8443/` | `test_arbeitsplatz_skript_https_mit_zertifikat` |
+
+Browser-Regression nach der Härtung: Offline-Szenario 16/16, 19 mobile Seiten ohne Fehler, 136 PC-Seitenaufrufe ohne Fehler.
+
+**Zusätzlich vor Ort testen:**
+- Chrome auf dem TC21 akzeptiert die beschränkte CA. Android unterstützt Name Constraints, das ist aber am Gerät zu bestätigen.
+- Der Dienst unter NETZWERKDIENST druckt auf den HT100 und schreibt die Sicherung auf das Netzlaufwerk.
+- Büro-PC: Arbeitsplatz-Skript mit Sicherheitsabfrage, danach öffnet die Lagerverwaltung ohne Warnung.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

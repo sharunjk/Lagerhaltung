@@ -1,4 +1,4 @@
-# Lagerverwaltung 2.2.1 (eigenständig)
+# Lagerverwaltung 2.2.2 (eigenständig)
 
 Eigenständige Lagerverwaltung für das Ersatzteillager – eigene Datenbank, Scanner-Ansicht für Handhelds und Smartphones, Etikettendruck für den HPRT HT100, Übernahme der Daten aus der Casper-Lagerverwaltung.
 

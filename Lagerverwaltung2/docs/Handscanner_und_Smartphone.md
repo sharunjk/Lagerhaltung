@@ -19,7 +19,7 @@ Die Scanner-Ansicht lässt sich auf Android als App installieren (eigenes Symbol
 ## Verbinden
 
 1. Das Gerät ins **Firmen-WLAN** bringen (dasselbe Netz wie der Lager-PC).
-2. Am PC *Einstellungen → Handscanner / Handy* öffnen. Dort stehen die Adressen, z. B. `http://192.168.1.20:8080/m`, und ein QR-Code.
+2. Am PC *Einstellungen → Handscanner / Handy* öffnen. Dort stehen die Adressen, z. B. `https://192.168.1.20:8443/m`, und ein QR-Code. Ohne installiertes Zertifikat warnt Chrome einmal „Verbindung nicht privat“ – siehe „Zebra TC21 einrichten“, Schritt 1.
 3. Auf dem Gerät Chrome öffnen und die Adresse eingeben (oder QR-Code mit der Handy-Kamera scannen).
 4. Anmelden – jeder Mitarbeiter mit eigenem Benutzer, damit die Buchungen zugeordnet sind. Die Anmeldung bleibt 30 Tage gespeichert.
 5. Im Chrome-Menü **„Zum Startbildschirm hinzufügen“**. Dann startet die Scanner-Ansicht wie eine App.
@@ -36,7 +36,7 @@ Test: Scanner-Ansicht öffnen, Etikett scannen – der Artikel muss sich öffnen
 
 ## Kamera (Smartphone)
 
-Browser erlauben die Kamera nur über eine sichere Verbindung. Dafür gibt es eine zweite Adresse mit **https** und Port **8443**, z. B. `https://192.168.1.20:8443/m`.
+Browser erlauben die Kamera nur über eine sichere Verbindung – die Adresse mit **https** und Port **8443**, z. B. `https://192.168.1.20:8443/m`, ist ohnehin die einzige, die von anderen Geräten aus erreichbar ist.
 
 Beim ersten Öffnen zeigt Chrome „Ihre Verbindung ist nicht privat“. Das ist erwartet (das Zertifikat stammt vom Lager-PC selbst, nicht aus dem Internet): *Erweitert → Weiter zu 192.168.1.20 (unsicher)*. Danach die Kamera erlauben. Das Kamera-Symbol neben jedem Eingabefeld startet den Scan.
 

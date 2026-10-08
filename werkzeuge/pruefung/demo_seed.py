@@ -15,7 +15,7 @@ from app.services.lager import Lager  # noqa: E402
 db.init_engine(f"sqlite:///{home}/daten/lager.db")
 with db.schreiben() as con:
     for r in ("admin", "lager", "lesen"):
-        con.execute(insert(users).values(username=r, anzeigename=r.capitalize() + " Demo", pw_hash=hash_pw("geheim1"), rolle=r, aktiv=True,
+        con.execute(insert(users).values(username=r, anzeigename=r.capitalize() + " Demo", pw_hash=hash_pw("Demo-Passwort-1"), rolle=r, aktiv=True,
                                          api_token=f"tok_{r}"))
     l1 = con.execute(insert(lieferanten).values(name="Muster Armaturen GmbH", email="einkauf@example.org")).inserted_primary_key[0]
     l2 = con.execute(insert(lieferanten).values(name="Prüftechnik Süd")).inserted_primary_key[0]

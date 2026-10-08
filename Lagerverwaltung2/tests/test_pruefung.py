@@ -41,7 +41,7 @@ def env(tmp_path, monkeypatch):
         from app.db import users
         from app.services.betrieb import hash_pw
         for r in ("admin", "lager", "lesen"):
-            con.execute(insert(users).values(username=r, anzeigename=r, pw_hash=hash_pw("geheim1"), rolle=r, aktiv=True, api_token=f"tok_{r}"))
+            con.execute(insert(users).values(username=r, anzeigename=r, pw_hash=hash_pw("Lager-Test-2026"), rolle=r, aktiv=True, api_token=f"tok_{r}"))
     return cfg, eng
 
 
@@ -65,7 +65,7 @@ def client(cfg, rolle=None):
     from app.main import create_app
     c = TestClient(create_app(cfg, start_scheduler=False), follow_redirects=False)
     if rolle:
-        assert c.post("/login", data={"username": rolle, "passwort": "geheim1"}).status_code == 303
+        assert c.post("/login", data={"username": rolle, "passwort": "Lager-Test-2026"}).status_code == 303
     return c
 
 
@@ -171,7 +171,7 @@ def test_parallele_entnahmen_ueber_http(env):
     clients = []
     for _ in range(8):
         h = httpx.Client(base_url=basis, follow_redirects=False)
-        h.post("/login", data={"username": "lager", "passwort": "geheim1"})
+        h.post("/login", data={"username": "lager", "passwort": "Lager-Test-2026"})
         clients.append(h)
     start = threading.Barrier(len(clients))
     erg = []
@@ -212,7 +212,7 @@ def test_keine_offene_weiterleitung(env):
     r = c.post("/bewegungen/1/storno", headers={"referer": "http://testserver//evil.example/x"})
     assert r.headers["location"] == "/bewegungen"
     c2 = client(cfg)
-    r = c2.post("/login", data={"username": "lager", "passwort": "geheim1", "weiter": "/\\evil.example"})
+    r = c2.post("/login", data={"username": "lager", "passwort": "Lager-Test-2026", "weiter": "/\\evil.example"})
     assert r.headers["location"] in ("/", "/m")
 
 
@@ -235,7 +235,7 @@ def test_rolle_und_sperre_wirken_sofort(env):
 def test_passwortwechsel_beendet_andere_sitzungen(env):
     cfg, _ = env
     a, b = client(cfg, "lager"), client(cfg, "lager")
-    r = a.post("/passwort", data={"alt": "geheim1", "neu": "neues-pw1", "neu2": "neues-pw1"})
+    r = a.post("/passwort", data={"alt": "Lager-Test-2026", "neu": "Neues-Passwort-1", "neu2": "Neues-Passwort-1"})
     assert r.status_code == 303
     assert a.get("/").status_code == 200  # eigene Sitzung bleibt
     assert b.get("/").headers["location"].startswith("/login")  # andere Sitzung mit altem Passwort endet
@@ -670,3 +670,173 @@ def test_entnahme_erledigt_nur_passende_reservierung(env):
         con.execute(text("INSERT INTO reservierungen (artikel_id, menge, fuer, status) VALUES (2, 1, 'Auftrag', 'offen')"))
         L(con).ausgang("1", "C1", 1, reservierung_id=1)  # Reservierung gehört zu Artikel 2
     assert anzahl(eng, "SELECT status FROM reservierungen WHERE id=1") == "offen"
+
+
+# ------------------------------------------------------------------ Härtung 2.2.2
+def test_anmeldeversuche_begrenzt(env):
+    cfg, _ = env
+    c = client(cfg)
+    for _ in range(5):
+        assert c.post("/login", data={"username": "lager", "passwort": "falsch-falsch"}).status_code == 200
+    r = c.post("/login", data={"username": "lager", "passwort": "Lager-Test-2026"})  # richtiges Passwort, aber gesperrt
+    assert r.status_code == 429 and "Zu viele Fehlversuche" in r.text
+    # anderes Konto vom selben Gerät geht weiter (bis zur Gerätegrenze)
+    assert client(cfg).post("/login", data={"username": "admin", "passwort": "Lager-Test-2026"}).status_code == 303
+
+
+def test_anmeldesperre_geraetegrenze_und_ablauf(monkeypatch):
+    import time as time_mod
+
+    from app.web import Anmeldesperre
+    s = Anmeldesperre()
+    jetzt = [1000.0]
+    monkeypatch.setattr(time_mod, "monotonic", lambda: jetzt[0])
+    for i in range(20):
+        s.fehlschlag("10.0.0.9", f"konto{i}")
+    assert s.sperre_sekunden("10.0.0.9", "irgendwer") > 0  # 20 Fehlversuche über verschiedene Konten sperren das Gerät
+    assert s.sperre_sekunden("10.0.0.10", "konto1") == 0     # anderes Gerät nicht betroffen
+    jetzt[0] += Anmeldesperre.FENSTER + 1
+    assert s.sperre_sekunden("10.0.0.9", "irgendwer") == 0   # nach 15 Minuten wieder frei
+    for _ in range(4):
+        s.fehlschlag("10.0.0.9", "max")
+    s.erfolg("10.0.0.9", "max")
+    s.fehlschlag("10.0.0.9", "max")
+    assert s.sperre_sekunden("10.0.0.9", "max") == 0         # erfolgreiche Anmeldung setzt den Zähler des Kontos zurück
+
+
+def test_passwort_mindestens_10_zeichen(env):
+    cfg, eng = env
+    a = client(cfg, "admin")
+    a.post("/benutzer/speichern", data={"username": "kurz", "rolle": "lager", "passwort": "123456789", "aktiv": "on"})
+    assert anzahl(eng, "SELECT count(*) FROM users WHERE username='kurz'") == 0
+    a.post("/benutzer/speichern", data={"username": "lang", "rolle": "lager", "passwort": "1234567890", "aktiv": "on"})
+    assert anzahl(eng, "SELECT count(*) FROM users WHERE username='lang'") == 1
+    assert "kürzer als 10" in a.post("/passwort", data={"alt": "Lager-Test-2026", "neu": "kurz12345", "neu2": "kurz12345"}).text
+    # bestehendes kurzes Passwort: Anmeldung geht, führt aber direkt zur Passwortänderung
+    from app.services.betrieb import hash_pw
+    with schreib(eng) as con:
+        con.execute(text("UPDATE users SET pw_hash=:h WHERE username='lesen'"), {"h": hash_pw("kurz1")})
+    r = client(cfg).post("/login", data={"username": "lesen", "passwort": "kurz1"})
+    assert r.status_code == 303 and r.headers["location"] == "/passwort"
+
+
+def test_ersteinrichtung_nur_am_lager_pc(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app.config import Config
+    from app.main import create_app
+    monkeypatch.setenv("LV_HOME", str(tmp_path))
+    cfg = Config()
+    cfg.daten.datenbank = str(tmp_path / "l.db")
+    cfg.daten.anhaenge = str(tmp_path / "a")
+    cfg.server.secret_key = "x"
+    app = create_app(cfg, start_scheduler=False)
+    daten = {"username": "chef", "passwort": "Sehr-sicher-1", "passwort2": "Sehr-sicher-1"}
+    netz = TestClient(app, follow_redirects=False, client=("192.168.1.50", 40000))
+    assert netz.get("/einrichtung").status_code == 403
+    assert netz.post("/einrichtung", data=daten).status_code == 403
+    lokal = TestClient(app, follow_redirects=False, client=("127.0.0.1", 40000))
+    assert lokal.post("/einrichtung", data=daten).status_code == 303
+    assert netz.post("/login", data={"username": "chef", "passwort": "Sehr-sicher-1"}).status_code == 303
+
+
+def test_cookie_ueber_https_nur_verschluesselt(env):
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+    cfg, _ = env
+    app = create_app(cfg, start_scheduler=False)
+    https = TestClient(app, base_url="https://testserver", follow_redirects=False)
+    r = https.post("/login", data={"username": "lager", "passwort": "Lager-Test-2026"})
+    assert "secure" in r.headers["set-cookie"].lower() and "httponly" in r.headers["set-cookie"].lower()
+    http = TestClient(app, base_url="http://localhost", follow_redirects=False, client=("127.0.0.1", 1))
+    r = http.post("/login", data={"username": "lager", "passwort": "Lager-Test-2026"})
+    assert "secure" not in r.headers["set-cookie"].lower()  # http://localhost am Lager-PC muss weiter funktionieren
+
+
+def test_http_nur_lokal(env):
+    from app.main import server_plan
+    cfg, _ = env
+    cfg.server.host, cfg.server.port, cfg.server.https_port = "0.0.0.0", 8080, 8443
+    assert server_plan(cfg, True) == [{"host": "127.0.0.1", "port": 8080, "ssl": False}, {"host": "0.0.0.0", "port": 8443, "ssl": True}]
+    # ohne HTTPS bliebe sonst nichts für Handhelds – dann HTTP wie konfiguriert
+    assert server_plan(cfg, False) == [{"host": "0.0.0.0", "port": 8080, "ssl": False}]
+    cfg.server.http_nur_lokal = False
+    assert server_plan(cfg, True)[0]["host"] == "0.0.0.0"
+
+
+def test_ca_nur_fuer_interne_adressen(tmp_path, monkeypatch):
+    import ipaddress
+
+    from cryptography import x509
+
+    from app.services import zertifikat
+    monkeypatch.setattr(zertifikat, "lokale_adressen", lambda: ["127.0.0.1", "192.168.10.20", "8.8.8.8"])
+    cert_p, _ = zertifikat.sicherstellen(tmp_path)
+    ca = x509.load_pem_x509_certificate(zertifikat.ca_pfade(tmp_path)[0].read_bytes())
+    nc = ca.extensions.get_extension_for_class(x509.NameConstraints)
+    assert nc.critical
+    netze = [n.value for n in nc.value.permitted_subtrees if isinstance(n, x509.IPAddress)]
+    assert ipaddress.ip_network("192.168.0.0/16") in netze and not any(ipaddress.ip_address("8.8.8.8") in n for n in netze)
+    dns = [n.value for n in nc.value.permitted_subtrees if isinstance(n, x509.DNSName)]
+    assert "localhost" in dns and not any("." in d and not d.endswith(tuple(dns)) for d in dns)
+    server = x509.load_pem_x509_certificates(cert_p.read_bytes())[0]
+    ips = {str(i) for i in server.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(x509.IPAddress)}
+    assert "192.168.10.20" in ips and "8.8.8.8" not in ips  # öffentliche Adressen kommen nicht ins Zertifikat
+    # Prüfung der Kette mit Namensbeschränkung (wie im Browser): Serverzertifikat gültig, fremde Domain nicht ausstellbar
+    from cryptography.x509.verification import PolicyBuilder, Store
+    store = Store([ca])
+    verifier = PolicyBuilder().store(store).build_server_verifier(x509.IPAddress(ipaddress.ip_address("192.168.10.20")))
+    verifier.verify(server, [])
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    ca_key = serialization.load_pem_private_key(zertifikat.ca_pfade(tmp_path)[1].read_bytes(), None)
+    k = ec.generate_private_key(ec.SECP256R1())
+    from datetime import datetime, timedelta, timezone
+    jetzt = datetime.now(timezone.utc)
+    boese = (x509.CertificateBuilder().subject_name(x509.Name([])).issuer_name(ca.subject).public_key(k.public_key())
+             .serial_number(1).not_valid_before(jetzt - timedelta(days=1)).not_valid_after(jetzt + timedelta(days=30))
+             .add_extension(x509.SubjectAlternativeName([x509.DNSName("mail.firma.de")]), critical=True)
+             .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+             .add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
+             .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False)
+             .sign(ca_key, hashes.SHA256()))
+    # mit gestohlenem CA-Schlüssel ausgestelltes Zertifikat für eine fremde Domain: an der Namensbeschränkung abgelehnt
+    with pytest.raises(Exception, match="name constraints"):
+        PolicyBuilder().store(store).build_server_verifier(x509.DNSName("mail.firma.de")).verify(boese, [])
+
+
+def test_alte_unbeschraenkte_ca_wird_ersetzt(tmp_path):
+    from datetime import datetime, timedelta, timezone
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    from app.services import zertifikat
+    k = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "alt")])
+    jetzt = datetime.now(timezone.utc)
+    alt = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(k.public_key()).serial_number(1)
+           .not_valid_before(jetzt).not_valid_after(jetzt + timedelta(days=99))
+           .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True).sign(k, hashes.SHA256()))
+    cert_p, key_p = zertifikat.ca_pfade(tmp_path)
+    cert_p.write_bytes(alt.public_bytes(serialization.Encoding.PEM))
+    key_p.write_bytes(k.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    neu, _ = zertifikat.ca_sicherstellen(tmp_path)
+    assert neu.extensions.get_extension_for_class(x509.NameConstraints)
+    assert (tmp_path / "lager_ca.crt.alt").is_file()
+
+
+def test_arbeitsplatz_skript_https_mit_zertifikat(env):
+    import base64
+    cfg, _ = env
+    cfg.daten.datenbank = cfg.daten.datenbank  # unverändert
+    c = client(cfg, "lesen")
+    bat = c.get("/arbeitsplatz.bat", headers={"host": "192.168.1.20:8443"}).content.decode("cp1252")
+    ps = base64.b64decode(re.search(r"-EncodedCommand (\S+)", bat).group(1)).decode("utf-16-le")
+    assert "$url = 'https://192.168.1.20:8443/'" in ps
+    assert "-----BEGIN CERTIFICATE-----" in ps and "PRIVATE KEY" not in ps
+    assert "Cert:\\CurrentUser\\Root" in ps  # ohne Adminrechte, nur für den angemeldeten Benutzer
+    assert "\r\n" in bat and "Adminrechte" in bat
