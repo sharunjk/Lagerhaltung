@@ -11,7 +11,7 @@ from ..db import artikel, lagerplaetze, users
 from ..services import queries
 from ..services.betrieb import check_pw, hash_pw
 from ..services.lager import audit
-from ..web import flash, render, require
+from ..web import flash, pw_kennung, render, require, sicheres_ziel
 
 router = APIRouter()
 
@@ -40,9 +40,9 @@ def login(request: Request, username: str = Form(...), passwort: str = Form(""),
         if not u or not u["aktiv"] or not u["pw_hash"] or not check_pw(passwort, u["pw_hash"]):
             return render(request, "login.html", weiter=weiter, fehler="Benutzername oder Passwort ist falsch.", username=username)
         con.execute(update(users).where(users.c.id == u["id"]).values(letzter_login=datetime.now()))
-    request.session["user"] = {"id": u["id"], "username": u["username"], "name": u["anzeigename"] or u["username"], "rolle": u["rolle"]}
-    if not weiter.startswith("/") or weiter.startswith("//"):
-        weiter = "/"
+    request.session["user"] = {"id": u["id"], "username": u["username"], "name": u["anzeigename"] or u["username"], "rolle": u["rolle"],
+                               "pw": pw_kennung(u["pw_hash"])}
+    weiter = sicheres_ziel(weiter, "/")
     if weiter == "/" and ist_mobil(request):
         weiter = "/m"
     return RedirectResponse(weiter, status_code=303)

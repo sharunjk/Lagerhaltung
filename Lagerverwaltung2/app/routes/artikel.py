@@ -5,6 +5,7 @@ import io
 import mimetypes
 import uuid
 from datetime import date
+from urllib.parse import urlencode
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
@@ -16,9 +17,14 @@ from ..db import anhaenge, artikel, lieferanten
 from ..services import labels, queries
 from ..services.excel import tabelle_xlsx
 from ..services.lager import BuchungsFehler, Lager, audit, fmt_num, parse_num
-from ..web import flash, render, require
+from ..web import flash, render, require, sicheres_ziel, zurueck
 
 router = APIRouter()
+
+MAX_ANHANG = 25 * 1024 * 1024
+# Nur diese Dateitypen werden im Browser direkt angezeigt; alles andere (HTML, SVG, ...) nur als Download,
+# sonst könnte eine hochgeladene Datei Skripte im Namen des angemeldeten Benutzers ausführen.
+INLINE_TYPEN = {"image/svg+xml", "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "application/pdf", "text/plain"}
 
 TEXT_FELDER = ["bezeichnung", "typ", "kategorie", "hersteller", "hersteller_nr", "lieferant_artnr", "einheit", "verwendung", "notiz"]
 ZAHL_FELDER = ["preis", "meldebestand", "mindestbestand", "bestellmenge"]
@@ -72,7 +78,7 @@ def liste(request: Request, q: str = "", filter: str = "", kategorie: str = "", 
 async def spalten(request: Request):
     require(request)
     request.session["spalten2"] = (await request.form()).getlist("spalten")
-    return RedirectResponse(request.headers.get("referer") or "/artikel", status_code=303)
+    return RedirectResponse(zurueck(request, "/artikel"), status_code=303)
 
 
 @router.get("/artikel/export.{fmt}")
@@ -189,17 +195,27 @@ def _anhang_ordner(request) -> Path:
 @router.post("/artikel/{nr}/anhang")
 async def anhang_hochladen(request: Request, nr: str, datei: UploadFile = File(...)):
     require(request, "lager")
-    inhalt = await datei.read()
-    weiter = request.query_params.get("weiter") or f"/artikel/{nr}#anhaenge"
-    if not inhalt or len(inhalt) > 25 * 1024 * 1024:
+    weiter = sicheres_ziel(request.query_params.get("weiter"), f"/artikel/{nr}#anhaenge")
+    with db.engine().connect() as con:
+        aid = con.execute(select(artikel.c.id).where(artikel.c.nummer == nr)).scalar()
+    if not aid:
+        flash(request, f"Artikel {nr} gibt es nicht.", "fehler")
+        return RedirectResponse("/artikel", status_code=303)
+    teile, groesse = [], 0
+    while chunk := await datei.read(1024 * 1024):  # stückweise, damit eine riesige Datei nicht komplett in den Speicher wandert
+        groesse += len(chunk)
+        if groesse > MAX_ANHANG:
+            break
+        teile.append(chunk)
+    if not groesse or groesse > MAX_ANHANG:
         flash(request, "Datei ist leer oder größer als 25 MB.", "fehler")
         return RedirectResponse(weiter, status_code=303)
-    endung = Path(datei.filename or "").suffix.lower()[:10]
+    inhalt = b"".join(teile)
+    endung = "".join(c for c in Path(datei.filename or "").suffix.lower()[:10] if c.isalnum() or c == ".")
     speicher = f"{uuid.uuid4().hex}{endung}"
     (_anhang_ordner(request) / speicher).write_bytes(inhalt)
-    typ = datei.content_type or mimetypes.guess_type(datei.filename or "")[0] or "application/octet-stream"
+    typ = mimetypes.guess_type(datei.filename or "")[0] or datei.content_type or "application/octet-stream"
     with db.schreiben() as con:
-        aid = con.execute(select(artikel.c.id).where(artikel.c.nummer == nr)).scalar()
         con.execute(insert(anhaenge).values(artikel_id=aid, dateiname=Path(datei.filename or "datei").name, speichername=speicher, typ=typ,
                                             groesse=len(inhalt), ist_bild=typ.startswith("image/"), hochgeladen_von=request.session["user"]["username"]))
         audit(con, request.session["user"]["username"], "Anhang hochgeladen", nr, {"datei": datei.filename})
@@ -212,10 +228,13 @@ def anhang(request: Request, aid: int, download: int = 0):
     require(request)
     with db.engine().connect() as con:
         a = con.execute(select(anhaenge).where(anhaenge.c.id == aid)).mappings().first()
-    if not a:
+    pfad = _anhang_ordner(request) / Path(a["speichername"]).name if a else None
+    if not a or not pfad.is_file():
         return Response(status_code=404)
-    return FileResponse(_anhang_ordner(request) / a["speichername"], media_type=a["typ"], filename=a["dateiname"],
-                        content_disposition_type="attachment" if download else "inline")
+    inline = not download and (a["typ"] or "").split(";")[0].strip().lower() in INLINE_TYPEN
+    return FileResponse(pfad, media_type=a["typ"] if inline else "application/octet-stream", filename=a["dateiname"],
+                        content_disposition_type="inline" if inline else "attachment",
+                        headers={"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"})
 
 
 @router.post("/anhang/{aid}/loeschen")
@@ -236,7 +255,7 @@ def anhang_loeschen(request: Request, aid: int):
 def etikett_vorschau(request: Request, code: str, z1: str = "", z2: str = "", format: str = "", barcode: str = ""):
     require(request)
     d = request.app.state.cfg.drucker
-    return HTMLResponse(labels.etikett_svg(code, z1, z2, format or d.standard_format, barcode or d.barcode, scale=1.6))
+    return HTMLResponse(labels.etikett_svg(code, z1, z2, format if format in labels.LAYOUTS else d.standard_format, barcode or d.barcode, scale=1.6))
 
 
 def etiketten_drucken(request, eintraege: list[tuple[str, str, str, int]], format_: str | None = None) -> str:
@@ -248,15 +267,16 @@ def etiketten_drucken(request, eintraege: list[tuple[str, str, str, int]], forma
 
 
 @router.post("/artikel/{nr}/etikett")
-def etikett_drucken(request: Request, nr: str, anzahl: int = Form(1), format: str = Form("")):
+def etikett_drucken(request: Request, nr: str, anzahl: str = Form("1"), format: str = Form("")):
     require(request, "lager")
     with db.engine().connect() as con:
         bez = con.execute(select(artikel.c.bezeichnung).where(artikel.c.nummer == nr)).scalar() or ""
     try:
-        flash(request, etiketten_drucken(request, [(nr, nr, bez, max(1, min(anzahl, 99)))], format or None))
+        n = int(anzahl) if str(anzahl).strip().isdigit() else 1
+        flash(request, etiketten_drucken(request, [(nr, nr, bez, max(1, min(n, 99)))], format if format in labels.LAYOUTS else None))
     except labels.DruckFehler as e:
         flash(request, f"Druck fehlgeschlagen: {e}", "fehler")
-    return RedirectResponse(request.query_params.get("weiter") or f"/artikel/{nr}", status_code=303)
+    return RedirectResponse(sicheres_ziel(request.query_params.get("weiter"), f"/artikel/{nr}"), status_code=303)
 
 
 @router.post("/etiketten/sammeldruck")
@@ -266,16 +286,17 @@ async def sammeldruck(request: Request):
     nrs = form.getlist("nr")
     if not nrs:
         flash(request, "Keine Artikel ausgewählt.", "fehler")
-        return RedirectResponse(request.headers.get("referer") or "/artikel", status_code=303)
+        return RedirectResponse(zurueck(request, "/artikel"), status_code=303)
     if form.get("ziel") == "browser":
-        return RedirectResponse("/etiketten/druckansicht?" + "&".join(f"nr={n}" for n in nrs), status_code=303)
+        return RedirectResponse("/etiketten/druckansicht?" + urlencode([("nr", n) for n in nrs]), status_code=303)
     with db.engine().connect() as con:
         bez = dict(con.execute(select(artikel.c.nummer, artikel.c.bezeichnung).where(artikel.c.nummer.in_(nrs))).all())
     try:
-        flash(request, f"{len(nrs)} Etiketten: " + etiketten_drucken(request, [(n, n, bez.get(n, ""), 1) for n in nrs], form.get("format") or None))
+        flash(request, f"{len(nrs)} Etiketten: " + etiketten_drucken(request, [(n, n, bez.get(n, ""), 1) for n in nrs],
+                                                                     form.get("format") if form.get("format") in labels.LAYOUTS else None))
     except labels.DruckFehler as e:
         flash(request, f"Druck fehlgeschlagen: {e}", "fehler")
-    return RedirectResponse(request.headers.get("referer") or "/artikel", status_code=303)
+    return RedirectResponse(zurueck(request, "/artikel"), status_code=303)
 
 
 @router.get("/etiketten/druckansicht")
@@ -285,7 +306,7 @@ def druckansicht(request: Request, format: str = ""):
     nrs = request.query_params.getlist("nr")
     plaetze = request.query_params.getlist("platz")
     d = request.app.state.cfg.drucker
-    fmt = format or d.standard_format
+    fmt = format if format in labels.LAYOUTS else d.standard_format
     with db.engine().connect() as con:
         bez = dict(con.execute(select(artikel.c.nummer, artikel.c.bezeichnung).where(artikel.c.nummer.in_(nrs))).all()) if nrs else {}
     svgs = [labels.etikett_svg(n, n, bez.get(n, ""), fmt, d.barcode) for n in nrs]

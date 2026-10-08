@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import text
 
 ECHTER_EXPORT = os.environ.get("LV_CASPER_EXPORT", "")
 

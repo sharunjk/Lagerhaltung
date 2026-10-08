@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+from urllib.parse import quote
 from datetime import date, datetime
 
 from fastapi import APIRouter, Form, Request
@@ -13,7 +14,7 @@ from ..db import artikel, reservierungen
 from ..services import queries
 from ..services.excel import tabelle_xlsx
 from ..services.lager import BuchungsFehler, Lager, audit, fmt_num, parse_num
-from ..web import flash, render, require
+from ..web import flash, render, require, sicheres_ziel, zurueck
 from .artikel import lager
 
 router = APIRouter()
@@ -85,10 +86,9 @@ async def buchen(request: Request):
                                      f.get("reservierung_id", ""))
     except BuchungsFehler as e:
         flash(request, str(e), "fehler")
-        return RedirectResponse(f"/buchen?artikel={nr}&typ={typ}", status_code=303)
+        return RedirectResponse(f"/buchen?artikel={quote(nr)}&typ={quote(typ)}", status_code=303)
     flash(request, msg)
-    weiter = f.get("weiter") or ""
-    return RedirectResponse(weiter if weiter.startswith("/") else f"/buchen?typ={typ}", status_code=303)
+    return RedirectResponse(sicheres_ziel(f.get("weiter"), f"/buchen?typ={quote(typ)}"), status_code=303)
 
 
 # ------------------------------------------------------------------ Bewegungen
@@ -135,7 +135,7 @@ def storno(request: Request, bid: int):
         flash(request, f"Buchung {bid} storniert (Gegenbuchung angelegt).")
     except BuchungsFehler as e:
         flash(request, str(e), "fehler")
-    return RedirectResponse(request.headers.get("referer") or "/bewegungen", status_code=303)
+    return RedirectResponse(zurueck(request, "/bewegungen"), status_code=303)
 
 
 # ------------------------------------------------------------------ Ausleihen
@@ -156,7 +156,7 @@ def rueckgabe(request: Request, bid: int, menge: str = Form(""), platz: str = Fo
         flash(request, f"Rückgabe gebucht: {fmt_num(e.menge)} × {e.artikel_nr} auf {e.platz}.")
     except BuchungsFehler as e:
         flash(request, str(e), "fehler")
-    return RedirectResponse(request.headers.get("referer") or "/ausleihen", status_code=303)
+    return RedirectResponse(zurueck(request, "/ausleihen"), status_code=303)
 
 
 # ------------------------------------------------------------------ Reservierungen
@@ -181,7 +181,7 @@ def reservierungen_liste(request: Request, status: str = "offen"):
 def reservierung_neu(request: Request, artikel_nr: str = Form(...), menge: str = Form(...), fuer: str = Form(...), person: str = Form(""), bis: str = Form("")):
     require(request, "lager")
     m = parse_num(menge)
-    weiter = request.headers.get("referer") or "/reservierungen"
+    weiter = zurueck(request, "/reservierungen")
     try:
         if not m or m <= 0:
             raise BuchungsFehler("Bitte eine Menge größer 0 angeben.")
@@ -211,4 +211,4 @@ def reservierung_status(request: Request, rid: int, status: str = Form(...)):
             con.execute(update(reservierungen).where(reservierungen.c.id == rid).values(status=status))
             audit(con, request.session["user"]["username"], f"Reservierung {status}", str(rid))
         flash(request, "Reservierung aktualisiert.")
-    return RedirectResponse(request.headers.get("referer") or "/reservierungen", status_code=303)
+    return RedirectResponse(zurueck(request, "/reservierungen"), status_code=303)

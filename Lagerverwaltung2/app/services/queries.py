@@ -233,6 +233,11 @@ def naechste_nummer(con: Connection) -> str:
     return str(max(nums) + 1) if nums else "10001"
 
 
+def _ohne_storno(b):
+    """Stornierte Buchungen und ihre Gegenbuchungen heben sich auf – in Verbrauchsauswertungen beide weglassen."""
+    return (b.c.storniert_durch.is_(None), b.c.storno_von.is_(None))
+
+
 def verbrauch(con: Connection, von: date, bis: date) -> list[dict]:
     b = bewegungen
     t0, t1 = datetime.combine(von, datetime.min.time()), datetime.combine(bis + timedelta(days=1), datetime.min.time())
@@ -241,7 +246,7 @@ def verbrauch(con: Connection, von: date, bis: date) -> list[dict]:
                func.sum(case((b.c.typ == "ausgang", -b.c.menge), else_=0)).label("ausgang"),
                func.sum(case((b.c.typ == "eingang", b.c.menge), else_=0)).label("eingang"), func.count().label("buchungen"))
         .select_from(b.outerjoin(artikel, artikel.c.id == b.c.artikel_id))
-        .where(and_(b.c.typ.in_(["eingang", "ausgang"]), b.c.zeit >= t0, b.c.zeit < t1))
+        .where(and_(b.c.typ.in_(["eingang", "ausgang"]), b.c.zeit >= t0, b.c.zeit < t1, *_ohne_storno(b)))
         .group_by(b.c.artikel_nr, artikel.c.bezeichnung, artikel.c.preis, artikel.c.einheit)
         .order_by(func.sum(case((b.c.typ == "ausgang", -b.c.menge), else_=0)).desc())).mappings().all()
     return [dict(r) for r in rows]
@@ -254,7 +259,7 @@ def verbrauch_kostenstelle(con: Connection, von: date, bis: date) -> list[dict]:
     rows = con.execute(select(k.label("kostenstelle"), func.sum(-b.c.menge).label("menge"), func.count().label("buchungen"),
                               func.sum(-b.c.menge * func.coalesce(artikel.c.preis, 0)).label("wert"))
                        .select_from(b.outerjoin(artikel, artikel.c.id == b.c.artikel_id))
-                       .where(and_(b.c.typ == "ausgang", b.c.zeit >= t0, b.c.zeit < t1)).group_by(k)
+                       .where(and_(b.c.typ == "ausgang", b.c.zeit >= t0, b.c.zeit < t1, *_ohne_storno(b))).group_by(k)
                        .order_by(func.sum(-b.c.menge).desc())).mappings().all()
     return [dict(r) for r in rows]
 

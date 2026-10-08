@@ -91,7 +91,7 @@ def qr_svg(data: str, x: float, y: float, size: float) -> str:
 
 
 def _kuerzen(text: str, max_zeichen: int) -> str:
-    text = (text or "").strip()
+    text = " ".join((text or "").split())
     return text if len(text) <= max_zeichen else text[: max_zeichen - 1] + "…"
 
 
@@ -118,6 +118,7 @@ def etikett_svg(code: str, zeile1: str, zeile2: str, layout: str = "45x23", barc
 
 # ------------------------------------------------------------------ TSPL
 def _tspl_str(s: str) -> str:
+    s = "".join(" " if ord(c) < 32 or ord(c) == 127 else c for c in str(s))
     return s.replace('"', "'").replace("\\", "/")
 
 
@@ -131,8 +132,8 @@ def etikett_tspl(code: str, zeile1: str, zeile2: str, layout: str = "45x23", bar
     cmds = [
         f"SIZE {L.breite} mm,{L.hoehe} mm",
         f"GAP {luecke_mm} mm,0 mm",
-        f"SPEED {geschwindigkeit}",
-        f"DENSITY {dichte}",
+        f"SPEED {max(2, min(5, int(geschwindigkeit)))}",  # HT100-Handbuch: Geschwindigkeit 2–5
+        f"DENSITY {max(0, min(15, int(dichte)))}",
         "DIRECTION 1,0",
         "REFERENCE 0,0",
         "CODEPAGE 1252",
@@ -148,7 +149,10 @@ def etikett_tspl(code: str, zeile1: str, zeile2: str, layout: str = "45x23", bar
         modules = sum(code128_modules(code))
         narrow = max(1, min(3, int(L.bc_b * d // modules)))
         bc_w = modules * narrow
-        x = int(L.bc_x * d + (L.bc_b * d - bc_w) / 2)
+        if bc_w > breite_dots:
+            raise DruckFehler(f"„{code}“ ist zu lang für einen Code-128-Barcode auf {L.name} (max. etwa {(breite_dots - 35) // 11} Zeichen). "
+                              "Bitte QR-Code einstellen oder kürzeren Code verwenden.")
+        x = max(0, int(L.bc_x * d + (L.bc_b * d - bc_w) / 2))
         cmds.append(f'BARCODE {x + ox},{int(L.bc_y * d) + oy},"128",{int(L.bc_h * d)},0,0,{narrow},{narrow},"{_tspl_str(code)}"')
     max_z = breite_dots // L.font_b
     for txt, y in ((zeile1, L.zeile1_y), (zeile2, L.zeile2_y)):
@@ -170,7 +174,7 @@ def windows_drucker() -> list[str]:
     try:
         import subprocess
         out = subprocess.run(["powershell", "-NoProfile", "-Command", "Get-Printer | Select-Object -ExpandProperty Name"],
-                             capture_output=True, text=True, timeout=15)
+                             capture_output=True, text=True, timeout=15, check=False)
         return [l.strip() for l in out.stdout.splitlines() if l.strip()]
     except Exception:
         return []

@@ -42,8 +42,12 @@
     if (!window.isSecureContext) {
       const port = document.body.dataset.httpsPort;
       const url = port ? `https://${location.hostname}:${port}${location.pathname}${location.search}` : "";
-      info.innerHTML = "Die Kamera funktioniert im Browser nur über eine sichere Verbindung." +
-        (url ? `<br><a class="underline font-semibold" href="${url}">Sichere Adresse öffnen</a> (Zertifikatswarnung einmal bestätigen)` : "");
+      info.textContent = "Die Kamera funktioniert im Browser nur über eine sichere Verbindung.";
+      if (url) {
+        const a = document.createElement("a");
+        a.className = "underline font-semibold"; a.href = url; a.textContent = "Sichere Adresse öffnen";
+        info.append(document.createElement("br"), a, " (Zertifikatswarnung einmal bestätigen)");
+      }
       return;
     }
     info.textContent = "Barcode ins Bild halten …";

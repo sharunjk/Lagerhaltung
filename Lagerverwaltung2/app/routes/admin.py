@@ -16,7 +16,7 @@ from ..services import betrieb, casper_import, labels, queries
 from ..services.excel import import_lesen, import_vorlage, tabelle_xlsx
 from ..services.lager import BuchungsFehler, audit, parse_num
 from ..services.zertifikat import lokale_adressen
-from ..web import ROLLEN, flash, render, require
+from ..web import ROLLEN, flash, pw_kennung, render, require
 from .artikel import etiketten_drucken, lager
 
 router = APIRouter()
@@ -89,13 +89,15 @@ def einstellungen(request: Request, tab: str = "allgemein"):
         nutzer = con.execute(select(users).order_by(func.lower(users.c.username))).mappings().all()
         letztes_backup = betrieb.get_setting(con, "letztes_backup")
         hat_daten = casper_import.hat_daten(con)
+        bericht = betrieb.get_setting(con, "uebernahme_bericht")
     bo = cfg.path(cfg.backup.ordner)
     backups = sorted(bo.glob("*.zip"), key=lambda p: p.stat().st_mtime, reverse=True)[:30] if bo.exists() else []
     svg = labels.etikett_svg("10001", "10001", "Testetikett Kugelhahn DN15", cfg.drucker.standard_format, cfg.drucker.barcode, 2)
     import socket
     return render(request, "einstellungen.html", tab=tab, users=nutzer, backups=backups, letztes_backup=letztes_backup,
                   drucker_liste=labels.windows_drucker() if tab == "drucker" else [], svg=svg, hat_daten=hat_daten,
-                  adressen=[a for a in lokale_adressen() if a != "127.0.0.1"], hostname=socket.gethostname())
+                  adressen=[a for a in lokale_adressen() if a != "127.0.0.1"], hostname=socket.gethostname(),
+                  uebernahme=json.loads(bericht) if bericht else None)
 
 
 def _cfg_update(request, section: str, werte: dict):
@@ -137,7 +139,7 @@ async def drucker(request: Request):
             "barcode": "QR" if f.get("barcode") == "QR" else "128",
             "versatz_x_mm": float(str(f.get("versatz_x_mm") or 0).replace(",", ".")),
             "versatz_y_mm": float(str(f.get("versatz_y_mm") or 0).replace(",", ".")),
-            "dichte": max(0, min(15, int(f.get("dichte") or 8))), "geschwindigkeit": max(1, min(6, int(f.get("geschwindigkeit") or 4))),
+            "dichte": max(0, min(15, int(f.get("dichte") or 8))), "geschwindigkeit": max(2, min(5, int(f.get("geschwindigkeit") or 4))),  # HT100: 2–5 (Handbuch)
             "luecke_mm": float(str(f.get("luecke_mm") or 2).replace(",", ".")),
         }
     except ValueError:
@@ -158,7 +160,7 @@ async def drucker(request: Request):
 async def mail(request: Request):
     require(request, "admin")
     f = await request.form()
-    werte = {"aktiv": f.get("aktiv") == "on", "server": (f.get("server") or "").strip(), "port": int(f.get("port") or 587),
+    werte = {"aktiv": f.get("aktiv") == "on", "server": (f.get("server") or "").strip(), "port": int(f.get("port")) if str(f.get("port") or "").isdigit() else 587,
              "ssl": f.get("ssl") == "on", "starttls": f.get("starttls") == "on", "benutzer": (f.get("benutzer") or "").strip(),
              "absender": (f.get("absender") or "").strip(), "empfaenger": (f.get("empfaenger") or "").strip(),
              "uhrzeit": (f.get("uhrzeit") or "07:30").strip()}
@@ -227,7 +229,8 @@ async def uebernahme(request: Request, datei: UploadFile = File(...), ersetzen: 
     except Exception as e:
         flash(request, f"Übernahme fehlgeschlagen, nichts geändert: {e}", "fehler")
         return RedirectResponse("/einstellungen?tab=uebernahme", status_code=303)
-    request.session["uebernahme"] = rep.__dict__
+    with db.schreiben() as con:
+        betrieb.set_setting(con, "uebernahme_bericht", json.dumps(rep.__dict__, ensure_ascii=False))
     flash(request, f"Übernommen: {rep.artikel} Artikel, {rep.lagerplaetze} Lagerplätze, {rep.bewegungen} Buchungen.")
     return RedirectResponse("/einstellungen?tab=uebernahme", status_code=303)
 
@@ -246,6 +249,16 @@ def benutzer_speichern(request: Request, id: str = Form(""), username: str = For
                 flash(request, "Passwort muss mindestens 6 Zeichen haben.", "fehler")
                 return RedirectResponse("/einstellungen?tab=benutzer", status_code=303)
             werte["pw_hash"] = betrieb.hash_pw(passwort)
+        if id and not id.isdigit():
+            flash(request, "Ungültiger Benutzer.", "fehler")
+            return RedirectResponse("/einstellungen?tab=benutzer", status_code=303)
+        if not username:
+            flash(request, "Bitte einen Benutzernamen angeben.", "fehler")
+            return RedirectResponse("/einstellungen?tab=benutzer", status_code=303)
+        doppelt = con.execute(select(users.c.id).where(func.lower(users.c.username) == username.lower())).scalar()
+        if doppelt and str(doppelt) != id:
+            flash(request, "Benutzername existiert bereits.", "fehler")
+            return RedirectResponse("/einstellungen?tab=benutzer", status_code=303)
         if id:
             if int(id) == me["id"] and (rolle != "admin" or not werte["aktiv"]):
                 flash(request, "Sie können sich nicht selbst die Admin-Rechte entziehen.", "fehler")
@@ -255,12 +268,11 @@ def benutzer_speichern(request: Request, id: str = Form(""), username: str = For
                 flash(request, "Zum Aktivieren bitte ein Passwort vergeben.", "fehler")
                 return RedirectResponse("/einstellungen?tab=benutzer", status_code=303)
             con.execute(update(users).where(users.c.id == int(id)).values(**werte))
+            if int(id) == me["id"] and "pw_hash" in werte:
+                request.session["user"] = {**me, "pw": pw_kennung(werte["pw_hash"])}
         else:
             if not passwort:
                 flash(request, "Für neue Benutzer ist ein Passwort nötig.", "fehler")
-                return RedirectResponse("/einstellungen?tab=benutzer", status_code=303)
-            if con.execute(select(users.c.id).where(func.lower(users.c.username) == username.lower())).first():
-                flash(request, "Benutzername existiert bereits.", "fehler")
                 return RedirectResponse("/einstellungen?tab=benutzer", status_code=303)
             con.execute(insert(users).values(**werte))
         audit(con, me["username"], "Benutzer gespeichert", username, {"rolle": rolle, "aktiv": werte["aktiv"]})
@@ -295,8 +307,11 @@ def passwort(request: Request, alt: str = Form(...), neu: str = Form(...), neu2:
             return render(request, "passwort.html", fehler="Aktuelles Passwort ist falsch.")
         if len(neu) < 6 or neu != neu2:
             return render(request, "passwort.html", fehler="Neue Passwörter stimmen nicht überein oder sind kürzer als 6 Zeichen.")
-        con.execute(update(users).where(users.c.id == me["id"]).values(pw_hash=betrieb.hash_pw(neu)))
-    flash(request, "Passwort geändert.")
+        neu_hash = betrieb.hash_pw(neu)
+        con.execute(update(users).where(users.c.id == me["id"]).values(pw_hash=neu_hash))
+        audit(con, me["username"], "Passwort geändert", me["username"])
+    request.session["user"] = {**me, "pw": pw_kennung(neu_hash)}
+    flash(request, "Passwort geändert. Andere Anmeldungen mit dem alten Passwort sind beendet.")
     return RedirectResponse("/", status_code=303)
 
 

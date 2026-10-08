@@ -37,7 +37,7 @@
           {% elif b.status in ("bestellt", "teilgeliefert") %}
           <form method="post" action="/bestellungen/{{ b.id }}/wareneingang" class="flex gap-1.5">
             <input name="menge" class="field py-1 w-16 text-sm text-right" value="{{ (b.menge - b.geliefert)|num }}" inputmode="decimal">
-            <input name="lagerort" list="plaetze" class="field py-1 w-28 text-sm" value="{{ haupt.get(b.artikel_id, '') }}" placeholder="Lagerplatz" required>
+            <input name="lagerort" list="plaetze" onfocus="this.select()" class="field py-1 w-28 text-sm" value="{{ haupt.get(b.artikel_id, '') }}" placeholder="Lagerplatz" required>
             <button class="btn btn-sm btn-primary">Wareneingang</button></form>
           {% endif %}
           {% if b.status in ("offen", "bestellt") %}<form method="post" action="/bestellungen/{{ b.id }}/status" class="mt-1" onsubmit="return confirm('Bestellposition stornieren?')"><input type="hidden" name="status" value="storniert"><button class="text-xs text-muted hover:text-crit">Stornieren</button></form>{% endif %}

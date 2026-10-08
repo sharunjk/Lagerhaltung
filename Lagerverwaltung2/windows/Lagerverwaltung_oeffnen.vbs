@@ -1,20 +1,27 @@
 ' Oeffnet die Lagerverwaltung als eigenes Fenster (ohne Browser-Leisten).
 ' Laeuft die Lagerverwaltung noch nicht, wird sie vorher unsichtbar im Hintergrund gestartet.
 Option Explicit
-Dim sh, fso, ordner, port, url, cfg, zeile, i
+Dim sh, fso, ordner, port, url, cfg, zeile, i, abschnitt
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 ordner = fso.GetParentFolderName(fso.GetParentFolderName(WScript.ScriptFullName))
 
-' Port aus config.toml lesen (Abschnitt [server], Zeile "port = ...")
+' Port aus config.toml lesen - nur Abschnitt [server] (unter [drucker] steht ebenfalls "port = 9100")
 port = "8080"
+abschnitt = ""
 If fso.FileExists(ordner & "\config.toml") Then
   Set cfg = fso.OpenTextFile(ordner & "\config.toml", 1)
   Do Until cfg.AtEndOfStream
     zeile = Trim(cfg.ReadLine)
-    If LCase(Left(zeile, 4)) = "port" And InStr(zeile, "=") > 0 Then
-      port = Trim(Split(Split(zeile, "=")(1), "#")(0))
-      Exit Do
+    If Left(zeile, 3) = Chr(239) & Chr(187) & Chr(191) Then zeile = Mid(zeile, 4)
+    If Left(zeile, 1) = "[" Then
+      abschnitt = LCase(Trim(Replace(Replace(Split(zeile, "#")(0), "[", ""), "]", "")))
+    ElseIf abschnitt = "server" And InStr(zeile, "=") > 0 Then
+      If LCase(Trim(Split(zeile, "=")(0))) = "port" Then
+        port = Trim(Split(Split(zeile, "=")(1), "#")(0))
+        If Not IsNumeric(port) Then port = "8080"
+        Exit Do
+      End If
     End If
   Loop
   cfg.Close

@@ -44,14 +44,14 @@
         <span class="bintag">{{ o }}</span><span class="font-semibold tabular-nums">{{ n|num }}</span></button>{% endfor %}
     </div>{% endif %}
     <div class="flex gap-2">
-      <input id="lagerort" name="lagerort" x-model="ort" list="orte" autocomplete="off" data-weiter="{{ 'ziel' if typ == 'umbuchung' else 'menge' }}" class="field h-14 text-xl font-semibold flex-1" placeholder="Platz scannen"
+      <input id="lagerort" name="lagerort" x-model="ort" list="orte" autocomplete="off" onfocus="this.select()" data-weiter="{{ 'ziel' if typ == 'umbuchung' else 'menge' }}" class="field h-14 text-xl font-semibold flex-1" placeholder="Platz scannen"
              {% if not vorwahl %}autofocus{% endif %} @keydown.enter.prevent="document.getElementById($el.dataset.weiter).focus()">
       <button type="button" onclick="LV.kamera('lagerort')" class="btn h-14 w-14" aria-label="Platz mit Kamera scannen">{{ icon("scan", "w-7 h-7") }}</button>
     </div>
   </div>
   {% if typ == "umbuchung" %}
   <div><label class="label" for="ziel">Nach Lagerplatz</label>
-    <div class="flex gap-2"><input id="ziel" name="ziel" list="orte" autocomplete="off" data-weiter="menge" required class="field h-14 text-xl font-semibold flex-1" placeholder="Zielplatz scannen" @keydown.enter.prevent="$refs.menge.focus()">
+    <div class="flex gap-2"><input id="ziel" name="ziel" list="orte" autocomplete="off" onfocus="this.select()" data-weiter="menge" required class="field h-14 text-xl font-semibold flex-1" placeholder="Zielplatz scannen" @keydown.enter.prevent="$refs.menge.focus()">
       <button type="button" onclick="LV.kamera('ziel')" class="btn h-14 w-14">{{ icon("scan", "w-7 h-7") }}</button></div></div>
   {% endif %}
   {% if typ == "ausleihe" %}

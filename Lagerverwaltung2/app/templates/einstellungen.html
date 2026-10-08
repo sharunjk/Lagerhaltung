@@ -103,7 +103,7 @@
       <div><label class="label">Versatz horizontal (mm)</label><input name="versatz_x_mm" value="{{ d.versatz_x_mm }}" class="field"></div>
       <div><label class="label">Versatz vertikal (mm)</label><input name="versatz_y_mm" value="{{ d.versatz_y_mm }}" class="field"></div>
       <div><label class="label">Druckdichte (0–15)</label><input name="dichte" type="number" min="0" max="15" value="{{ d.dichte }}" class="field"></div>
-      <div><label class="label">Geschwindigkeit (1–6)</label><input name="geschwindigkeit" type="number" min="1" max="6" value="{{ d.geschwindigkeit }}" class="field"></div>
+      <div><label class="label">Geschwindigkeit (2–5)</label><input name="geschwindigkeit" type="number" min="2" max="5" value="{{ d.geschwindigkeit }}" class="field"></div>
       <div><label class="label">Abstand zwischen Etiketten (mm)</label><input name="luecke_mm" value="{{ d.luecke_mm }}" class="field"></div>
     </div>
     <div class="flex gap-2"><button class="btn btn-primary" name="aktion" value="speichern">Speichern</button><button class="btn" name="aktion" value="test">{{ icon("print", "w-4 h-4") }}Speichern und Testetikett drucken</button></div>
@@ -158,7 +158,7 @@
     {% if hat_daten %}<label class="flex items-start gap-2 text-sm rounded-md border border-crit/40 bg-crit/5 p-3"><input type="checkbox" name="ersetzen" class="mt-0.5"><span><b>Vorhandene Daten ersetzen.</b> Alle Artikel, Bestände, Buchungen, Bestellungen und Inventuren in dieser Lagerverwaltung werden gelöscht und durch den Export ersetzt. Vorher wird automatisch gesichert.</span></label>{% endif %}
     <button class="btn btn-primary">Übernahme starten</button>
   </form>
-  {% set rep = request.session.get("uebernahme") %}
+  {% set rep = uebernahme %}
   {% if rep %}
   <section class="panel p-5">
     <h2 class="mb-3">Ergebnis der letzten Übernahme</h2>

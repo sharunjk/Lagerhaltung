@@ -76,7 +76,9 @@ def _werte_lesen(s: str, i: int) -> tuple[list, int]:
 def dump_lesen(text: str) -> dict[str, list[dict]]:
     """Alle INSERT-Zeilen eines MySQL/HeidiSQL-Exports als {tabelle: [zeile, ...]}."""
     tabellen: dict[str, list[dict]] = defaultdict(list)
-    pat = re.compile(r"INSERT INTO `?(\w+)`?\s*\(([^)]*)\)\s*VALUES\s*", re.I)
+    # Nur INSERTs am Zeilenanfang sind Daten. Der Casper-Export enthält zusätzlich den Trigger
+    # "bewegungsdaten_after_insert" mit "INSERT INTO lagerorte ... VALUES (new.Artikelnummer, ...)" – das ist Code, keine Zeile.
+    pat = re.compile(r"^INSERT INTO `?(\w+)`?\s*\(([^)]*)\)\s*VALUES\s*", re.I | re.M)
     pos = 0
     while True:
         m = pat.search(text, pos)
@@ -89,7 +91,7 @@ def dump_lesen(text: str) -> dict[str, list[dict]]:
             while text[i] in " \t\r\n":
                 i += 1
             werte, i = _werte_lesen(text, i)
-            tabellen[tab].append(dict(zip(cols, werte)))
+            tabellen[tab].append(dict(zip(cols, werte, strict=False)))
             while text[i] in " \t\r\n":
                 i += 1
             if text[i] == ",":

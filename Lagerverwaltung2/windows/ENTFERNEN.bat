@@ -1,4 +1,14 @@
 @echo off
+schtasks /Query /TN "Lagerverwaltung" >nul 2>&1
+if not errorlevel 1 (
+  net session >nul 2>&1
+  if errorlevel 1 (
+    echo HINWEIS: Die Lagerverwaltung ist als Aufgabe beim Hochfahren eingerichtet.
+    echo Zum vollstaendigen Entfernen diese Datei mit Rechtsklick - "Als Administrator ausfuehren" starten.
+    pause
+    exit /b 1
+  )
+)
 rem Beendet die Lagerverwaltung und entfernt Autostart, Dienst und Firewall-Regel. Danach kann der Ordner geloescht werden.
 del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Lagerverwaltung.vbs" 2>nul
 schtasks /End /TN "Lagerverwaltung" >nul 2>&1

@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
@@ -16,7 +16,7 @@ from .config import load_config
 from .services.betrieb import Zeitplaner
 from .web import Forbidden, LoginRequired, render
 
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 log = logging.getLogger("lagerverwaltung")
 
 
@@ -54,12 +54,15 @@ def create_app(cfg=None, start_scheduler: bool = True) -> FastAPI:
     async def _login(request: Request, exc):
         if request.headers.get("hx-request"):
             return HTMLResponse("", headers={"HX-Redirect": "/login"})
-        return RedirectResponse(f"/login?weiter={request.url.path}", status_code=303)
+        ziel = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+        return RedirectResponse(f"/login?weiter={quote(ziel, safe='')}", status_code=303)
 
     @app.exception_handler(Forbidden)
     async def _forbidden(request: Request, exc):
-        return render(request, "fehler.html", titel="Keine Berechtigung",
-                      text="Für diese Aktion fehlt Ihrer Rolle die Berechtigung. Bitte wenden Sie sich an einen Administrator.")
+        antwort = render(request, "fehler.html", titel="Keine Berechtigung",
+                         text="Für diese Aktion fehlt Ihrer Rolle die Berechtigung. Bitte wenden Sie sich an einen Administrator.")
+        antwort.status_code = 403
+        return antwort
 
     app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 

@@ -16,7 +16,7 @@
   <input type="hidden" name="artikel" value="{{ a.nummer }}">
   <div><span class="font-cond text-xl font-bold">{{ a.nummer }}</span> {{ a.bezeichnung }}</div>
   <div class="grid grid-cols-2 gap-2">{% for o, n in mit %}<button type="button" @click='ort = {{ o|tojson }}' class="rounded-md border-2 px-2 py-2 flex justify-between" :class='ort === {{ o|tojson }} ? "border-primary bg-primary/10" : "border-line"'><span class="bintag">{{ o }}</span><b>{{ n|num }}</b></button>{% else %}<p class="text-crit text-sm col-span-2">Kein Bestand vorhanden.</p>{% endfor %}</div>
-  <div class="flex gap-2"><input id="k_platz" name="lagerort" x-model="ort" class="field h-12 flex-1" placeholder="Platz" data-weiter="k_menge"><input id="k_menge" name="menge" value="1" inputmode="decimal" class="field h-12 w-24 text-center text-xl font-bold" autofocus onfocus="this.select()"></div>
+  <div class="flex gap-2"><input id="k_platz" name="lagerort" x-model="ort" onfocus="this.select()" class="field h-12 flex-1" placeholder="Platz" data-weiter="k_menge"><input id="k_menge" name="menge" value="1" inputmode="decimal" class="field h-12 w-24 text-center text-xl font-bold" autofocus onfocus="this.select()"></div>
   <div class="grid grid-cols-2 gap-2"><button class="btn btn-primary h-12">Zur Liste</button><a href="/m/korb" class="btn h-12">Abbrechen</a></div>
 </form>
 {% endif %}

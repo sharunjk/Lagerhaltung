@@ -1,10 +1,10 @@
-# Lagerverwaltung 2.2 – Installation
+# Lagerverwaltung 2.2.1 – Installation
 
 Eigenständige Lagerverwaltung mit eigener Datenbank. Sie braucht weder Casper noch MySQL noch den MIS Communicator. Die bisherigen Daten werden einmalig aus einem HeidiSQL-Export übernommen. Dauer: etwa 20 Minuten.
 
 ## Was Sie brauchen
 
-- Das Paket `Lagerverwaltung_v2.2.zip`
+- Das Paket `Lagerverwaltung_v2.2.1.zip`
 - Die Datei **python-3.12.10-embed-amd64.zip** von python.org (*Downloads → Windows → Python 3.12.10 → „Windows embeddable package (64-bit)“*). Keine Installation, keine Adminrechte nötig.
 - Den SQL-Export der Casper-Datenbank (HeidiSQL → Rechtsklick auf `daten` → *Datenbank als SQL exportieren*, Daten: „Einfügen“). Frisch exportieren, damit die letzten Buchungen enthalten sind.
 - Für Handscanner/Smartphones und andere PCs: einmalig Adminrechte für die Firewall-Freigabe (IT)
@@ -13,10 +13,10 @@ Die Lagerverwaltung kann auf dem bisherigen Lager-PC oder auf jedem anderen Wind
 
 ## 1. Installieren
 
-1. `Lagerverwaltung_v2.2.zip` nach `C:\` entpacken. Es entsteht `C:\Lagerverwaltung2`.
+1. `Lagerverwaltung_v2.2.1.zip` nach `C:\` entpacken. Es entsteht `C:\Lagerverwaltung2`.
 2. `python-3.12.10-embed-amd64.zip` **ungeöffnet** in `C:\Lagerverwaltung2` legen.
 3. Doppelklick auf `windows\1_EINRICHTEN.bat`. Erwartet: `OK: Lagerverwaltung ist startbereit.`
-4. Rechtsklick auf `windows\FIREWALL_FREIGEBEN_als_Admin.bat` → *Als Administrator ausführen* (für Handscanner, Smartphones und andere PCs).
+4. Rechtsklick auf `windows\FIREWALL_FREIGEBEN_als_Admin.bat` → *Als Administrator ausführen* (für Handscanner, Smartphones und andere PCs). Erwartet: `Firewall-Regel "Lagerverwaltung" fuer TCP-Port(s) 8080,8443 angelegt`. Die Regel gilt für die Netzwerkprofile *Domäne* und *Privat* – ist das Firmennetz am Lager-PC als *Öffentlich* eingestuft, bitte die IT das Profil ändern lassen.
 5. Doppelklick auf das neue Symbol **Lagerverwaltung** auf dem Desktop (auch im Startmenü). Die Lagerverwaltung öffnet sich als eigenes Programmfenster – ohne Adressleiste und Browser-Tabs. Beim ersten Mal startet sie dabei im Hintergrund, das dauert ein paar Sekunden.
 
 ## 2. Ersten Administrator anlegen
@@ -31,7 +31,7 @@ Beim ersten Aufruf erscheint *Ersten Administrator anlegen*. Benutzername und Pa
 
 Übernommen werden: Artikel (Freifeld „Lieferant“ → Lieferant, „Gruppe“ → Gruppe, „Typenbezeichnung“ → Typ, „Austragungsgrund“ → Notiz), Lagerplätze mit Beständen, die komplette Buchungshistorie und die Benutzernamen. Benutzer aus dem Altsystem sind danach gesperrt und ohne Passwort – unter *Einstellungen → Benutzer* anklicken, Passwort vergeben, „Aktiv“ anhaken.
 
-Muss die Übernahme wiederholt werden (z. B. mit einem neueren Export), „Vorhandene Daten ersetzen“ anhaken. Vorher wird automatisch gesichert.
+Muss die Übernahme wiederholt werden (z. B. mit einem neueren Export), „Vorhandene Daten ersetzen“ anhaken. Vorher wird automatisch gesichert (`backups\vor_uebernahme_….zip`; diese Sicherungen werden nie automatisch gelöscht).
 
 ## 4. Etikettendrucker
 
@@ -56,7 +56,9 @@ Die Lagerverwaltung besteht aus zwei Teilen: dem **Hintergrunddienst** auf dem L
 ## 7. Dauerbetrieb
 
 - **Ohne Adminrechte:** `windows\3_AUTOSTART_EIN.bat` – startet unsichtbar bei jeder Anmeldung am PC.
-- **Mit Adminrechten (empfohlen):** Rechtsklick auf `windows\DIENST_EINRICHTEN_als_Admin.bat` → *Als Administrator ausführen* – startet beim Hochfahren, auch ohne Anmeldung.
+- **Mit Adminrechten (empfohlen):** Rechtsklick auf `windows\DIENST_EINRICHTEN_als_Admin.bat` → *Als Administrator ausführen* – startet beim Hochfahren, auch ohne Anmeldung. Das Skript entfernt dabei einen vorher eingerichteten Benutzer-Autostart, damit nicht zwei Instanzen laufen.
+
+Nur eine der beiden Varianten verwenden.
 
 ## 8. Umstieg
 
@@ -66,9 +68,18 @@ Die Lagerverwaltung besteht aus zwei Teilen: dem **Hintergrunddienst** auf dem L
 
 ## Datensicherung
 
-Täglich um 22:00 Uhr entsteht eine ZIP-Datei in `C:\Lagerverwaltung2\backups` (Datenbank + Fotos/Dokumente, 30 Tage). Ordner, Uhrzeit, Dauer unter *Einstellungen → Datensicherung*; am besten ein Netzlaufwerk wählen. „Jetzt sichern“ geht jederzeit.
+Täglich um 22:00 Uhr entsteht eine ZIP-Datei `lager_backup_….zip` in `C:\Lagerverwaltung2\backups` (Datenbank + Fotos/Dokumente, 30 Tage; andere Dateien im Ordner werden nicht angefasst). Läuft die Lagerverwaltung um 22:00 Uhr nicht, wird die Sicherung nachgeholt, sobald sie am selben Tag nach 22:00 Uhr wieder läuft – sonst folgt die nächste Sicherung am Folgetag. Schlägt eine Sicherung fehl (z. B. Netzlaufwerk nicht erreichbar), wird sie jede Minute erneut versucht; Details im Protokoll `logs\lagerverwaltung.log`. Ordner, Uhrzeit, Dauer unter *Einstellungen → Datensicherung*; „Jetzt sichern“ geht jederzeit.
 
-**Wiederherstellen:** Lagerverwaltung beenden (`4_AUTOSTART_AUS.bat` bzw. Fenster schließen), ZIP entpacken, `lager.db` nach `C:\Lagerverwaltung2\daten\lager.db` kopieren, Ordner `anhaenge` nach `daten\anhaenge`, wieder starten.
+Zusätzlich eine Kopie außerhalb des PCs ablegen (Netzlaufwerk). Wichtig: Läuft die Lagerverwaltung als Dienst (`DIENST_EINRICHTEN_als_Admin.bat`), kennt sie keine Laufwerksbuchstaben wie `N:` – dann den Netzwerkpfad eintragen (z. B. `\\server\freigabe\lager`) und das Schreibrecht für das Computerkonto des Lager-PCs von der IT einrichten lassen. Nach dem Ändern einmal „Jetzt sichern“ und prüfen, ob die Datei ankommt.
+
+**Wiederherstellen:**
+
+1. Lagerverwaltung beenden: `windows\4_AUTOSTART_AUS.bat` – ist sie als Dienst eingerichtet, mit Rechtsklick *Als Administrator ausführen*. Das Programmfenster zu schließen genügt **nicht**, der Hintergrunddienst läuft weiter.
+2. Im Ordner `C:\Lagerverwaltung2\daten` die Dateien `lager.db-wal` und `lager.db-shm` löschen (falls vorhanden) – sonst mischt SQLite Reste der alten Datenbank in die Sicherung.
+3. ZIP entpacken, `lager.db` nach `C:\Lagerverwaltung2\daten\lager.db` kopieren (überschreiben), Ordner `anhaenge` nach `daten\anhaenge`.
+4. Wieder starten (Symbol *Lagerverwaltung*; beim Dienst den PC neu starten oder `schtasks /Run /TN Lagerverwaltung` als Administrator).
+
+Dieselben Schritte stehen in jeder Sicherung in `LIESMICH.txt`.
 
 **Umzug auf einen anderen PC:** Ordner `C:\Lagerverwaltung2` komplett kopieren (bei beendeter Lagerverwaltung), dort `1_EINRICHTEN.bat` und Firewall-Freigabe ausführen.
 
@@ -83,6 +94,8 @@ Täglich um 22:00 Uhr entsteht eine ZIP-Datei in `C:\Lagerverwaltung2\backups` (
 | `FEHLER: Python fehlt` | Python-ZIP liegt nicht im Programmordner oder ist nicht 3.12 / 64-bit / embeddable. |
 | Seite lädt nicht | Läuft das Fenster bzw. der Autostart? Protokoll: `logs\lagerverwaltung.log`. |
 | Handy/Handscanner erreicht die Seite nicht | Firewall-Freigabe ausgeführt? Gerät im selben Netz (Firmen-WLAN, nicht Gäste-WLAN)? Adresse aus *Einstellungen → Handscanner / Handy* verwenden. |
-| Port 8080 belegt | *Einstellungen → Allgemein* oder `config.toml`: anderen Port eintragen, neu starten. |
+| Port 8080 belegt | *Einstellungen → Allgemein* oder `config.toml` (Abschnitt `[server]`): anderen Port eintragen, Lagerverwaltung neu starten und `FIREWALL_FREIGEBEN_als_Admin.bat` erneut ausführen (liest die Ports aus `config.toml`). |
+| Handy meldet nach IP-Wechsel des Lager-PCs „Verbindung nicht privat“ | Lagerverwaltung neu starten – das HTTPS-Zertifikat wird beim Start für die aktuellen Adressen neu ausgestellt. Das Zertifikat auf den Geräten muss nicht neu installiert werden. |
+| Skript meldet „Keine Administratorrechte“ | Rechtsklick auf die Datei → *Als Administrator ausführen*. |
 | Etikett wird nicht gedruckt | Druckername exakt wie in Windows? Drucker an, Etiketten kalibriert? Sonst „Über den Browser drucken“. |
 | „database is locked“ im Protokoll | Kommt nur vor, wenn jemand die Datei `daten\lager.db` mit einem anderen Programm geöffnet hat. Programm schließen. |

@@ -22,6 +22,10 @@ def tabelle_xlsx(titel: str, spalten: list[str], zeilen: list[list], breiten: li
         c.alignment = Alignment(vertical="center")
     for z in zeilen:
         ws.append([_xl(v) for v in z])
+        for c in ws[ws.max_row]:
+            # Text wie "=HYPERLINK(...)" aus Bezeichnung/Notiz nicht als Excel-Formel ausführen lassen
+            if isinstance(c.value, str) and c.value.startswith("="):
+                c.data_type = "s"
     for i, sp in enumerate(spalten, 1):
         w = (breiten[i - 1] if breiten and i - 1 < len(breiten) else None) or min(50, max(10, len(sp) + 2,
               *(len(str(z[i - 1])) + 2 for z in zeilen[:300] if i - 1 < len(z) and z[i - 1] is not None)))
@@ -73,7 +77,7 @@ def import_lesen(daten: bytes) -> list[dict]:
         if not any(v not in (None, "") for v in r):
             continue
         d = {}
-        for k, v in zip(kopf, r):
+        for k, v in zip(kopf, r, strict=False):
             if k:
                 d[k] = "" if v is None else (str(int(v)) if isinstance(v, float) and v.is_integer() and k != "preis" else str(v)).strip()
         out.append(d)

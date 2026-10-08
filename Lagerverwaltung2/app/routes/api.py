@@ -9,12 +9,12 @@ from datetime import date
 
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import func, insert, select
+from sqlalchemy import and_, func, insert, select
 
 from .. import db
 from ..db import artikel, bewegungen, reservierungen, users
 from ..services import queries
-from ..services.lager import BuchungsFehler, Lager, audit
+from ..services.lager import MAX_MENGE, BuchungsFehler, Lager, audit
 from .buchen import buchung_ausfuehren
 
 router = APIRouter(prefix="/api/v1", tags=["Lager"])
@@ -65,7 +65,7 @@ def plaetze(authorization: str | None = Header(None), x_api_key: str | None = He
 def bewegungen_liste(seit_id: int = 0, limit: int = 500, authorization: str | None = Header(None), x_api_key: str | None = Header(None)):
     _user(authorization, x_api_key)
     with db.engine().connect() as con:
-        rows = con.execute(select(bewegungen).where(bewegungen.c.id > seit_id).order_by(bewegungen.c.id).limit(min(limit, 5000))).mappings().all()
+        rows = con.execute(select(bewegungen).where(bewegungen.c.id > seit_id).order_by(bewegungen.c.id).limit(max(1, min(limit, 5000)))).mappings().all()
     return [dict(r) for r in rows]
 
 
@@ -92,7 +92,7 @@ def buchen(b: Buchung, request: Request, authorization: str | None = Header(None
             msg = buchung_ausfuehren(L, b.typ, b.artikel, str(b.menge), b.lagerplatz, b.ziel, b.empfaenger, b.kostenstelle, b.zweck)
             letzte = con.execute(select(func.max(bewegungen.c.id))).scalar()
     except BuchungsFehler as e:
-        raise HTTPException(422, str(e))
+        raise HTTPException(422, str(e)) from None
     return {"ok": True, "meldung": msg, "bewegung_id": letzte}
 
 
@@ -107,8 +107,14 @@ class Reservierung(BaseModel):
 @router.post("/reservierungen")
 def reservieren(r: Reservierung, authorization: str | None = Header(None), x_api_key: str | None = Header(None)):
     u = _user(authorization, x_api_key)
+    if u["rolle"] == "lesen":
+        raise HTTPException(403, "Rolle darf nicht reservieren")
+    if not (0 < r.menge <= MAX_MENGE):
+        raise HTTPException(422, "Die Menge muss größer als 0 sein.")
+    if not r.fuer.strip():
+        raise HTTPException(422, "Bitte angeben, wofür reserviert wird.")
     with db.schreiben() as con:
-        aid = con.execute(select(artikel.c.id).where(artikel.c.nummer == r.artikel)).scalar()
+        aid = con.execute(select(artikel.c.id).where(and_(artikel.c.nummer == r.artikel.strip(), artikel.c.aktiv == True))).scalar()  # noqa: E712
         if not aid:
             raise HTTPException(404, "Artikel nicht gefunden")
         rid = con.execute(insert(reservierungen).values(artikel_id=aid, menge=r.menge, fuer=r.fuer, person=r.person or None, bis=r.bis,

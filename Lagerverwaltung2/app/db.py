@@ -4,8 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, Column, Date, DateTime, Float, ForeignKey, Index, Integer, MetaData, String, Table, Text,
-    UniqueConstraint, create_engine, event, func, text,
+    Boolean, Column, Date, DateTime, Float, ForeignKey, Index, Integer, MetaData, String, Table, Text,
+    UniqueConstraint, create_engine, event, func,
 )
 from sqlalchemy.engine import Engine
 

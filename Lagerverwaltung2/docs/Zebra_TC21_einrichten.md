@@ -9,7 +9,7 @@ Einmal pro Gerät, etwa 10 Minuten. Die Adressen und QR-Codes für Ihr Netz steh
 - TC21 im **Firmen-WLAN** (gleiches Netz wie der Lager-PC, nicht das Gäste-WLAN)
 - Am Lager-PC wurde `FIREWALL_FREIGEBEN_als_Admin.bat` ausgeführt
 - Ein Benutzer für die Person, die das Gerät nutzt (*Einstellungen → Benutzer*)
-- Der Lager-PC sollte eine **feste IP-Adresse** haben (IT fragen), sonst ändert sich die App-Adresse
+- Der Lager-PC sollte eine **feste IP-Adresse** haben (IT fragen), sonst ändert sich die App-Adresse. Nach einem IP-Wechsel die Lagerverwaltung am PC neu starten (das HTTPS-Zertifikat wird beim Start neu ausgestellt).
 
 ## Schritt 1: Sicherheitszertifikat installieren
 
@@ -62,9 +62,10 @@ Grüne Meldung mit kurzem Ton = gebucht. Rote Meldung mit Doppelvibration = nich
 
 ## Ohne WLAN (Offline-Modus)
 
-Fehlt an einer Stelle im Lager das WLAN, wird eine Buchung **nicht verloren**:
+Fehlt an einer Stelle im Lager das WLAN, wird eine Buchung **nicht verloren**. Voraussetzung: Die App wurde wie oben über die **https**-Adresse installiert (nur dann hält Chrome die Offline-Seite vor).
 
 - Beim Buchen prüft die App kurz die Verbindung. Ist der Lager-PC nicht erreichbar, wird die Buchung im Gerät gespeichert und die Seite *Offline erfassen* geöffnet.
+- Ist nur die Anmeldung abgelaufen, wird die Buchung ebenfalls im Gerät gespeichert und die Anmeldung geöffnet; nach dem Anmelden wird sie übertragen.
 - Auf *Offline erfassen* lässt sich ohne Verbindung weiterarbeiten: Artikel scannen (Bezeichnung und Bestände vom letzten Abgleich werden angezeigt), Platz, Menge, Speichern.
 - Oben rechts zeigt ein Zähler „1 wartet“. Sobald wieder Verbindung besteht, überträgt die App automatisch (spätestens nach 30 Sekunden). Doppelt gebucht wird dabei nie.
 - Lässt sich eine offline erfasste Buchung später nicht ausführen (z. B. Bestand inzwischen woanders entnommen), erscheint sie rot unter *Offline erfassen* mit dem Grund – dort „Erneut senden“ oder „Verwerfen“.

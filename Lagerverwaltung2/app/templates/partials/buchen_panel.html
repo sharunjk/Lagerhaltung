@@ -30,10 +30,10 @@
         {% endfor %}
       </div>
       {% endif %}
-      <input name="lagerort" x-model="ort" list="orte_liste" class="field max-w-xs font-semibold" maxlength="60" placeholder="Lagerplatz scannen oder eingeben" @keydown.enter.prevent="$refs.menge.focus()">
+      <input name="lagerort" x-model="ort" list="orte_liste" onfocus="this.select()" class="field max-w-xs font-semibold" maxlength="60" placeholder="Lagerplatz scannen oder eingeben" @keydown.enter.prevent="$refs.menge.focus()">
       {% if typ in ("ausgang", "umbuchung", "ausleihe") and not mit_bestand %}<p class="text-sm text-warn mt-1">Für diesen Artikel ist kein Bestand vorhanden.</p>{% endif %}
     </div>
-    {% if typ == "umbuchung" %}<div><label class="label" for="ziel">Nach Lagerplatz</label><input id="ziel" name="ziel" list="orte_liste" class="field max-w-xs font-semibold" maxlength="60" required placeholder="Ziel-Lagerplatz"></div>{% endif %}
+    {% if typ == "umbuchung" %}<div><label class="label" for="ziel">Nach Lagerplatz</label><input id="ziel" name="ziel" list="orte_liste" onfocus="this.select()" class="field max-w-xs font-semibold" maxlength="60" required placeholder="Ziel-Lagerplatz"></div>{% endif %}
     {% if typ == "ausleihe" %}
     <div class="grid sm:grid-cols-2 gap-3 max-w-xl">
       <div><label class="label">Ausgeliehen an</label><input name="empfaenger" list="empf" required class="field" placeholder="Name / Firma"></div>

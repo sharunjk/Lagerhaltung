@@ -11,7 +11,7 @@ from ..db import artikel, bestand, bestellungen, bewegungen, inventur_pos, inven
 from ..services import labels, queries
 from ..services.excel import tabelle_xlsx
 from ..services.lager import BuchungsFehler, audit, fmt_num, parse_num
-from ..web import flash, render, require
+from ..web import flash, render, require, sicheres_ziel, zurueck
 from .artikel import etiketten_drucken, lager
 
 router = APIRouter()
@@ -61,6 +61,10 @@ def platz_speichern(request: Request, code: str = Form(...), bereich: str = Form
         vorhanden = con.execute(select(lagerplaetze.c.id).where(func.lower(lagerplaetze.c.code) == code.lower())).scalar()
         if alt:
             pid = con.execute(select(lagerplaetze.c.id).where(lagerplaetze.c.code == alt)).scalar()
+            if pid is None:
+                # Ohne diese Prüfung würde unten "lagerplatz_id IS NULL" alle Bewegungen ohne Platz umbenennen.
+                flash(request, f"Den Lagerplatz {alt} gibt es nicht mehr.", "fehler")
+                return RedirectResponse("/lagerplaetze", status_code=303)
             if vorhanden and vorhanden != pid:
                 flash(request, f"Den Platz {code} gibt es schon. Zum Zusammenlegen „Zusammenführen“ verwenden.", "fehler")
                 return RedirectResponse(f"/lagerplaetze/ansicht?code={alt}", status_code=303)
@@ -89,6 +93,8 @@ def zusammenfuehren(request: Request, von: str = Form(...), nach: str = Form(...
             if pv["id"] == pn["id"]:
                 raise BuchungsFehler("Quell- und Zielplatz sind identisch.")
             for aid, menge in con.execute(select(bestand.c.artikel_id, bestand.c.menge).where(bestand.c.lagerplatz_id == pv["id"])).all():
+                if menge < 0:
+                    raise BuchungsFehler(f"Auf {pv['code']} gibt es einen negativen Bestand. Bitte erst per Zählung korrigieren.")
                 if menge > 0:
                     L.umbuchung(aid, pv["code"], pn["code"], menge)
                     n += 1
@@ -112,10 +118,11 @@ async def platz_etikett(request: Request):
     f = await request.form()
     codes = f.getlist("code")
     try:
-        flash(request, etiketten_drucken(request, [(c, c, f.get("text") or "Lagerplatz", max(1, min(int(f.get("anzahl") or 1), 99))) for c in codes]))
+        anzahl = int(f.get("anzahl")) if str(f.get("anzahl") or "").isdigit() else 1
+        flash(request, etiketten_drucken(request, [(c, c, f.get("text") or "Lagerplatz", max(1, min(anzahl, 99))) for c in codes]))
     except labels.DruckFehler as e:
         flash(request, f"Druck fehlgeschlagen: {e}", "fehler")
-    return RedirectResponse(request.headers.get("referer") or "/lagerplaetze", status_code=303)
+    return RedirectResponse(zurueck(request, "/lagerplaetze"), status_code=303)
 
 
 # ------------------------------------------------------------------ Nachbestellung / Bestellungen
@@ -143,10 +150,15 @@ async def bestellungen_anlegen(request: Request):
     n = 0
     with db.schreiben() as con:
         for aid in form.getlist("aid"):
+            if not str(aid).isdigit():
+                continue
             m = parse_num(form.get(f"menge_{aid}"))
             if not m or m <= 0:
                 continue
-            lid = con.execute(select(artikel.c.lieferant_id).where(artikel.c.id == int(aid))).scalar()
+            a_row = con.execute(select(artikel.c.id, artikel.c.lieferant_id).where(artikel.c.id == int(aid))).first()
+            if not a_row:
+                continue
+            lid = a_row[1]
             con.execute(insert(bestellungen).values(artikel_id=int(aid), menge=m, geliefert=0, lieferant_id=lid, status="offen",
                                                     erstellt_von=request.session["user"]["username"]))
             n += 1
@@ -167,7 +179,7 @@ def bestellung_einzeln(request: Request, artikel_nr: str = Form(...), menge: str
             flash(request, f"Bestellposition für {artikel_nr} angelegt.")
         else:
             flash(request, "Artikel oder Menge ungültig.", "fehler")
-    return RedirectResponse(request.headers.get("referer") or "/bestellungen", status_code=303)
+    return RedirectResponse(zurueck(request, "/bestellungen"), status_code=303)
 
 
 def _bestell_query(status: str = "aktiv", lieferant_id: int | None = None):
@@ -234,6 +246,8 @@ def wareneingang(request: Request, bid: int, menge: str = Form(...), lagerort: s
                                .where(bestellungen.c.id == bid)).mappings().first()
             if not best:
                 raise BuchungsFehler("Bestellung nicht gefunden.")
+            if best["status"] == "storniert":
+                raise BuchungsFehler("Diese Bestellung ist storniert. Ware bitte als normalen Eingang buchen.")
             lager(con, request, "mobil" if weiter.startswith("/m") else "pc").eingang(best["nummer"], lagerort, m, bestellung_id=bid,
                                         zweck=f"Wareneingang Bestellung {best['bestellnummer'] or bid}")
             geliefert = float(best["geliefert"] or 0) + m
@@ -243,7 +257,7 @@ def wareneingang(request: Request, bid: int, menge: str = Form(...), lagerort: s
         flash(request, f"Wareneingang: {fmt_num(m)} × {best['nummer']} auf {lagerort}.")
     except BuchungsFehler as e:
         flash(request, str(e), "fehler")
-    return RedirectResponse(weiter if weiter.startswith("/") else "/bestellungen", status_code=303)
+    return RedirectResponse(sicheres_ziel(weiter, "/bestellungen"), status_code=303)
 
 
 @router.get("/bestellungen/export.xlsx")
@@ -346,7 +360,7 @@ async def inventur_zaehlen(request: Request, iid: int):
     form = await request.form()
     werte = {}
     for k, v in form.items():
-        if k.startswith("ist_") and str(v).strip() != "":
+        if k.startswith("ist_") and k[4:].isdigit() and str(v).strip() != "":
             val = parse_num(v)
             if val is not None and val >= 0:
                 werte[int(k[4:])] = val
@@ -375,8 +389,15 @@ def inventur_abschliessen(request: Request, iid: int):
             for p in inventur_positionen(con, iid):
                 if p["ist"] is None:
                     continue
-                if abs(float(p["ist"]) - float(p["aktuell"] or 0)) > 1e-9 or p["aktuell"] is None:
-                    L.inventur(p["nummer"], p["code"], p["ist"], zweck=inv["name"])
+                # Buchungen nach dem Zählzeitpunkt (z. B. Entnahme zwischen Zählung und Abschluss) dürfen nicht verloren gehen:
+                # Sollbestand = gezählt + Summe der Bewegungen an diesem Platz seit der Zählung.
+                seit = float(con.execute(select(func.coalesce(func.sum(bewegungen.c.menge), 0)).where(and_(
+                    bewegungen.c.artikel_id == p["artikel_id"], bewegungen.c.lagerplatz_id == p["lagerplatz_id"],
+                    bewegungen.c.typ.in_(queries.BESTANDSWIRKSAM), bewegungen.c.zeit > p["gezaehlt_am"]))).scalar()) if p["gezaehlt_am"] else 0.0
+                ziel = max(0.0, float(p["ist"]) + seit)
+                if abs(ziel - float(p["aktuell"] or 0)) > 1e-9 or p["aktuell"] is None:
+                    zweck = inv["name"] + (f" (gezählt {fmt_num(p['ist'])}, seit Zählung {'+' if seit > 0 else ''}{fmt_num(seit)})" if abs(seit) > 1e-9 else "")
+                    L.inventur(p["nummer"], p["code"], ziel, zweck=zweck)
                     n += 1
             con.execute(update(inventuren).where(inventuren.c.id == iid).values(status="abgeschlossen", abgeschlossen_am=datetime.now()))
             audit(con, request.session["user"]["username"], "Inventur abgeschlossen", str(iid), {"korrekturen": n})
@@ -422,7 +443,7 @@ async def lieferant_speichern(request: Request):
         if doppelt and str(doppelt) != str(f.get("id") or ""):
             flash(request, f"Lieferant {werte['name']} gibt es schon.", "fehler")
             return RedirectResponse("/lieferanten", status_code=303)
-        if f.get("id"):
+        if str(f.get("id") or "").isdigit():
             con.execute(update(lieferanten).where(lieferanten.c.id == int(f["id"])).values(**werte))
         else:
             con.execute(insert(lieferanten).values(**werte))

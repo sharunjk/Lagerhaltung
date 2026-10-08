@@ -5,6 +5,8 @@ ohne Verbindung werden sie im Gerät gespeichert und über /m/sync nachgereicht.
 """
 from __future__ import annotations
 
+import json
+import logging
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
@@ -15,6 +17,7 @@ from sqlalchemy import and_, func, insert, select, update
 from .. import db
 from ..db import artikel, bestand, bestellungen, inventuren, lagerplaetze, lieferanten, reservierungen, sync_log
 from ..services import queries
+from ..services.betrieb import get_setting, set_setting
 from ..services.lager import BuchungsFehler, audit, fmt_num, parse_num
 from ..web import current_user, flash, render, require, templates
 from .artikel import etiketten_drucken, form_daten, lager
@@ -23,6 +26,29 @@ from .lager import inventur_positionen, zaehlung_speichern
 
 router = APIRouter(prefix="/m")
 RUECKGAENGIG_MINUTEN = 10
+log = logging.getLogger("lagerverwaltung")
+
+
+# Die Sammelentnahme-Liste liegt in der Datenbank und nicht im Sitzungs-Cookie: Browser verwerfen Cookies über 4 KB
+# (ab ca. 20 Positionen), und beim doppelten Absenden darf dieselbe Liste nicht zweimal gebucht werden.
+def _korb_schluessel(request: Request) -> str:
+    return f"korb:{require(request)['id']}"
+
+
+def _korb(con, request: Request) -> list[dict]:
+    try:
+        return json.loads(get_setting(con, _korb_schluessel(request)) or "[]")
+    except ValueError:
+        return []
+
+
+def _korb_lesen(request: Request) -> list[dict]:
+    with db.engine().connect() as con:
+        return _korb(con, request)
+
+
+def _korb_speichern(con, request: Request, k: list[dict]) -> None:
+    set_setting(con, _korb_schluessel(request), json.dumps(k, ensure_ascii=False))
 
 
 def _merken(request: Request, typ: str, ids: list[int], msg: str) -> None:
@@ -75,7 +101,7 @@ def start(request: Request):
         res = con.execute(select(func.count()).where(reservierungen.c.status == "offen")).scalar()
         best = con.execute(select(func.count()).where(bestellungen.c.status.in_(["bestellt", "teilgeliefert"]))).scalar()
     return render(request, "m/start.html", letzte=letzte, inventuren=inv, ausleihen=ausl, reserviert=res, bestellt=best,
-                  korb=len(request.session.get("korb", [])))
+                  korb=len(_korb_lesen(request)))
 
 
 # ------------------------------------------------------------------ Buchen
@@ -129,18 +155,26 @@ def rueckgaengig(request: Request):
             for r in rows:
                 if r["storniert_durch"]:
                     raise BuchungsFehler("Diese Buchung wurde schon zurückgenommen.")
+            gegen: dict[int, int] = {}
             for r in rows:
                 nr = r["artikel_nr"]
+                vorher = len(L.ids)
                 if r["typ"] in ("eingang", "ausgang"):
-                    L.storno(r["id"])
-                elif r["typ"] == "umbuchung" and r["menge"] > 0:
+                    L.storno(r["id"])  # setzt storniert_durch selbst
+                    continue
+                if r["typ"] == "umbuchung" and r["menge"] > 0:
                     L.umbuchung(nr, r["lagerplatz"], r["text"].split("von ", 1)[1].split(";")[0], r["menge"])
+                    gegen[r["id"]] = L.ids[-2]  # Gegenbuchung am Zielplatz (Abgang)
+                    if r["bezug_id"]:
+                        gegen[r["bezug_id"]] = L.ids[-1]  # Gegenbuchung am Quellplatz (Zugang)
                 elif r["typ"] == "inventur":
                     L.inventur(nr, r["lagerplatz"], (r["bestand_nachher"] or 0) - (r["menge"] or 0))
                 elif r["typ"] == "ausleihe":
                     L.rueckgabe(r["id"])
-            for r in rows:
-                con.execute(update(bewegungen).where(bewegungen.c.id == r["id"]).values(storniert_durch=L.ids[-1] if L.ids else None))
+                if len(L.ids) > vorher:
+                    gegen.setdefault(r["id"], L.ids[-1])
+            for bid, gid in gegen.items():
+                con.execute(update(bewegungen).where(and_(bewegungen.c.id == bid, bewegungen.c.storniert_durch.is_(None))).values(storniert_durch=gid))
             audit(con, request.session["user"]["username"], "Rückgängig (Handheld)", ",".join(str(i) for i in l["ids"]))
     except (BuchungsFehler, IndexError, AttributeError) as e:
         flash(request, f"Rückgängig nicht möglich: {e}", "fehler")
@@ -275,7 +309,7 @@ def korb(request: Request, artikel: str = ""):
         if artikel.strip():
             a = queries.artikel_detail(con, artikel.strip())
         vs = queries.vorschlaege(con)
-    return render(request, "m/korb.html", korb=request.session.get("korb", []), a=a, artikel=artikel, vs=vs,
+    return render(request, "m/korb.html", korb=_korb_lesen(request), a=a, artikel=artikel, vs=vs,
                   nicht_gefunden=bool(artikel.strip() and not a))
 
 
@@ -288,9 +322,10 @@ def korb_neu(request: Request, nr: str = Form(..., alias="artikel"), lagerort: s
     if not a or not m or m <= 0 or not lagerort.strip():
         flash(request, "Artikel, Lagerplatz und Menge prüfen.", "fehler")
         return RedirectResponse(f"/m/korb?artikel={quote(nr)}", status_code=303)
-    k = request.session.get("korb", [])
-    k.append({"nr": a["nummer"], "bez": a["bezeichnung"], "einheit": a["einheit"], "platz": " ".join(lagerort.split()), "menge": m})
-    request.session["korb"] = k
+    with db.schreiben() as con:
+        k = _korb(con, request)
+        k.append({"nr": a["nummer"], "bez": a["bezeichnung"], "einheit": a["einheit"], "platz": " ".join(lagerort.split()), "menge": m})
+        _korb_speichern(con, request, k)
     flash(request, f"{fmt_num(m)} × {a['nummer']} in die Liste übernommen.")
     return RedirectResponse("/m/korb", status_code=303)
 
@@ -298,31 +333,32 @@ def korb_neu(request: Request, nr: str = Form(..., alias="artikel"), lagerort: s
 @router.post("/korb/entfernen/{i}")
 def korb_entfernen(request: Request, i: int):
     require(request)
-    k = request.session.get("korb", [])
-    if 0 <= i < len(k):
-        k.pop(i)
-    request.session["korb"] = k
+    with db.schreiben() as con:
+        k = _korb(con, request)
+        if 0 <= i < len(k):
+            k.pop(i)
+        _korb_speichern(con, request, k)
     return RedirectResponse("/m/korb", status_code=303)
 
 
 @router.post("/korb/buchen")
 def korb_buchen(request: Request, empfaenger: str = Form(""), kostenstelle: str = Form(""), zweck: str = Form("")):
     require(request, "lager")
-    k = request.session.get("korb", [])
-    if not k:
-        return RedirectResponse("/m/korb", status_code=303)
     try:
         with db.schreiben() as con:
+            k = _korb(con, request)  # innerhalb der Schreibsperre lesen: ein zweites Absenden findet eine leere Liste
+            if not k:
+                return RedirectResponse("/m/korb", status_code=303)
             L = lager(con, request, "mobil")
             for pos in k:
                 L.ausgang(pos["nr"], pos["platz"], pos["menge"], empfaenger=empfaenger, kostenstelle=kostenstelle, zweck=zweck)
             ids = list(L.ids)
+            _korb_speichern(con, request, [])
     except BuchungsFehler as e:
         flash(request, f"Nichts gebucht: {e}", "fehler")
         return RedirectResponse("/m/korb", status_code=303)
     msg = f"Sammelentnahme: {len(k)} Positionen gebucht."
     _merken(request, "ausgang", ids, msg)
-    request.session["korb"] = []
     flash(request, msg)
     return RedirectResponse("/m/korb", status_code=303)
 
@@ -394,7 +430,8 @@ async def inventur_post(request: Request, iid: int):
     require(request, "lager")
     f = await request.form()
     platz = (f.get("platz") or "").strip()
-    werte = {int(k[4:]): parse_num(v) for k, v in f.items() if k.startswith("ist_") and str(v).strip() != "" and parse_num(v) is not None}
+    werte = {int(k[4:]): parse_num(v) for k, v in f.items()
+             if k.startswith("ist_") and k[4:].isdigit() and str(v).strip() != "" and parse_num(v) is not None and parse_num(v) >= 0}
     neu = None
     if (f.get("neu_artikel") or "").strip() and parse_num(f.get("neu_ist")) is not None:
         neu = (f["neu_artikel"].strip(), platz, parse_num(f["neu_ist"]))
@@ -435,10 +472,19 @@ async def sync(request: Request):
         return JSONResponse({"fehler": "nicht angemeldet"}, status_code=401)
     if u["rolle"] == "lesen":
         return JSONResponse({"fehler": "keine Berechtigung"}, status_code=403)
-    daten = await request.json()
+    try:
+        daten = await request.json()
+    except ValueError:
+        return JSONResponse({"fehler": "ungültige Daten"}, status_code=400)
+    items = daten.get("items") if isinstance(daten, dict) else None
+    if not isinstance(items, list):
+        return JSONResponse({"fehler": "ungültige Daten"}, status_code=400)
     ergebnis = {}
-    for it in daten.get("items", [])[:500]:
-        uid = str(it.get("uuid") or "")[:64]
+    for roh in items[:500]:
+        if not isinstance(roh, dict):
+            continue
+        it = {k: ("" if v is None else str(v)) for k, v in roh.items()}
+        uid = it.get("uuid", "")[:64]
         if not uid:
             continue
         with db.engine().connect() as con:
@@ -447,7 +493,7 @@ async def sync(request: Request):
             ergebnis[uid] = {"ok": True, "meldung": schon, "doppelt": True}
             continue
         try:
-            erfasst = datetime.fromisoformat(str(it.get("erfasst", "")).replace("Z", "+00:00")).astimezone().strftime("%d.%m. %H:%M")
+            erfasst = datetime.fromisoformat(it.get("erfasst", "").replace("Z", "+00:00")).astimezone().strftime("%d.%m. %H:%M")
         except ValueError:
             erfasst = "?"
         try:
@@ -457,10 +503,14 @@ async def sync(request: Request):
                     continue
                 L = lager(con, request, "offline")
                 L.hinweis = f"offline erfasst {erfasst}"
-                msg = buchung_ausfuehren(L, it.get("typ", ""), str(it.get("artikel", "")).strip(), str(it.get("menge", "")), it.get("lagerort", ""),
-                                         it.get("ziel", ""), it.get("empfaenger", ""), it.get("kostenstelle", ""), it.get("zweck", ""))
-                con.execute(insert(sync_log).values(uuid=uid, benutzer=u["username"], erfasst_am=str(it.get("erfasst", ""))[:40], meldung=msg[:300]))
+                msg = buchung_ausfuehren(L, it.get("typ", ""), it.get("artikel", "").strip(), it.get("menge", ""), it.get("lagerort", ""),
+                                         it.get("ziel", ""), it.get("empfaenger", ""), it.get("kostenstelle", ""), it.get("zweck", ""),
+                                         it.get("rueckgabe_bis", ""), it.get("reservierung_id", ""))
+                con.execute(insert(sync_log).values(uuid=uid, benutzer=u["username"], erfasst_am=it.get("erfasst", "")[:40], meldung=msg[:300]))
             ergebnis[uid] = {"ok": True, "meldung": msg}
         except BuchungsFehler as e:
             ergebnis[uid] = {"ok": False, "meldung": str(e)}
+        except Exception:  # eine fehlerhafte Buchung darf die übrigen nicht blockieren
+            log.exception("Offline-Buchung %s konnte nicht übernommen werden", uid)
+            ergebnis[uid] = {"ok": False, "meldung": "Interner Fehler beim Übertragen – bitte am PC prüfen (Protokolldatei)."}
     return ergebnis

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import base64
-import gzip
 import hashlib
 import hmac
 import logging
@@ -10,11 +9,12 @@ import os
 import smtplib
 import threading
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from email.message import EmailMessage
+from html import escape
 from pathlib import Path
 
-from sqlalchemy import insert, select, text, update
+from sqlalchemy import insert, select, update
 from sqlalchemy.engine import Engine
 
 from ..db import settings as lv_settings
@@ -88,7 +88,7 @@ def meldebestand_mail(eng: Engine, cfg, nur_wenn_vorhanden: bool = True) -> int:
               f"Melde {fmt_num(a['meldebestand']) or '-':>4}  Mindest {fmt_num(a['mindestbestand']) or '-':>4}  "
               f"{'KRITISCH' if a['status'] == 'kritisch' else ''}" for a in arts]
     rows = "".join(
-        f"<tr><td>{a['nummer']}</td><td>{a['bezeichnung'] or ''}</td><td align=right>{fmt_num(a['bestand'])}</td>"
+        f"<tr><td>{escape(a['nummer'])}</td><td>{escape(a['bezeichnung'] or '')}</td><td align=right>{fmt_num(a['bestand'])}</td>"
         f"<td align=right>{fmt_num(a['meldebestand'])}</td><td align=right>{fmt_num(a['mindestbestand'])}</td>"
         f"<td style='color:{'#b91c1c' if a['status'] == 'kritisch' else '#b45309'}'>{'kritisch' if a['status'] == 'kritisch' else 'nachbestellen'}</td></tr>"
         for a in arts)
@@ -110,6 +110,10 @@ def backup_erstellen(cfg, ordner: Path | None = None, aufbewahren_tage: int | No
     ordner = ordner or cfg.path(cfg.backup.ordner)
     ordner.mkdir(parents=True, exist_ok=True)
     datei = ordner / f"{name}_{datetime.now():%Y%m%d_%H%M%S}.zip"
+    n = 1
+    while datei.exists():  # zwei Sicherungen in derselben Sekunde nicht überschreiben
+        n += 1
+        datei = ordner / f"{name}_{datetime.now():%Y%m%d_%H%M%S}_{n}.zip"
     with tempfile.TemporaryDirectory() as tmp:
         kopie = Path(tmp) / "lager.db"
         src = sqlite3.connect(str(cfg.path(cfg.daten.datenbank)))
@@ -125,9 +129,14 @@ def backup_erstellen(cfg, ordner: Path | None = None, aufbewahren_tage: int | No
                 for f in anh.rglob("*"):
                     if f.is_file():
                         z.write(f, f"anhaenge/{f.relative_to(anh)}")
-            z.writestr("LIESMICH.txt", "Datensicherung Lagerverwaltung\r\n"
-                       "Wiederherstellen: Lagerverwaltung beenden, lager.db nach daten\\lager.db kopieren,\r\n"
-                       "Ordner anhaenge nach daten\\anhaenge kopieren, Lagerverwaltung starten.\r\n")
+            z.writestr("LIESMICH.txt", "Datensicherung Lagerverwaltung\r\n\r\n"
+                       "Wiederherstellen:\r\n"
+                       "1. Lagerverwaltung beenden (windows\\4_AUTOSTART_AUS.bat).\r\n"
+                       "2. Im Ordner daten die Dateien lager.db-wal und lager.db-shm loeschen (falls vorhanden).\r\n"
+                       "   Wichtig: sonst mischt die Datenbank alte Restdaten in die Sicherung.\r\n"
+                       "3. lager.db aus dieser Sicherung nach daten\\lager.db kopieren (ueberschreiben).\r\n"
+                       "4. Ordner anhaenge aus dieser Sicherung nach daten\\anhaenge kopieren.\r\n"
+                       "5. Lagerverwaltung starten.\r\n")
     tage = cfg.backup.aufbewahren_tage if aufbewahren_tage is None else aufbewahren_tage
     grenze = time.time() - tage * 86400
     for alt in ordner.glob(f"{name}_*.zip"):
@@ -154,21 +163,28 @@ class Zeitplaner(threading.Thread):
         jetzt = datetime.now()
         if (jetzt.hour, jetzt.minute) < (h, m):
             return False
+        with self.eng.connect() as con:
+            return get_setting(con, key) != jetzt.strftime("%Y-%m-%d")
+
+    def _erledigt(self, key: str) -> None:
         with self.eng.execution_options(schreiben=True).begin() as con:
-            if get_setting(con, key) == jetzt.strftime("%Y-%m-%d"):
-                return False
-            set_setting(con, key, jetzt.strftime("%Y-%m-%d"))
-        return True
+            set_setting(con, key, datetime.now().strftime("%Y-%m-%d"))
 
     def run(self):
         while not self.stop_event.wait(60):
             cfg = self.cfg_getter()
             try:
+                # erst nach Erfolg als erledigt merken – schlägt die Sicherung fehl, wird sie in der nächsten Minute erneut versucht
                 if cfg.backup.aktiv and self._faellig("letztes_backup", cfg.backup.uhrzeit):
                     p = backup_erstellen(cfg)
+                    self._erledigt("letztes_backup")
                     log.info("Datensicherung erstellt: %s", p)
+            except Exception:  # pragma: no cover
+                log.exception("Fehler bei der Datensicherung")
+            try:
                 if cfg.mail.aktiv and self._faellig("letzte_meldemail", cfg.mail.uhrzeit):
+                    self._erledigt("letzte_meldemail")  # Mail nicht minütlich wiederholen, wenn der Server hängt
                     n = meldebestand_mail(self.eng, cfg)
                     log.info("Meldebestands-Mail: %s Artikel", n)
             except Exception:  # pragma: no cover
-                log.exception("Fehler im Zeitplaner")
+                log.exception("Fehler beim Mailversand")

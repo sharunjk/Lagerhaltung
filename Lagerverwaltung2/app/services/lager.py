@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -13,6 +14,9 @@ from ..db import artikel, audit as audit_t, bestand, bewegungen, lagerplaetze, r
 
 class BuchungsFehler(ValueError):
     pass
+
+
+MAX_MENGE = 1_000_000_000  # Schutz gegen Tippfehler/Fehlscans (z. B. Barcode statt Menge gescannt)
 
 
 def fmt_num(v) -> str:
@@ -37,9 +41,11 @@ def parse_num(v) -> float | None:
     else:
         s = s.replace(",", ".")
     try:
-        return float(s)
+        f = float(s)
     except ValueError:
         return None
+    # "nan", "inf", "1e999" sind für Python gültige Zahlen, aber keine Mengen
+    return f if math.isfinite(f) else None
 
 
 def audit(con: Connection, user: str, aktion: str, objekt: str, details: dict | None = None) -> None:
@@ -130,6 +136,8 @@ class Lager:
         m = parse_num(m)
         if m is None or m <= 0:
             raise BuchungsFehler("Die Menge muss größer als 0 sein.")
+        if m > MAX_MENGE:
+            raise BuchungsFehler(f"Die Menge {fmt_num(m)} ist unplausibel groß (wurde ein Barcode ins Mengenfeld gescannt?).")
         return m
 
     def _abbuchen(self, a: dict, p: dict, menge: float) -> tuple[float, float]:
@@ -175,6 +183,8 @@ class Lager:
         ist = parse_num(gezaehlt)
         if ist is None or ist < 0:
             raise BuchungsFehler("Bitte den gezählten Bestand (0 oder mehr) eingeben.")
+        if ist > MAX_MENGE:
+            raise BuchungsFehler(f"Der gezählte Bestand {fmt_num(ist)} ist unplausibel groß.")
         alt = self.menge_am_platz(a["id"], p["id"])
         self._setzen(a["id"], p["id"], ist, alt)
         return self._bewegung(a, p, "inventur", ist - (alt or 0), ist, text=f"gezählt {fmt_num(ist)} (vorher {fmt_num(alt or 0)})", **ext)
@@ -234,9 +244,13 @@ class Lager:
         werte.setdefault("einheit", "Stk")
         aid = self.con.execute(insert(artikel).values(nummer=nr, aktiv=True, erstellt_am=self.zeit, geaendert_am=self.zeit, **werte)).inserted_primary_key[0]
         a = self.artikel(aid)
+        if str(anfangsbestand).strip() not in ("", "0") and parse_num(anfangsbestand) is None:
+            raise BuchungsFehler(f"Anfangsbestand „{anfangsbestand}“ ist keine gültige Zahl.")
         m = parse_num(anfangsbestand) or 0
         if m < 0:
             raise BuchungsFehler("Anfangsbestand darf nicht negativ sein.")
+        if m > MAX_MENGE:
+            raise BuchungsFehler(f"Anfangsbestand {fmt_num(m)} ist unplausibel groß.")
         if platz and platz.strip():
             p = self.platz(platz)
             self._setzen(aid, p["id"], m, None)

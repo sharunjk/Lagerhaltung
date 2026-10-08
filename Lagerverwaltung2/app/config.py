@@ -113,6 +113,19 @@ def load_config(path: Path | None = None) -> Config:
     return cfg
 
 
+def _toml_text(v: str) -> str:
+    """TOML-String; Steuerzeichen (z. B. Zeilenumbruch aus einem Formularfeld) würden die Datei sonst unlesbar machen."""
+    out = []
+    for c in v:
+        if c in ('"', "\\"):
+            out.append("\\" + c)
+        elif ord(c) < 32 or ord(c) == 127:
+            out.append(f"\\u{ord(c):04x}")
+        else:
+            out.append(c)
+    return '"' + "".join(out) + '"'
+
+
 def save_section(section: str, values: dict, path: Path | None = None) -> None:
     path = path or CONFIG_PATH
     data = tomllib.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
@@ -126,7 +139,7 @@ def save_section(section: str, values: dict, path: Path | None = None) -> None:
             elif isinstance(v, (int, float)):
                 s = repr(v)
             else:
-                s = '"' + str(v).replace("\\", "\\\\").replace('"', '\\"') + '"'
+                s = _toml_text(str(v))
             out.append(f"{k} = {s}")
         out.append("")
     path.write_text("\n".join(out), encoding="utf-8")

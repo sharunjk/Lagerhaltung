@@ -46,7 +46,8 @@
     },
     async alle() { return (await tx(STORE, "readonly", (s) => req(s.getAll()))) || []; },
     async loeschen(id) { await tx(STORE, "readwrite", (s) => s.delete(id)); LV.queue.badge(); },
-    async setzen(item) { await tx(STORE, "readwrite", (s) => s.put(item)); },
+    // Kopie speichern: Alpine-Proxys lassen sich nicht in IndexedDB ablegen ("could not be cloned")
+    async setzen(item) { await tx(STORE, "readwrite", (s) => s.put(JSON.parse(JSON.stringify(item)))); },
     async badge() {
       const el = document.getElementById("offline-badge");
       if (!el) return;
@@ -64,8 +65,9 @@
       LV.queue.laeuft = true;
       try {
         const r = await fetch("/m/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: offen }), credentials: "same-origin" });
-        if (r.status === 401) { LV.meldung("Zum Übertragen bitte neu anmelden.", false); return; }
-        if (!r.ok) return;
+        if (r.status === 401) { LV.meldung("Zum Übertragen der gespeicherten Buchungen bitte neu anmelden.", false); return; }
+        if (r.status === 403) { LV.meldung("Ihre Rolle darf nicht buchen – gespeicherte Buchungen bitte verwerfen oder anders anmelden.", false); return; }
+        if (!r.ok) { LV.meldung(`Übertragung fehlgeschlagen (Fehler ${r.status}) – wird später erneut versucht.`, false); return; }
         const erg = await r.json();
         let ok = 0, fehl = 0;
         for (const it of offen) {
@@ -111,25 +113,35 @@
     box._t = setTimeout(() => (box.style.display = "none"), 4000);
   };
 
-  LV.erreichbar = async function () {
-    if (!navigator.onLine) return false;
+  LV.status = async function () {
+    if (!navigator.onLine) return { ok: false, angemeldet: false };
     try {
       const c = new AbortController();
       const t = setTimeout(() => c.abort(), 2500);
       const r = await fetch("/m/ping", { cache: "no-store", signal: c.signal, credentials: "same-origin" });
       clearTimeout(t);
-      return r.ok;
-    } catch (e) { return false; }
+      if (!r.ok) return { ok: false, angemeldet: false };
+      const d = await r.json().catch(() => ({}));
+      return { ok: true, angemeldet: !!d.angemeldet };
+    } catch (e) { return { ok: false, angemeldet: false }; }
   };
+  LV.erreichbar = async function () { return (await LV.status()).ok; };
 
   // Formulare mit data-offline: ohne Verbindung in die Warteschlange statt absenden
   document.addEventListener("submit", async (e) => {
     const f = e.target;
     if (!f.matches("form[data-offline]") || f.dataset.geprueft) return;
     e.preventDefault();
-    if (await LV.erreichbar()) { f.dataset.geprueft = "1"; f.submit(); return; }
+    const st = await LV.status();
+    if (st.ok && st.angemeldet) { f.dataset.geprueft = "1"; f.submit(); return; }
+    // Ohne Verbindung oder mit abgelaufener Anmeldung: Buchung im Gerät behalten statt sie zu verlieren
     const d = Object.fromEntries(new FormData(f).entries());
     await LV.queue.add(d);
+    if (st.ok) {
+      LV.meldung("Anmeldung abgelaufen – Buchung im Gerät gespeichert. Bitte neu anmelden, dann wird sie übertragen.", true);
+      setTimeout(() => { location.href = "/login?weiter=" + encodeURIComponent("/m/offline?typ=" + (d.typ || "ausgang")); }, 1800);
+      return;
+    }
     LV.meldung("Keine Verbindung – Buchung gespeichert, wird automatisch übertragen.", true);
     setTimeout(() => { location.href = "/m/offline?typ=" + encodeURIComponent(d.typ || "ausgang"); }, 1200);
   });

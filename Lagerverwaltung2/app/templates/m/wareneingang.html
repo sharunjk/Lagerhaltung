@@ -9,7 +9,7 @@
   <input type="hidden" name="weiter" value="/m/wareneingang">
   <div class="flex justify-between gap-2"><span><b>{{ b.nummer }}</b> {{ b.bezeichnung }}</span><span class="text-sm text-muted whitespace-nowrap">{{ b.geliefert|num }} / {{ b.menge|num }}</span></div>
   <div class="text-xs text-muted">{{ b.lieferant or "ohne Lieferant" }}{% if b.bestellnummer %}, Bestellnr. {{ b.bestellnummer }}{% endif %}{% if b.status == "offen" %}, noch nicht als bestellt markiert{% endif %}</div>
-  <div class="flex gap-2"><input id="we_{{ b.id }}" name="lagerort" value="{{ haupt.get(b.artikel_id, '') }}" list="plaetze" required class="field h-12 flex-1" placeholder="Platz">
+  <div class="flex gap-2"><input id="we_{{ b.id }}" name="lagerort" onfocus="this.select()" value="{{ haupt.get(b.artikel_id, '') }}" list="plaetze" required class="field h-12 flex-1" placeholder="Platz">
     <button type="button" onclick="LV.kamera('we_{{ b.id }}')" class="btn h-12 w-12">{{ icon("scan", "w-6 h-6") }}</button>
     <input name="menge" value="{{ (b.menge - b.geliefert)|num }}" inputmode="decimal" class="field h-12 w-20 text-center font-bold"><button class="btn btn-primary h-12">Buchen</button></div>
 </form>

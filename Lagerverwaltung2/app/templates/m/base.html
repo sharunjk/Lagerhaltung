@@ -16,7 +16,18 @@
   <script src="/static/js/scan.js?v={{ request.app.state.version }}" defer></script>
   <script src="/static/js/offline.js?v={{ request.app.state.version }}" defer></script>
   <script src="/static/vendor/alpine.min.js" defer></script>
-  <style>body{padding-bottom:calc(4.5rem + env(safe-area-inset-bottom))} input,select,button{font-size:1.05rem}</style>
+  <style>body{padding-bottom:calc(4.5rem + env(safe-area-inset-bottom))} input,select,button{font-size:1.05rem}
+    /* Bedienelemente mindestens 44 x 44 px (Bedienung mit Handschuhen / Handheld) */
+    header a:not(.hidden){min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+    main a.rounded-full:not(.hidden),main button.rounded-full:not(.hidden){min-height:44px;display:inline-flex;align-items:center}
+    main a.bintag:not(.hidden){display:inline-flex;align-items:center;min-height:44px;min-width:44px;justify-content:center}
+    main summary:not(.hidden){min-height:44px;display:flex;align-items:center;gap:.5rem;cursor:pointer}
+    main summary::before{content:"▸";transition:transform .15s} main details[open]>summary::before{transform:rotate(90deg)}
+    main summary::-webkit-details-marker{display:none}
+    main input[type=checkbox],main input[type=radio]{width:24px;height:24px;min-width:24px}
+    main .btn:not(.hidden),main button.rounded-md:not(.hidden){min-height:44px}
+    main label:has(>input[type=checkbox]),main label:has(>input[type=radio]){min-height:44px}
+    main p a:not(.hidden),main div>a.text-sm:not(.hidden){display:inline-flex;align-items:center;min-height:44px}</style>
 </head>
 <body class="min-h-screen" data-https-port="{{ cfg.server.https_port or '' }}">
 <header class="sticky top-0 z-20 bg-nav text-white">
@@ -24,7 +35,7 @@
     <a href="/m" class="grid place-items-center w-9 h-9 rounded bg-tag text-tagink">{{ icon("scan", "w-6 h-6") }}</a>
     <div class="flex-1 min-w-0"><div class="font-cond font-bold text-lg leading-tight truncate">{% block kopf %}Lager{% endblock %}</div><div class="text-xs text-navink truncate">{{ user.name }}</div></div>
     <a id="offline-badge" href="/m/offline" class="hidden rounded-full px-2.5 py-1 text-xs font-bold text-white bg-warn"></a>
-    <a href="/" class="text-xs text-navink underline">PC</a>
+    <a href="/" class="text-xs text-navink underline px-2">PC</a>
   </div>
 </header>
 {% for f in flashes %}

@@ -12,6 +12,7 @@
   <script>try{const t=localStorage.getItem("lv-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
   <script src="/static/vendor/htmx.min.js" defer></script>
   <script src="/static/vendor/alpine.min.js" defer></script>
+  <style>@media (max-height:820px){aside .navlink{padding-top:.3rem;padding-bottom:.3rem} aside nav>div.pt-4{padding-top:.5rem;margin-top:.5rem}}</style>
   {% block head %}{% endblock %}
 </head>
 <body class="min-h-screen" hx-boost="false">

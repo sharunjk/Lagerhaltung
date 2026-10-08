@@ -12,7 +12,7 @@ Das Suchfeld oben ist zugleich Scanfeld (**F2** springt hinein). Ein USB-Barcode
 2. Artikel scannen/eingeben, Lagerplatz antippen oder scannen, Menge, **Enter**.
 3. Bei Entnahmen optional Empfänger, Kostenstelle, Verwendung – erscheinen in den Auswertungen.
 
-Fehlbuchung? Bei der Buchung **Storno** – es entsteht eine Gegenbuchung, nichts wird gelöscht.
+Fehlbuchung? Bei der Buchung **Storno** – es entsteht eine Gegenbuchung, nichts wird gelöscht. Stornieren lassen sich Eingänge und Entnahmen; Umbuchungen und Zählungen werden durch eine neue Umbuchung bzw. Zählung korrigiert (am Handscanner geht „Rückgängig“ bis 10 Minuten für alle Arten).
 
 ## Artikel
 
@@ -38,7 +38,7 @@ Fehlbuchung? Bei der Buchung **Storno** – es entsteht eine Gegenbuchung, nicht
 
 1. *Inventur → Neue Inventur*, Bereich wählen oder gesamtes Lager.
 2. Zählen am PC (Liste) oder am Handscanner (Platz scannen, Mengen eintragen).
-3. Administrator: **Inventur abschließen** bucht alle Differenzen.
+3. Administrator: **Inventur abschließen** bucht alle Differenzen. Wurde zwischen Zählung und Abschluss am Platz gebucht (z. B. eine Entnahme), wird das berücksichtigt: Neuer Bestand = gezählt ± Buchungen seit der Zählung.
 
 ## Lagerplätze
 
