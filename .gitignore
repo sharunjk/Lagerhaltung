@@ -1,17 +1,16 @@
-!Lagerverwaltung2/tests/**/*.sql
-# Echtdaten nie einchecken
 # Windows-Bibliotheken (nur im Auslieferungs-ZIP) und lokale Laufzeitdaten
+Lagerverwaltung2/lib/
+Lagerverwaltung2/python/
+Lagerverwaltung2/daten/
+Lagerverwaltung2/backups/
+Lagerverwaltung2/logs/
+Lagerverwaltung2/druckausgabe/
+Lagerverwaltung2/config.toml
+Lagerverwaltung2/.secret_key
+__pycache__/
+.pytest_cache/
 *.pyc
+# Echtdaten (Casper-Export) und Pakete nie einchecken
 *.sql
 *.zip
-.pytest_cache/
-Lagerverwaltung2/.secret_key
-Lagerverwaltung2/backups/
-Lagerverwaltung2/config.toml
-Lagerverwaltung2/daten/
-Lagerverwaltung2/druckausgabe/
-Lagerverwaltung2/lib/
-Lagerverwaltung2/logs/
-Lagerverwaltung2/python/
-__pycache__/
 ausgabe/
