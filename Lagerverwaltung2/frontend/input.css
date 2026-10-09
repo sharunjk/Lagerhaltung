@@ -62,6 +62,8 @@
   .kbd { @apply inline-block rounded border border-line bg-soft px-1.5 text-xs text-muted font-sans; }
 }
 
+[x-cloak] { display: none !important; }
+
 @media print {
   .no-print { display: none !important; }
   body { background: white; }

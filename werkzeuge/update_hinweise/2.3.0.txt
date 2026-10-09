@@ -1,0 +1,17 @@
+Neu in 2.3.0: Datensicherung
+- Mehrere Speicherorte, z. B. zusaetzlich eine externe Festplatte oder ein Netzwerkordner.
+- Mehrere Uhrzeiten am Tag, z. B. 07:00, 12:00, 16:00, 22:00.
+- "Nur bei Aenderung": unveraenderter Stand wird nicht erneut abgelegt.
+- Zustand je Speicherort; rote Meldung "Datensicherung pruefen" auf der Startseite (nur Administratoren),
+  wenn ein Speicherort fehlt oder die letzte Sicherung aelter als einen Tag ist.
+- Wiederherstellen direkt in der Lagerverwaltung, mit Vorschau und automatischer Sicherung des vorherigen Stands.
+- Versionsnummer unten in der Seitenleiste.
+
+Nach dem Update (Einstellungen -> Datensicherung):
+1. Externe Festplatte anschliessen. Am besten vorher in der Datentraegerverwaltung einen festen
+   Laufwerksbuchstaben vergeben (Anleitung: docs\Installationsanleitung.pdf, Abschnitt Datensicherung).
+2. "Weiteren Speicherort hinzufuegen" -> "Ordner auswaehlen ..." -> Festplatte -> Ordner anlegen -> verwenden.
+3. "Pruefen", Uhrzeiten eintragen, "Speichern und jetzt sichern".
+
+Bisherige Einstellungen gelten weiter (Ordner backups, 22:00 Uhr, 30 Tage). Neu: Die letzten 3 Sicherungen
+je Speicherort bleiben immer erhalten, auch wenn sie aelter als die Aufbewahrungszeit sind.

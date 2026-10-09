@@ -25,9 +25,13 @@ barcode = "128"            # 128 | QR
 
 [backup]
 aktiv = true
-ordner = "backups"
-uhrzeit = "22:00"
+ordner = "backups"            # Hauptspeicherort (relativ zum Programmordner oder absolut)
+uhrzeit = "22:00"             # eine oder mehrere Uhrzeiten, z. B. "07:00, 12:00, 16:00, 22:00"
 aufbewahren_tage = 30
+nur_bei_aenderung = true      # unveränderten Stand nicht erneut ablegen
+# weitere Speicherorte, z. B. externe Festplatte und Netzwerkordner (am einfachsten über Einstellungen -> Datensicherung)
+weitere_ziele = []
+# weitere_ziele = [{ ordner = "S:\\Lagerbackup", aufbewahren_tage = 90 }, { ordner = "\\\\server\\freigabe\\lager", aufbewahren_tage = 30 }]
 
 [mail]
 aktiv = false

@@ -8,7 +8,7 @@ from sqlalchemy import func, insert, select, update
 
 from .. import db
 from ..db import artikel, lagerplaetze, users
-from ..services import queries
+from ..services import queries, sicherung
 from ..services.betrieb import check_pw, hash_pw
 from ..services.lager import audit
 import logging
@@ -113,12 +113,14 @@ def setup(request: Request, username: str = Form(...), anzeigename: str = Form("
 
 @router.get("/")
 def dashboard(request: Request):
-    require(request)
+    me = require(request)
     with db.engine().connect() as con:
         d = queries.dashboard(con)
         letzte, _ = queries.bewegungen_liste(con, limit=12)
         leer = not con.execute(select(func.count()).select_from(artikel)).scalar()
-    return render(request, "dashboard.html", d=d, letzte=letzte, last_id=letzte[0]["id"] if letzte else 0, leer=leer)
+        sicherung_warnungen = sicherung.warnungen(request.app.state.cfg, con) if me["rolle"] == "admin" and not leer else []
+    return render(request, "dashboard.html", d=d, letzte=letzte, last_id=letzte[0]["id"] if letzte else 0, leer=leer,
+                  sicherung_warnungen=sicherung_warnungen)
 
 
 @router.get("/live", response_class=HTMLResponse)

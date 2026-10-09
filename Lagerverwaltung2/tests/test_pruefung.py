@@ -563,14 +563,16 @@ def test_backup_aufbewahrung_loescht_nur_alte_sicherungen(env):
     cfg, _ = env
     o = Path(cfg.backup.ordner)
     o.mkdir(parents=True)
-    alt = o / "lager_backup_20200101_000000.zip"
+    alte = [o / f"lager_backup_2020010{i}_000000.zip" for i in range(1, 5)]
     fremd = o / "wichtig.zip"
     vor = o / "vor_uebernahme_20200101_000000.zip"
-    for f in (alt, fremd, vor):
+    for n, f in enumerate([*alte, fremd, vor]):
         f.write_bytes(b"x")
-        os.utime(f, (time.time() - 90 * 86400,) * 2)
+        os.utime(f, (time.time() - (90 + 10 - n) * 86400,) * 2)
     backup_erstellen(cfg)
-    assert not alt.exists() and fremd.exists() and vor.exists()
+    # 2.3.0: die neuesten 3 Sicherungen bleiben immer (sonst löscht "nur bei Änderung" + Frist irgendwann alle)
+    assert [f.exists() for f in alte] == [False, False, True, True]
+    assert fremd.exists() and vor.exists()
 
 
 # ------------------------------------------------------------------ Konfiguration, Excel, Mail

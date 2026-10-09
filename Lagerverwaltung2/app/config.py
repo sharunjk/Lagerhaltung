@@ -68,9 +68,11 @@ class MailCfg:
 @dataclass
 class BackupCfg:
     aktiv: bool = True
-    ordner: str = "backups"
-    uhrzeit: str = "22:00"
+    ordner: str = "backups"  # Hauptspeicherort (relativ zum Programmordner oder absolut)
+    uhrzeit: str = "22:00"  # eine oder mehrere Uhrzeiten, z. B. "07:00, 12:00, 16:00, 22:00"
     aufbewahren_tage: int = 30
+    weitere_ziele: list = field(default_factory=list)  # [{ordner = "S:\\Lagerbackup", aufbewahren_tage = 90}, ...]
+    nur_bei_aenderung: bool = True  # unveränderten Stand nicht erneut ablegen
 
 
 SECTIONS = ("server", "daten", "lager", "drucker", "mail", "backup")
@@ -127,6 +129,18 @@ def _toml_text(v: str) -> str:
     return '"' + "".join(out) + '"'
 
 
+def _toml_wert(v) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return repr(v)
+    if isinstance(v, (list, tuple)):
+        return "[" + ", ".join(_toml_wert(x) for x in v) + "]"
+    if isinstance(v, dict):
+        return "{ " + ", ".join(f"{k} = {_toml_wert(x)}" for k, x in v.items()) + " }"
+    return _toml_text(str(v))
+
+
 def save_section(section: str, values: dict, path: Path | None = None) -> None:
     path = path or CONFIG_PATH
     data = tomllib.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
@@ -135,12 +149,6 @@ def save_section(section: str, values: dict, path: Path | None = None) -> None:
     for sec, vals in data.items():
         out.append(f"[{sec}]")
         for k, v in vals.items():
-            if isinstance(v, bool):
-                s = "true" if v else "false"
-            elif isinstance(v, (int, float)):
-                s = repr(v)
-            else:
-                s = _toml_text(str(v))
-            out.append(f"{k} = {s}")
+            out.append(f"{k} = {_toml_wert(v)}")
         out.append("")
     path.write_text("\n".join(out), encoding="utf-8")

@@ -4,15 +4,17 @@ import base64
 import json
 import secrets
 from datetime import date, datetime, timedelta
+from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy import func, insert, select, update
 
 from .. import db
 from ..config import save_section
-from ..db import artikel, audit as audit_t, lieferanten, users
-from ..services import betrieb, casper_import, labels, queries
+from ..db import artikel, audit as audit_t, bewegungen, lieferanten, users
+from ..services import betrieb, casper_import, labels, queries, sicherung
 from ..services.excel import import_lesen, import_vorlage, tabelle_xlsx
 from ..services.lager import BuchungsFehler, audit, parse_num
 from ..services.zertifikat import lokale_adressen
@@ -87,14 +89,14 @@ def einstellungen(request: Request, tab: str = "allgemein"):
     cfg = request.app.state.cfg
     with db.engine().connect() as con:
         nutzer = con.execute(select(users).order_by(func.lower(users.c.username))).mappings().all()
-        letztes_backup = betrieb.get_setting(con, "letztes_backup")
         hat_daten = casper_import.hat_daten(con)
         bericht = betrieb.get_setting(con, "uebernahme_bericht")
-    bo = cfg.path(cfg.backup.ordner)
-    backups = sorted(bo.glob("*.zip"), key=lambda p: p.stat().st_mtime, reverse=True)[:30] if bo.exists() else []
+        sich = sicherung.uebersicht(cfg, con) if tab == "backup" else []
+    for u in sich:
+        u["dateien"] = sicherung.sicherungen_in(Path(u["pfad"]), 10)
     svg = labels.etikett_svg("10001", "10001", "Testetikett Kugelhahn DN15", cfg.drucker.standard_format, cfg.drucker.barcode, 2)
     import socket
-    return render(request, "einstellungen.html", tab=tab, users=nutzer, backups=backups, letztes_backup=letztes_backup,
+    return render(request, "einstellungen.html", tab=tab, users=nutzer, sich=sich, groesse=sicherung.groesse_text,
                   drucker_liste=labels.windows_drucker() if tab == "drucker" else [], svg=svg, hat_daten=hat_daten,
                   adressen=[a for a in lokale_adressen() if a != "127.0.0.1"], hostname=socket.gethostname(),
                   uebernahme=json.loads(bericht) if bericht else None)
@@ -183,26 +185,171 @@ async def backup(request: Request):
     require(request, "admin")
     f = await request.form()
     cfg = request.app.state.cfg
+    try:
+        zeiten = sicherung.uhrzeiten(str(f.get("uhrzeit") or ""))
+        ordner = [str(o).strip() for o in f.getlist("ziel_ordner")]
+        tage = [str(t).strip() for t in f.getlist("ziel_tage")]
+        tage += [""] * (len(ordner) - len(tage))
+        weitere = [{"ordner": o, "aufbewahren_tage": max(1, int(t or 30))} for o, t in zip(ordner[1:], tage[1:]) if o]
+        werte = {"aktiv": f.get("aktiv") == "on", "uhrzeit": ", ".join(zeiten), "nur_bei_aenderung": f.get("nur_bei_aenderung") == "on",
+                 "ordner": (ordner[0] if ordner else "") or "backups", "aufbewahren_tage": max(1, int(tage[0] or 30) if tage else 30),
+                 "weitere_ziele": weitere}
+    except ValueError as e:
+        flash(request, str(e) if "Uhrzeit" in str(e) else "Ungültige Zahl bei „Aufbewahren (Tage)“.", "fehler")
+        return RedirectResponse("/einstellungen?tab=backup", status_code=303)
+    _cfg_update(request, "backup", werte)
     if f.get("aktion") == "jetzt":
         try:
-            flash(request, f"Sicherung erstellt: {betrieb.backup_erstellen(cfg).name}")
+            erg = sicherung.sichern(cfg, db.engine(), erzwingen=True)
         except Exception as e:
             flash(request, f"Sicherung fehlgeschlagen: {e}", "fehler")
+            return RedirectResponse("/einstellungen?tab=backup", status_code=303)
+        for e in erg:
+            ort = "Hauptspeicherort" if e.ziel.haupt else str(e.ziel.pfad)
+            if e.ok:
+                flash(request, f"{ort}: gesichert ({e.datei.name}).")
+            else:
+                flash(request, f"{ort}: {e.fehler}", "fehler")
     else:
-        _cfg_update(request, "backup", {"aktiv": f.get("aktiv") == "on", "ordner": (f.get("ordner") or "backups").strip(),
-                                        "uhrzeit": (f.get("uhrzeit") or "22:00").strip(), "aufbewahren_tage": max(1, int(f.get("aufbewahren_tage") or 30))})
         flash(request, "Sicherungseinstellungen gespeichert.")
     return RedirectResponse("/einstellungen?tab=backup", status_code=303)
 
 
+def _sicherung_datei(cfg, ziel: int, name: str) -> Path | None:
+    """Sicherungsdatei aus einem eingestellten Speicherort (nur Dateinamen, keine Pfade)."""
+    alle = sicherung.ziele(cfg)
+    if not (0 <= ziel < len(alle)) or "/" in name or "\\" in name or not name.endswith(".zip"):
+        return None
+    p = alle[ziel].pfad / name
+    return p if p.is_file() else None
+
+
 @router.get("/einstellungen/backup/{name}")
-def backup_download(request: Request, name: str):
+def backup_download(request: Request, name: str, ziel: int = 0):
     require(request, "admin")
-    cfg = request.app.state.cfg
-    p = cfg.path(cfg.backup.ordner) / name
-    if "/" in name or "\\" in name or not name.endswith(".zip") or not p.exists():
+    p = _sicherung_datei(request.app.state.cfg, ziel, name)
+    if not p:
         return Response(status_code=404)
     return FileResponse(p, filename=name)
+
+
+@router.get("/einstellungen/backup-ordner")
+def backup_ordner(request: Request, pfad: str = ""):
+    """Ordnerauswahl: Laufwerke bzw. Unterordner auf dem Lager-PC (so, wie die Lagerverwaltung sie sieht)."""
+    require(request, "admin")
+    return JSONResponse(sicherung.ordner_inhalt(request.app.state.cfg, pfad))
+
+
+@router.post("/einstellungen/backup-ordner")
+def backup_ordner_neu(request: Request, pfad: str = Form(""), name: str = Form("")):
+    require(request, "admin")
+    try:
+        p = sicherung.neuer_ordner(request.app.state.cfg, pfad, name)
+    except (ValueError, OSError) as e:
+        return JSONResponse({"ok": False, "text": str(e)})
+    return JSONResponse({"ok": True, "pfad": str(p)})
+
+
+@router.post("/einstellungen/backup-pruefen")
+def backup_pruefen(request: Request, pfad: str = Form("")):
+    require(request, "admin")
+    try:
+        return JSONResponse({"ok": True, "text": sicherung.ziel_pruefen(request.app.state.cfg, pfad)})
+    except ValueError as e:
+        return JSONResponse({"ok": False, "text": str(e)})
+
+
+def _upload_pfad(cfg) -> Path:
+    return cfg.path(cfg.daten.datenbank).parent / sicherung.UPLOAD
+
+
+MAX_SICHERUNG = 4 * 1024 ** 3
+
+
+@router.post("/einstellungen/backup-hochladen")
+async def backup_hochladen(request: Request, datei: UploadFile | None = File(None)):
+    require(request, "admin")
+    if datei is None:
+        return RedirectResponse("/einstellungen?tab=backup", status_code=303)
+    ziel = _upload_pfad(request.app.state.cfg)
+    groesse = 0
+    with open(ziel, "wb") as out:
+        while chunk := await datei.read(1024 * 1024):
+            groesse += len(chunk)
+            if groesse > MAX_SICHERUNG:
+                break
+            out.write(chunk)
+    if not groesse or groesse > MAX_SICHERUNG:
+        ziel.unlink(missing_ok=True)
+        flash(request, "Datei ist leer oder zu groß.", "fehler")
+        return RedirectResponse("/einstellungen?tab=backup", status_code=303)
+    return RedirectResponse(f"/einstellungen/backup-wiederherstellen?quelle={quote(str(ziel), safe='')}&hochgeladen={quote(datei.filename or '', safe='')}",
+                            status_code=303)
+
+
+def _quelle(quelle: str) -> Path | None:
+    p = Path(quelle or "")
+    return p if p.is_absolute() and p.suffix.lower() == ".zip" and p.is_file() else None
+
+
+@router.get("/einstellungen/backup-wiederherstellen")
+def wiederherstellen_seite(request: Request, quelle: str = "", hochgeladen: str = ""):
+    require(request, "admin")
+    p = _quelle(quelle)
+    info, fehler = None, ""
+    if not p:
+        fehler = "Die Sicherungsdatei wurde nicht gefunden."
+    else:
+        try:
+            info = sicherung.sicherung_pruefen(p)
+        except sicherung.WiederherstellFehler as e:
+            fehler = str(e)
+    with db.engine().connect() as con:
+        aktuell = {"artikel": con.execute(select(func.count()).select_from(artikel)).scalar(),
+                   "buchungen": con.execute(select(func.count()).select_from(bewegungen)).scalar(),
+                   "letzte_buchung": con.execute(select(func.max(bewegungen.c.zeit))).scalar(),
+                   "benutzer": con.execute(select(func.count()).select_from(users)).scalar()}
+    anh = request.app.state.cfg.path(request.app.state.cfg.daten.anhaenge)
+    aktuell["anhaenge"] = sum(1 for f in anh.rglob("*") if f.is_file()) if anh.exists() else 0
+    return render(request, "backup_wiederherstellen.html", info=info, fehler=fehler, quelle=quelle, aktuell=aktuell,
+                  anzeigename=hochgeladen or (p.name if p else ""), groesse=sicherung.groesse_text)
+
+
+@router.post("/einstellungen/backup-wiederherstellen")
+def wiederherstellen(request: Request, quelle: str = Form(""), passwort: str = Form(""), bestaetigt: str = Form("")):
+    me = require(request, "admin")
+    cfg = request.app.state.cfg
+    zurueck_url = f"/einstellungen/backup-wiederherstellen?quelle={quote(quelle, safe='')}"
+    sperre, ip = request.app.state.anmeldesperre, (request.client.host if request.client else "?")
+    if sperre.sperre_sekunden(ip, me["username"]):
+        flash(request, "Zu viele Fehlversuche. Bitte später erneut versuchen.", "fehler")
+        return RedirectResponse(zurueck_url, status_code=303)
+    with db.engine().connect() as con:
+        u = con.execute(select(users).where(users.c.id == me["id"])).mappings().first()
+    if not u or not betrieb.check_pw(passwort, u["pw_hash"] or ""):
+        sperre.fehlschlag(ip, me["username"])
+        flash(request, "Passwort ist falsch.", "fehler")
+        return RedirectResponse(zurueck_url, status_code=303)
+    if bestaetigt != "on":
+        flash(request, "Bitte bestätigen, dass der aktuelle Stand ersetzt werden soll.", "fehler")
+        return RedirectResponse(zurueck_url, status_code=303)
+    p = _quelle(quelle)
+    if not p:
+        flash(request, "Die Sicherungsdatei wurde nicht gefunden.", "fehler")
+        return RedirectResponse("/einstellungen?tab=backup", status_code=303)
+    try:
+        r = sicherung.wiederherstellen(cfg, db.engine(), p, me["username"])
+    except sicherung.WiederherstellFehler as e:
+        flash(request, f"Nicht wiederhergestellt, nichts geändert: {e}", "fehler")
+        return RedirectResponse(zurueck_url, status_code=303)
+    except Exception as e:
+        flash(request, f"Wiederherstellung fehlgeschlagen: {e}. Der vorherige Stand liegt als Sicherung „vor_wiederherstellung“ im Hauptspeicherort.", "fehler")
+        return RedirectResponse("/einstellungen?tab=backup", status_code=303)
+    if p == _upload_pfad(cfg):
+        p.unlink(missing_ok=True)
+    flash(request, f"Sicherung vom {r['erstellt']:%d.%m.%Y %H:%M} wiederhergestellt: {r['artikel']} Artikel, {r['buchungen']} Buchungen. "
+                   f"Der vorherige Stand wurde als {r['vorher']} im Hauptspeicherort gesichert.")
+    return RedirectResponse("/einstellungen?tab=backup", status_code=303)
 
 
 @router.post("/einstellungen/uebernahme")

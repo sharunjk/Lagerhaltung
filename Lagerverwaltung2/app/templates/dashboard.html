@@ -14,6 +14,17 @@
   </div>
 </section>
 {% endif %}
+{% if sicherung_warnungen %}
+<section class="panel p-4 mb-6 border-l-4 border-l-crit" role="alert">
+  <div class="flex flex-wrap items-start gap-3">
+    <div class="flex-1 min-w-0">
+      <h2 class="text-crit">Datensicherung prüfen</h2>
+      <ul class="text-sm mt-1 space-y-0.5">{% for w in sicherung_warnungen %}<li class="break-words">{{ w }}</li>{% endfor %}</ul>
+    </div>
+    <a href="/einstellungen?tab=backup" class="btn">Zur Datensicherung</a>
+  </div>
+</section>
+{% endif %}
 <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
   <div>
     <h1>Guten {{ "Morgen" if now().hour < 11 else ("Tag" if now().hour < 17 else "Abend") }}, {{ user.name }}</h1>

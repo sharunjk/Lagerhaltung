@@ -4,7 +4,7 @@ tmp = tempfile.mkdtemp()
 os.environ["LV_HOME"] = tmp
 from app import db
 from app.services import casper_import
-from sqlalchemy import select, func, text
+from sqlalchemy import text
 db.init_engine(f"sqlite:///{tmp}/lager.db")
 dump = open(sys.argv[2], encoding="utf-8").read()
 with db.schreiben() as con:

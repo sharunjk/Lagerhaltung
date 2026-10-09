@@ -136,20 +136,185 @@
 
 {% elif tab == "backup" %}
 {% set b = cfg.backup %}
-<div class="grid xl:grid-cols-2 gap-6 max-w-6xl">
-  <form method="post" action="/einstellungen/backup" class="panel p-5 space-y-4">
-    <h2>Automatische Datensicherung</h2>
-    <p class="text-sm text-muted">Sichert Datenbank, Fotos und Dokumente als ZIP-Datei.{% if letztes_backup %} Letzte automatische Sicherung: {{ letztes_backup }}.{% endif %}</p>
-    <label class="flex items-center gap-2"><input type="checkbox" name="aktiv" {% if b.aktiv %}checked{% endif %}> Täglich sichern um <input name="uhrzeit" value="{{ b.uhrzeit }}" class="field w-24 py-1 inline-block"> Uhr</label>
-    <div><label class="label">Ordner</label><input name="ordner" value="{{ b.ordner }}" class="field"><p class="text-xs text-muted mt-1">Relativ zum Programmordner oder absolut, z. B. ein Netzlaufwerk: \\server\backup\lager</p></div>
-    <div><label class="label">Aufbewahren (Tage)</label><input name="aufbewahren_tage" type="number" min="1" value="{{ b.aufbewahren_tage }}" class="field w-28"></div>
-    <div class="flex gap-2"><button class="btn btn-primary" name="aktion" value="speichern">Speichern</button><button class="btn" name="aktion" value="jetzt">Jetzt sichern</button></div>
-  </form>
-  <section class="panel overflow-hidden self-start">
-    <div class="px-4 py-3 border-b border-line"><h2>Vorhandene Sicherungen</h2></div>
-    <ul class="divide-y divide-line text-sm">{% for f in backups %}<li class="flex justify-between px-4 py-2"><a href="/einstellungen/backup/{{ f.name }}" class="text-primary">{{ f.name }}</a><span class="text-muted">{{ (f.stat().st_size / 1024)|round|int }} KB</span></li>{% else %}<li class="px-4 py-6 text-muted">Noch keine Sicherung vorhanden.</li>{% endfor %}</ul>
+{% set ziele_js = [] %}{% for u in sich %}{% set _ = ziele_js.append({"ordner": u.ordner, "tage": u.aufbewahren_tage}) %}{% endfor %}
+<div class="max-w-6xl space-y-6" x-data='lvSicherung({{ ziele_js|tojson }})'>
+  {% set warn = sich|selectattr("warnung")|list %}
+  {% if warn or not b.aktiv %}
+  <section class="panel p-4 border-l-4 border-l-crit" role="alert">
+    <h2 class="text-crit mb-1">Datensicherung prüfen</h2>
+    <ul class="text-sm list-disc pl-5 space-y-0.5">
+      {% if not b.aktiv %}<li>Die automatische Datensicherung ist ausgeschaltet.</li>{% endif %}
+      {% for u in warn %}<li><b>{{ "Hauptspeicherort" if u.haupt else u.pfad }}:</b> {{ u.warnung }}</li>{% endfor %}
+    </ul>
   </section>
+  {% endif %}
+
+  <form method="post" action="/einstellungen/backup" class="panel p-5 space-y-5">
+    <h2>Automatische Datensicherung</h2>
+    <p class="text-sm text-muted">Sichert Datenbank, Fotos und Dokumente als ZIP-Datei in jeden Speicherort. Fällt ein Speicherort aus (z. B. Festplatte abgezogen), werden die anderen trotzdem beschrieben und der fehlende alle 30 Minuten erneut versucht.</p>
+    <div>
+      <label class="flex flex-wrap items-center gap-2"><input type="checkbox" name="aktiv" {% if b.aktiv %}checked{% endif %}> Automatisch sichern um
+        <input name="uhrzeit" value="{{ b.uhrzeit }}" class="field w-80 py-1 inline-block" placeholder="07:00, 12:00, 16:00, 22:00" aria-label="Uhrzeiten"> Uhr</label>
+      <p class="text-xs text-muted mt-1">Mehrere Uhrzeiten mit Komma trennen, z. B. <i>07:00, 12:00, 16:00, 22:00</i>. War der PC zu einer Uhrzeit aus, wird die Sicherung beim nächsten Start nachgeholt.</p>
+    </div>
+    <label class="flex items-start gap-2"><input type="checkbox" name="nur_bei_aenderung" class="mt-1" {% if b.nur_bei_aenderung %}checked{% endif %}>
+      <span>Nur sichern, wenn sich seit der letzten Sicherung etwas geändert hat<span class="block text-sm text-muted">Spart Platz an Wochenenden und Feiertagen. Die letzten {{ 3 }} Sicherungen je Speicherort bleiben immer erhalten – auch wenn sie älter als die Aufbewahrungszeit sind.</span></span></label>
+
+    <div>
+      <h3 class="label">Speicherorte</h3>
+      <div class="space-y-3">
+        <template x-for="(z, i) in ziele" :key="z.id">
+          <div class="rounded-md border border-line p-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-sm font-semibold" x-text="i === 0 ? 'Hauptspeicherort (auf diesem PC)' : 'Weiterer Speicherort ' + i"></span>
+              <button type="button" class="btn btn-sm btn-danger" x-show="i > 0" @click="ziele.splice(i, 1)">Entfernen</button>
+            </div>
+            <div class="flex flex-wrap gap-2 items-end">
+              <div class="flex-1 min-w-[16rem]"><label class="label" :for="'zo' + z.id">Ordner</label>
+                <input :id="'zo' + z.id" name="ziel_ordner" x-model="z.ordner" class="field" :required="i === 0" :placeholder="i === 0 ? 'backups' : 'z. B. S:\\Lagerbackup oder \\\\server\\freigabe\\lager'"></div>
+              <div><label class="label" :for="'zt' + z.id">Aufbewahren (Tage)</label><input :id="'zt' + z.id" name="ziel_tage" type="number" min="1" x-model="z.tage" class="field w-28"></div>
+              <button type="button" class="btn" @click="waehlen(i)">Ordner auswählen …</button>
+              <button type="button" class="btn" @click="pruefen(i)" :disabled="!!z.pruefe">Prüfen</button>
+            </div>
+            <p class="text-sm mt-2" x-show="z.text" :class="z.ok ? 'text-ok' : 'text-crit'" x-text="z.text"></p>
+          </div>
+        </template>
+      </div>
+      <button type="button" class="btn mt-3" @click="ziele.push(neuesZiel('', 90))">{{ icon("plus", "w-4 h-4") }}Weiteren Speicherort hinzufügen</button>
+      <p class="text-xs text-muted mt-2">Relativ zum Programmordner (z. B. <i>backups</i>) oder absolut: externe Festplatte/USB-Stick (z. B. <i>S:\Lagerbackup</i>) oder Netzwerkpfad (<i>\\server\freigabe\lager</i>). Läuft die Lagerverwaltung als Dienst, kennt sie verbundene Netzlaufwerke wie <i>N:</i> nicht – dann den Netzwerkpfad eintragen. „Prüfen“ schreibt eine Testdatei mit den Rechten der Lagerverwaltung.</p>
+    </div>
+    <div class="flex flex-wrap gap-2"><button class="btn btn-primary" name="aktion" value="speichern">Speichern</button><button class="btn" name="aktion" value="jetzt">Speichern und jetzt sichern</button></div>
+  </form>
+
+  <section class="panel overflow-hidden">
+    <div class="px-4 py-3 border-b border-line"><h2>Zustand</h2></div>
+    <div class="overflow-x-auto"><table class="tbl">
+      <thead><tr><th>Speicherort</th><th>Letzte Sicherung</th><th class="num">Größe</th><th class="num">Frei</th><th>Zustand</th></tr></thead>
+      <tbody>{% for u in sich %}<tr>
+        <td><div class="font-medium break-all">{{ u.pfad }}</div><div class="text-xs text-muted">{{ "Hauptspeicherort" if u.haupt else "weiterer Speicherort" }}, {{ u.aufbewahren_tage }} Tage{% if u.hinweis %} · <span class="text-warn">{{ u.hinweis }}</span>{% endif %}</div></td>
+        <td class="whitespace-nowrap">{% if u.ok_am %}{{ u.ok_am.strftime("%d.%m.%Y %H:%M") }}{% if u.unveraendert %}<div class="text-xs text-muted">unverändert seit {{ u.gesichert_am.strftime("%d.%m.%Y %H:%M") if u.gesichert_am else "–" }}</div>{% endif %}{% else %}–{% endif %}</td>
+        <td class="num whitespace-nowrap">{{ groesse(u.groesse) }}</td>
+        <td class="num whitespace-nowrap">{{ groesse(u.frei) }}</td>
+        <td>{% if u.warnung %}<span class="status st-kritisch">Achtung</span><div class="text-xs text-crit max-w-md">{{ u.warnung }}</div>{% else %}<span class="status st-ok">in Ordnung</span>{% endif %}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+
+  <section class="panel overflow-hidden">
+    <div class="px-4 py-3 border-b border-line"><h2>Vorhandene Sicherungen und Wiederherstellen</h2></div>
+    <div class="p-4 space-y-5">
+      <p class="text-sm text-muted">„Wiederherstellen“ ersetzt <b>alle</b> Artikel, Bestände, Buchungen, Benutzer und Anhänge durch den Stand der Sicherung. Vorher wird der aktuelle Stand automatisch gesichert (<i>vor_wiederherstellung_…</i> im Hauptspeicherort). Sie sehen vor dem Ersetzen noch einmal, was die Sicherung enthält.</p>
+      {% for u in sich %}
+      <div>
+        <h3 class="font-semibold text-sm mb-1 break-all">{{ u.pfad }}</h3>
+        <ul class="divide-y divide-line text-sm rounded-md border border-line">{% for f in u.dateien %}
+          <li class="flex flex-wrap items-center gap-2 px-3 py-2"><span class="flex-1 min-w-0 truncate">{{ f.name }}</span>
+            <span class="text-muted whitespace-nowrap">{{ groesse(f.stat().st_size) }}</span>
+            <a class="btn btn-sm" href="/einstellungen/backup/{{ f.name|urlencode }}?ziel={{ u.nr }}">Herunterladen</a>
+            <a class="btn btn-sm" href="/einstellungen/backup-wiederherstellen?quelle={{ f|string|urlencode }}">Wiederherstellen …</a></li>
+        {% else %}<li class="px-3 py-3 text-muted">Keine Sicherung vorhanden{% if u.warnung %} oder Speicherort nicht erreichbar{% endif %}.</li>{% endfor %}</ul>
+      </div>
+      {% endfor %}
+      <div class="grid lg:grid-cols-2 gap-4">
+        <div class="rounded-md border border-line p-3 space-y-2">
+          <h3 class="font-semibold text-sm">Sicherung aus einem anderen Ordner</h3>
+          <p class="text-sm text-muted">Z. B. von der externen Festplatte nach einem Umzug auf einen neuen PC.</p>
+          <button type="button" class="btn" @click="quelleWaehlen()">Sicherung auswählen …</button>
+        </div>
+        <form method="post" action="/einstellungen/backup-hochladen" enctype="multipart/form-data" class="rounded-md border border-line p-3 space-y-2">
+          <h3 class="font-semibold text-sm">Sicherung hochladen</h3>
+          <p class="text-sm text-muted">ZIP-Datei von diesem Computer (z. B. aus „Herunterladen“).</p>
+          <input type="file" name="datei" accept=".zip" required class="text-sm block file:btn file:btn-sm file:mr-2">
+          <button class="btn">Hochladen und prüfen</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  {# Ordnerauswahl (an body angehängt, damit der Hintergrund auch die Kopfzeile abdunkelt) #}
+  <template x-teleport="body">
+  <div x-show="w.offen" x-cloak class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" @keydown.escape.window="w.offen = false" @click.self="w.offen = false">
+    <div class="panel w-full max-w-2xl max-h-[85vh] flex flex-col shadow-xl" role="dialog" aria-modal="true" aria-labelledby="wahl-titel">
+      <div class="px-4 py-3 border-b border-line flex items-center gap-2">
+        <h2 id="wahl-titel" class="flex-1" x-text="w.modus === 'ordner' ? 'Ordner auswählen' : 'Sicherung auswählen'"></h2>
+        <button type="button" class="btn btn-sm" @click="w.offen = false">Schließen</button>
+      </div>
+      <div class="px-4 py-2 border-b border-line flex gap-2">
+        <input class="field py-1" x-model="w.eingabe" @keydown.enter.prevent="laden(w.eingabe)" placeholder="Pfad eingeben, z. B. \\server\freigabe" aria-label="Pfad">
+        <button type="button" class="btn btn-sm" @click="laden(w.eingabe)">Öffnen</button>
+      </div>
+      <div class="px-4 py-2 text-sm flex flex-wrap items-center gap-2 border-b border-line">
+        <button type="button" class="btn btn-sm" @click="laden('')">Laufwerke</button>
+        <button type="button" class="btn btn-sm" x-show="w.eltern" @click="laden(w.eltern)">Eine Ebene höher</button>
+        <span class="font-medium break-all" x-text="w.pfad"></span>
+      </div>
+      <p class="px-4 pt-2 text-sm text-warn" x-show="w.hinweis" x-text="w.hinweis"></p>
+      <div class="overflow-y-auto flex-1 min-h-[12rem]">
+        <p class="p-4 text-muted text-sm" x-show="w.laedt">Wird geladen …</p>
+        <ul class="divide-y divide-line text-sm">
+          <template x-for="l in w.laufwerke" :key="l.pfad">
+            <li><button type="button" class="w-full text-left px-4 py-2.5 hover:bg-soft flex justify-between gap-2" @click="laden(l.pfad)">
+              <span><b x-text="l.name"></b> <span class="text-muted" x-text="l.art"></span></span><span class="text-muted whitespace-nowrap" x-text="gr(l.frei) + ' frei'"></span></button></li>
+          </template>
+          <template x-for="o in w.ordner" :key="o">
+            <li><button type="button" class="w-full text-left px-4 py-2.5 hover:bg-soft flex items-center gap-2" @click="laden(verbinde(w.pfad, o))">{{ icon("folder", "w-4 h-4 text-muted shrink-0") }}<span x-text="o"></span></button></li>
+          </template>
+          <template x-for="d in (w.modus === 'zip' ? w.dateien : [])" :key="d.pfad">
+              <li><a class="block px-4 py-2.5 hover:bg-soft" :href="'/einstellungen/backup-wiederherstellen?quelle=' + encodeURIComponent(d.pfad)">
+                <b x-text="d.name"></b> <span class="text-muted" x-text="d.zeit + ', ' + gr(d.groesse)"></span></a></li>
+          </template>
+          <li class="px-4 py-3 text-muted" x-show="!w.laedt && w.pfad && !w.ordner.length && !(w.modus === 'zip' && w.dateien.length)">Keine Unterordner.</li>
+        </ul>
+      </div>
+      <div class="px-4 py-3 border-t border-line flex flex-wrap items-center gap-2" x-show="w.pfad">
+        <input class="field py-1 w-56" x-model="w.neu" placeholder="Neuer Ordner, z. B. Lagerbackup" aria-label="Name für neuen Ordner">
+        <button type="button" class="btn btn-sm" @click="neuerOrdner()" :disabled="!w.neu.trim()">Anlegen</button>
+        <span class="flex-1"></span>
+        <button type="button" class="btn btn-primary" x-show="w.modus === 'ordner'" @click="uebernehmen()">Diesen Ordner verwenden</button>
+      </div>
+      <p class="px-4 pb-3 text-sm text-crit" x-show="w.fehler" x-text="w.fehler"></p>
+    </div>
+  </div>
+  </template>
 </div>
+<script>
+let lvZielNr = 0;
+function neuesZiel(ordner, tage) { return {id: ++lvZielNr, ordner: ordner, tage: tage, text: "", ok: false, pruefe: false}; }
+function lvSicherung(start) {
+  const json = async (r) => { if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) throw new Error("Sitzung abgelaufen – bitte Seite neu laden und anmelden."); return r.json(); };
+  return {
+    ziele: start.map((z) => neuesZiel(z.ordner, z.tage)),
+    w: {offen: false, modus: "ordner", index: 0, pfad: "", eltern: "", eingabe: "", ordner: [], dateien: [], laufwerke: [], hinweis: "", fehler: "", neu: "", laedt: false},
+    gr(n) { if (n == null) return "–"; for (const [e, f] of [["GB", 1024 ** 3], ["MB", 1024 ** 2], ["KB", 1024]]) if (n >= f) return (n / f).toFixed(1).replace(".", ",") + " " + e; return n + " Byte"; },
+    verbinde(a, b) { const t = a.includes("\\") || /^[A-Za-z]:/.test(a) ? "\\" : "/"; return a.endsWith(t) ? a + b : a + t + b; },
+    async laden(pfad) {
+      Object.assign(this.w, {laedt: true, fehler: "", ordner: [], dateien: [], laufwerke: []});
+      try {
+        const d = await json(await fetch("/einstellungen/backup-ordner?pfad=" + encodeURIComponent(pfad || "")));
+        Object.assign(this.w, {pfad: d.pfad, eltern: d.eltern, ordner: d.ordner, dateien: d.dateien, laufwerke: d.laufwerke, hinweis: d.hinweis, eingabe: d.pfad});
+      } catch (e) { this.w.fehler = e.message; }
+      this.w.laedt = false;
+    },
+    waehlen(i) { Object.assign(this.w, {offen: true, modus: "ordner", index: i, neu: ""}); this.laden(this.ziele[i].ordner); },
+    quelleWaehlen() { Object.assign(this.w, {offen: true, modus: "zip", neu: ""}); this.laden(this.ziele.length > 1 ? this.ziele[1].ordner : ""); },
+    uebernehmen() { this.ziele[this.w.index].ordner = this.w.pfad; this.ziele[this.w.index].text = ""; this.w.offen = false; },
+    async neuerOrdner() {
+      const fd = new FormData(); fd.append("pfad", this.w.pfad); fd.append("name", this.w.neu);
+      try {
+        const d = await json(await fetch("/einstellungen/backup-ordner", {method: "POST", body: fd}));
+        if (d.ok) { this.w.neu = ""; await this.laden(d.pfad); } else this.w.fehler = d.text;
+      } catch (e) { this.w.fehler = e.message; }
+    },
+    async pruefen(i) {
+      const z = this.ziele[i]; z.pruefe = true; z.text = "Wird geprüft …"; z.ok = true;
+      const fd = new FormData(); fd.append("pfad", z.ordner);
+      try { const d = await json(await fetch("/einstellungen/backup-pruefen", {method: "POST", body: fd})); z.ok = d.ok; z.text = d.text; }
+      catch (e) { z.ok = false; z.text = e.message; }
+      z.pruefe = false;
+    },
+  };
+}
+</script>
 {% elif tab == "uebernahme" %}
 <div class="grid xl:grid-cols-2 gap-6 max-w-6xl">
   <form method="post" action="/einstellungen/uebernahme" enctype="multipart/form-data" class="panel p-5 space-y-3" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Übernahme läuft …'">

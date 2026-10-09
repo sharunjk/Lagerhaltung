@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Sicherung wiederherstellen{% endblock %}
+{% block content %}
+<div class="max-w-3xl space-y-6">
+  <div class="flex flex-wrap items-center gap-3">
+    <h1 class="flex-1">Sicherung wiederherstellen</h1>
+    <a href="/einstellungen?tab=backup" class="btn">Zurück zur Datensicherung</a>
+  </div>
+  {% if fehler %}
+  <section class="panel p-5 border-l-4 border-l-crit">
+    <h2 class="text-crit mb-1">Diese Sicherung kann nicht verwendet werden</h2>
+    <p class="text-sm">{{ fehler }}</p>
+    <p class="text-sm text-muted mt-2 break-all">{{ anzeigename }}</p>
+  </section>
+  {% else %}
+  <section class="panel overflow-hidden">
+    <div class="px-5 py-3 border-b border-line"><h2>Vergleich</h2><p class="text-sm text-muted break-all">{{ anzeigename }} · {{ groesse(info.groesse) }}</p></div>
+    <table class="tbl">
+      <thead><tr><th></th><th>Aktueller Stand</th><th>Stand der Sicherung</th></tr></thead>
+      <tbody>
+        <tr><td>Gesichert am</td><td>–</td><td class="font-semibold">{{ info.erstellt.strftime("%d.%m.%Y %H:%M") }}</td></tr>
+        <tr><td>Artikel</td><td>{{ aktuell.artikel }}</td><td>{{ info.artikel }}</td></tr>
+        <tr><td>Buchungen</td><td>{{ aktuell.buchungen }}</td><td>{{ info.buchungen }}</td></tr>
+        <tr><td>Letzte Buchung</td><td>{{ aktuell.letzte_buchung.strftime("%d.%m.%Y %H:%M") if aktuell.letzte_buchung else "–" }}</td><td>{{ info.letzte_buchung.strftime("%d.%m.%Y %H:%M") if info.letzte_buchung else "–" }}</td></tr>
+        <tr><td>Benutzer</td><td>{{ aktuell.benutzer }}</td><td>{{ info.benutzer }}</td></tr>
+        <tr><td>Fotos und Dokumente</td><td>{{ aktuell.anhaenge }}</td><td>{{ info.anhaenge }}</td></tr>
+      </tbody>
+    </table>
+  </section>
+  <form method="post" action="/einstellungen/backup-wiederherstellen" class="panel p-5 space-y-4 border-l-4 border-l-crit">
+    <h2>Aktuellen Stand ersetzen</h2>
+    <ul class="text-sm list-disc pl-5 space-y-1">
+      <li>Alle Artikel, Bestände, Buchungen, Bestellungen, Inventuren, Benutzer und Anhänge werden durch den Stand der Sicherung ersetzt. Buchungen nach dem {{ info.erstellt.strftime("%d.%m.%Y %H:%M") }} gehen dabei verloren.</li>
+      <li>Vorher wird der aktuelle Stand automatisch als <i>vor_wiederherstellung_…zip</i> im Hauptspeicherort gesichert – so lässt sich der Schritt rückgängig machen.</li>
+      <li>Danach gelten die Benutzer und Passwörter aus der Sicherung. Eventuell müssen Sie sich neu anmelden.</li>
+      <li>Handscanner: Offline erfasste, noch nicht übertragene Buchungen vorher übertragen.</li>
+    </ul>
+    <input type="hidden" name="quelle" value="{{ quelle }}">
+    <label class="flex items-start gap-2"><input type="checkbox" name="bestaetigt" class="mt-1" required><span>Ich möchte den aktuellen Stand durch die Sicherung vom <b>{{ info.erstellt.strftime("%d.%m.%Y %H:%M") }}</b> ersetzen.</span></label>
+    <div class="max-w-xs"><label class="label" for="pw">Ihr Passwort zur Bestätigung</label><input id="pw" name="passwort" type="password" class="field" required autocomplete="current-password"></div>
+    <button class="btn btn-danger">Wiederherstellen</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

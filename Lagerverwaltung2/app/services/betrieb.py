@@ -103,57 +103,23 @@ def meldebestand_mail(eng: Engine, cfg, nur_wenn_vorhanden: bool = True) -> int:
 
 # ------------------------------------------------------------------ Datensicherung
 def backup_erstellen(cfg, ordner: Path | None = None, aufbewahren_tage: int | None = None, name: str = "lager_backup") -> Path:
-    """Sichert Datenbank (konsistent über die SQLite-Backup-Funktion) und Anhänge in eine ZIP-Datei."""
-    import sqlite3
-    import tempfile
-    import zipfile
-    ordner = ordner or cfg.path(cfg.backup.ordner)
-    ordner.mkdir(parents=True, exist_ok=True)
-    datei = ordner / f"{name}_{datetime.now():%Y%m%d_%H%M%S}.zip"
-    n = 1
-    while datei.exists():  # zwei Sicherungen in derselben Sekunde nicht überschreiben
-        n += 1
-        datei = ordner / f"{name}_{datetime.now():%Y%m%d_%H%M%S}_{n}.zip"
-    with tempfile.TemporaryDirectory() as tmp:
-        kopie = Path(tmp) / "lager.db"
-        src = sqlite3.connect(str(cfg.path(cfg.daten.datenbank)))
-        dst = sqlite3.connect(str(kopie))
-        with dst:
-            src.backup(dst)
-        dst.close()
-        src.close()
-        with zipfile.ZipFile(datei, "w", zipfile.ZIP_DEFLATED) as z:
-            z.write(kopie, "lager.db")
-            anh = cfg.path(cfg.daten.anhaenge)
-            if anh.exists():
-                for f in anh.rglob("*"):
-                    if f.is_file():
-                        z.write(f, f"anhaenge/{f.relative_to(anh)}")
-            z.writestr("LIESMICH.txt", "Datensicherung Lagerverwaltung\r\n\r\n"
-                       "Wiederherstellen:\r\n"
-                       "1. Lagerverwaltung beenden (windows\\4_AUTOSTART_AUS.bat).\r\n"
-                       "2. Im Ordner daten die Dateien lager.db-wal und lager.db-shm loeschen (falls vorhanden).\r\n"
-                       "   Wichtig: sonst mischt die Datenbank alte Restdaten in die Sicherung.\r\n"
-                       "3. lager.db aus dieser Sicherung nach daten\\lager.db kopieren (ueberschreiben).\r\n"
-                       "4. Ordner anhaenge aus dieser Sicherung nach daten\\anhaenge kopieren.\r\n"
-                       "5. Lagerverwaltung starten.\r\n")
-    tage = cfg.backup.aufbewahren_tage if aufbewahren_tage is None else aufbewahren_tage
-    grenze = time.time() - tage * 86400
-    for alt in ordner.glob(f"{name}_*.zip"):
-        if alt.stat().st_mtime < grenze:
-            alt.unlink(missing_ok=True)
-    return datei
+    """Sichert Datenbank (konsistent über die SQLite-Backup-Funktion) und Anhänge in eine ZIP-Datei in einem Ordner.
+    Die regelmäßige Sicherung in alle Speicherorte übernimmt ``sicherung.sichern``."""
+    from .sicherung import einzel_sicherung
+    return einzel_sicherung(cfg, ordner or cfg.path(cfg.backup.ordner), name, aufbewahren_tage)
 
 
 # ------------------------------------------------------------------ Zeitplaner
 class Zeitplaner(threading.Thread):
-    """Prüft minütlich, ob die tägliche Sicherung bzw. Meldebestands-Mail fällig ist."""
+    """Prüft minütlich, ob eine Datensicherung bzw. die Meldebestands-Mail fällig ist."""
+    WIEDERHOLEN_MIN = 30  # nicht erreichbaren Speicherort (z. B. abgezogene Festplatte) so oft erneut versuchen
 
     def __init__(self, eng: Engine, cfg_getter):
         super().__init__(daemon=True, name="zeitplaner")
         self.eng = eng
         self.cfg_getter = cfg_getter
         self.stop_event = threading.Event()
+        self.nachholen: tuple[float, set[str]] | None = None  # (Zeitpunkt, fehlgeschlagene Speicherorte)
 
     def _faellig(self, key: str, uhrzeit: str) -> bool:
         try:
@@ -170,15 +136,43 @@ class Zeitplaner(threading.Thread):
         with self.eng.execution_options(schreiben=True).begin() as con:
             set_setting(con, key, datetime.now().strftime("%Y-%m-%d"))
 
+    def sicherung_pruefen(self, cfg, jetzt: datetime | None = None) -> list | None:
+        """Ein Durchlauf: fälligen Termin sichern bzw. fehlgeschlagene Speicherorte erneut versuchen."""
+        from . import sicherung
+        jetzt = jetzt or datetime.now()
+        if not cfg.backup.aktiv:
+            return None
+        termin = sicherung.faelliger_termin(cfg.backup.uhrzeit, jetzt)
+        if termin:
+            with self.eng.connect() as con:
+                if (get_setting(con, sicherung.TERMIN) or "") >= termin:
+                    termin = None
+        nur = None
+        if not termin:
+            if not self.nachholen or time.time() < self.nachholen[0]:
+                return None
+            nur = self.nachholen[1]
+        erg = sicherung.sichern(cfg, self.eng, nur=nur, melden=True)
+        if termin:
+            # Termin gilt als erledigt, auch wenn ein Speicherort fehlte – der wird alle 30 Minuten erneut versucht,
+            # statt jede Minute eine neue Datei in die anderen Speicherorte zu schreiben.
+            self._setzen(sicherung.TERMIN, termin)
+        fehl = {e.ziel.schluessel for e in erg if not e.ok}
+        self.nachholen = (time.time() + self.WIEDERHOLEN_MIN * 60, fehl) if fehl else None
+        for e in erg:
+            if e.ok and not e.uebersprungen:
+                log.info("Datensicherung %s: %s", e.ziel.pfad, "unverändert" if e.unveraendert else e.datei)
+        return erg
+
+    def _setzen(self, key: str, wert: str) -> None:
+        with self.eng.execution_options(schreiben=True).begin() as con:
+            set_setting(con, key, wert)
+
     def run(self):
         while not self.stop_event.wait(60):
             cfg = self.cfg_getter()
             try:
-                # erst nach Erfolg als erledigt merken – schlägt die Sicherung fehl, wird sie in der nächsten Minute erneut versucht
-                if cfg.backup.aktiv and self._faellig("letztes_backup", cfg.backup.uhrzeit):
-                    p = backup_erstellen(cfg)
-                    self._erledigt("letztes_backup")
-                    log.info("Datensicherung erstellt: %s", p)
+                self.sicherung_pruefen(cfg)
             except Exception:  # pragma: no cover
                 log.exception("Fehler bei der Datensicherung")
             try:
