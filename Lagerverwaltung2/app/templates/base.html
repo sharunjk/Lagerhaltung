@@ -61,6 +61,7 @@
             <a href="/logout" class="navlink">{{ icon("logout") }}Abmelden</a>
           </div>
         </details>
+        {% if pfad != "/" %}<button type="button" class="btn px-2.5" onclick="lvZurueck('/')" title="Zurück (Alt+←)" aria-label="Zurück">{{ icon("back", "w-5 h-5") }}</button>{% endif %}
         <form action="/scan" method="get" class="relative flex-1 max-w-2xl" x-data="{offen:false}" @click.outside="offen=false">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">{{ icon("scan", "w-5 h-5") }}</span>
           <input id="scanfeld" name="code" autocomplete="off" class="field pl-10 pr-16 h-11 text-base"
@@ -87,6 +88,10 @@
   {% block nologin %}{% endblock %}
 {% endif %}
 <script>
+// Zurück: in der installierten App (ohne Browserleiste) gibt es keinen Zurück-Pfeil. Kam man von einer Seite der
+// Lagerverwaltung, geht es dorthin zurück, sonst zur Startseite.
+function lvZurueck(start){let intern=false;try{intern=!!document.referrer&&new URL(document.referrer).origin===location.origin}catch(e){}
+  if(intern&&history.length>1)history.back();else location.href=start}
 function lvTheme(){const d=document.documentElement.classList.toggle("dark");try{localStorage.setItem("lv-theme",d?"dark":"light")}catch(e){}}
 // Doppeltes Absenden verhindern (Doppelklick/Doppel-Tipp würde sonst zweimal buchen)
 document.addEventListener("submit", function(e){

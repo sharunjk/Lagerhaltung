@@ -17,6 +17,8 @@
   <script src="/static/js/offline.js?v={{ request.app.state.version }}" defer></script>
   <script src="/static/vendor/alpine.min.js" defer></script>
   <script>// Doppeltes Absenden verhindern (Doppelklick/Doppel-Tipp würde sonst zweimal buchen)
+function lvZurueck(start){let intern=false;try{intern=!!document.referrer&&new URL(document.referrer).origin===location.origin}catch(e){}
+  if(intern&&history.length>1)history.back();else location.href=start}
 document.addEventListener("submit", function(e){
   const f = e.target;
   if ((f.getAttribute("method") || "").toLowerCase() !== "post" || f.hasAttribute("data-offline") || e.defaultPrevented) return;
@@ -41,7 +43,8 @@ document.addEventListener("submit", function(e){
 <body class="min-h-screen" data-https-port="{{ cfg.server.https_port or '' }}">
 <header class="sticky top-0 z-20 bg-nav text-white">
   <div class="flex items-center gap-3 px-4 h-14">
-    <a href="/m" class="grid place-items-center w-9 h-9 rounded bg-tag text-tagink">{{ icon("scan", "w-6 h-6") }}</a>
+    {% if pfad not in ("/m", "/m/") %}<a href="/m" onclick="event.preventDefault(); lvZurueck('/m')" class="grid place-items-center -ml-2 text-white" aria-label="Zurück">{{ icon("back", "w-6 h-6") }}</a>{% endif %}
+    <a href="/m" class="grid place-items-center w-9 h-9 rounded bg-tag text-tagink" aria-label="Start">{{ icon("scan", "w-6 h-6") }}</a>
     <div class="flex-1 min-w-0"><div class="font-cond font-bold text-lg leading-tight truncate">{% block kopf %}Lager{% endblock %}</div><div class="text-xs text-navink truncate">{{ user.name }}</div></div>
     <a id="offline-badge" href="/m/offline" class="hidden rounded-full px-2.5 py-1 text-xs font-bold text-white bg-warn"></a>
     <a href="/" class="text-xs text-navink underline px-2">PC</a>

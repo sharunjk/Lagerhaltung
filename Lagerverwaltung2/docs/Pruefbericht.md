@@ -326,6 +326,18 @@ Auf Wunsch ergänzt: Wenn der alte Lager-PC ausfällt, sollen die Daten auf eine
 - Festplatte abziehen → nach dem nächsten Termin rote Meldung auf der Startseite. Wieder anstecken → spätestens nach 30 Minuten wieder in Ordnung.
 - Wiederherstellen einer Sicherung mit Fotos, danach öffnen die Fotos. Zurück über `vor_wiederherstellung_…`.
 
+## Nachtrag: Lagerplätze und Navigation 2.3.1
+
+Auf Wunsch aus dem Betrieb ergänzt:
+
+| Änderung | Umsetzung | Beleg |
+|---|---|---|
+| Übersicht nach Regal | In jedem Bereich (C1, C2 …) eine Zeile je Regal (zweiter Teil des Codes, R1, R2 …). Codes ohne Regal (C1-F1) stehen als „Einzelplätze“ vorn. Sortierung natürlich: R2 vor R10, C1-R1-2 vor C1-R1-10 | `test_natuerliche_sortierung`, `test_uebersicht_nach_bereich_und_regal` |
+| Zurück-Knopf | Pfeil links oben am PC und in der Scanner-App (44 × 44 px). Gibt es eine vorherige Seite der Lagerverwaltung, geht es dorthin, sonst zur Startseite (App direkt auf einer Unterseite geöffnet) | `test_zurueck_knopf`, Browserprüfung |
+| Lagerplatz löschen | Nur Administratoren, nur leere Plätze. Bestätigung durch Eintippen des Codes plus Rückfrage. Buchungen behalten den Code als Text (`lagerplatz_id` → leer). Abgelehnt bei laufender Inventur oder gezählten Mengen in einer abgeschlossenen Inventur. Eintrag im Protokoll | `test_platz_loeschen_mit_bestaetigung`, `test_platz_loeschen_nur_admin`, `test_platz_loeschen_und_inventur` |
+
+Prüfung: 97 Tests grün. Browserprüfung `werkzeuge/pruefung/lagerplaetze.cjs` mit 12/12 Schritten (dunkles Design, PC und 360 px), ohne JS-Fehler.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

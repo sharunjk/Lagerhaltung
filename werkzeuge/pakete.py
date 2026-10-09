@@ -1,7 +1,10 @@
 """Pakete der Lagerverwaltung bauen.
 
     python3 werkzeuge/pakete.py voll   <version>                     -> ausgabe/Lagerverwaltung_v<version>.zip
-    python3 werkzeuge/pakete.py update <basis-commit> <alt> <neu>   -> ausgabe/Lagerverwaltung_Update_<alt>_auf_<neu>.zip
+    python3 werkzeuge/pakete.py update <basis-commit> <alt> <neu>   -> ausgabe/Lagerverwaltung_Update_auf_<neu>.zip
+
+<alt> ist die älteste Version, für die das Paket gilt (Stand von <basis-commit>). Das Paket enthält alle seitdem
+geänderten Dateien und passt damit auch für jede Version dazwischen.
 
 Inhalt immer aus dem letzten Commit (HEAD), nie aus ungespeicherten Änderungen. Das vollständige Paket enthält alle
 Dateien unter Lagerverwaltung2/ aus Git plus den Ordner lib/ (Python-Pakete, nicht in Git). Das Update-Paket enthält
@@ -59,14 +62,14 @@ def update(basis: str, alt: str, neu: str) -> Path:
         if rel.startswith(NIE) or rel in NIE:
             sys.exit(f"{rel} gehört nie in ein Update-Paket.")
         (geloescht if art == "D" else geaendert).append(pfad)
-    ziel = AUSGABE / f"Lagerverwaltung_Update_{alt}_auf_{neu}.zip"
+    ziel = AUSGABE / f"Lagerverwaltung_Update_auf_{neu}.zip"
     h = WURZEL / "werkzeuge" / "update_hinweise" / f"{neu}.txt"
     hinweise = h.read_text(encoding="utf-8").strip().replace("\r\n", "\n").replace("\n", "\r\n") if h.exists() else ""
     liste = "\r\n".join(f"  {p[len(APP) + 1:]}" for p in geaendert)
     weg = "\r\n".join(f"  {p[len(APP) + 1:]}" for p in geloescht)
-    liesmich = (f"Lagerverwaltung - Update {alt} auf {neu} ({date.today():%d.%m.%Y})\r\n"
+    liesmich = (f"Lagerverwaltung - Update auf {neu} ({date.today():%d.%m.%Y})\r\n"
                 f"=============================================================\r\n\r\n"
-                f"Nur fuer eine eingerichtete Lagerverwaltung {alt}. Fuer eine neue Installation das vollstaendige\r\n"
+                f"Fuer eine eingerichtete Lagerverwaltung ab Version {alt}. Fuer eine neue Installation das vollstaendige\r\n"
                 f"Paket Lagerverwaltung_v{neu}.zip verwenden.\r\n\r\n"
                 f"Dieses Paket enthaelt nur geaenderte Programmdateien. Daten, Einstellungen (config.toml),\r\n"
                 f"Benutzer, Sicherungen und Zertifikate bleiben unveraendert.\r\n\r\n"

@@ -1,0 +1,10 @@
+Neu in 2.3.1:
+- Lagerplaetze: Uebersicht in jedem Bereich (C1, C2 ...) nach Regal unterteilt (R1, R2 ...).
+- Zurueck-Pfeil links oben am PC und in der Scanner-App (auch in der installierten App ohne Browserleiste).
+- Leere, falsch angelegte Lagerplaetze loeschen (nur Administratoren): Platz oeffnen -> "Platz loeschen" ->
+  Code eintippen -> Loeschen -> Rueckfrage bestaetigen. Fruehere Buchungen behalten den Code in der Historie.
+
+Kommen Sie von 2.2.2 (in der Seitenleiste steht noch keine Versionsnummer), ist auch alles aus 2.3.0 enthalten:
+- Datensicherung: mehrere Speicherorte (z. B. externe Festplatte), mehrere Uhrzeiten am Tag, "nur bei Aenderung",
+  Zustand je Speicherort mit Warnung auf der Startseite, Wiederherstellen mit Vorschau.
+  Einrichten unter Einstellungen -> Datensicherung (Anleitung: docs\Installationsanleitung.pdf).

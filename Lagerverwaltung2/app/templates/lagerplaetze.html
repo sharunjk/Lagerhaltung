@@ -7,16 +7,26 @@
   <form class="flex gap-2"><input name="q" value="{{ q }}" class="field w-56" placeholder="Platz suchen"><label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="leer" value="1" {% if leer %}checked{% endif %} onchange="this.form.submit()">leere zeigen</label><button class="btn">Suchen</button></form>
 </div>
 {% set auffaellig = [] %}
-{% for b, orte in bereiche.items() %}{% for o in orte %}{% if not (o.code is match_platz) %}{% set _ = auffaellig.append(o) %}{% endif %}{% endfor %}{% endfor %}
+{% for b, reihen in bereiche.items() %}{% for r, orte in reihen.items() %}{% for o in orte %}{% if not (o.code is match_platz) %}{% set _ = auffaellig.append(o) %}{% endif %}{% endfor %}{% endfor %}{% endfor %}
 <div class="grid xl:grid-cols-[1fr_340px] gap-6">
   <div class="space-y-5 min-w-0">
-  {% for b, orte in bereiche.items() %}
+  {% for b, reihen in bereiche.items() %}
+    {% set n = reihen.values()|map("length")|sum %}
     <section class="panel p-4">
-      <h2 class="mb-3">{{ b }} <span class="text-muted font-sans text-sm font-normal">{{ orte|length }} Plätze</span></h2>
-      <div class="flex flex-wrap gap-2">
-      {% for o in orte %}
-        <a href="/lagerplaetze/ansicht?code={{ o.code|urlq }}" class="flex items-center gap-2 rounded-md border border-line px-2 py-1.5 hover:border-primary {{ 'opacity-50' if not o.aktiv }}" title="{{ o.beschreibung or '' }}">
-          <span class="bintag {{ 'bintag-leer' if not o.artikel }}">{{ o.code }}</span><span class="text-sm text-muted tabular-nums">{{ o.artikel }} Art.</span></a>
+      <h2 class="mb-3">{{ b }} <span class="text-muted font-sans text-sm font-normal">{{ n }} Plätze</span></h2>
+      <div class="space-y-3">
+      {% for r, orte in reihen.items() %}
+        <div class="{{ 'sm:grid sm:grid-cols-[6.5rem_1fr] sm:gap-3' if reihen|length > 1 or r }}">
+          {% if reihen|length > 1 or r %}
+          <div class="text-sm pt-1.5 mb-1 sm:mb-0"><span class="font-semibold">{{ r or "Einzelplätze" }}</span> <span class="text-muted">{{ orte|length }}</span></div>
+          {% endif %}
+          <div class="flex flex-wrap gap-2">
+          {% for o in orte %}
+            <a href="/lagerplaetze/ansicht?code={{ o.code|urlq }}" class="flex items-center gap-2 rounded-md border border-line px-2 py-1.5 hover:border-primary {{ 'opacity-50' if not o.aktiv }}" title="{{ o.beschreibung or '' }}">
+              <span class="bintag {{ 'bintag-leer' if not o.artikel }}">{{ o.code }}</span><span class="text-sm text-muted tabular-nums">{{ o.artikel }} Art.</span></a>
+          {% endfor %}
+          </div>
+        </div>
       {% endfor %}
       </div>
     </section>

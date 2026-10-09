@@ -16,7 +16,7 @@ from .config import load_config
 from .services.betrieb import Zeitplaner
 from .web import Anmeldesperre, Forbidden, LoginRequired, render
 
-VERSION = "2.3.0"
+VERSION = "2.3.1"
 log = logging.getLogger("lagerverwaltung")
 
 

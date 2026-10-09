@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
+from urllib.parse import quote
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse, Response
@@ -29,11 +31,21 @@ def lagerplaetze_liste(request: Request, q: str = "", leer: int = 0):
         sichtbar = [o for o in orte if o["artikel"] or o["beschreibung"]]
     else:
         sichtbar = orte
-    bereiche: dict[str, list] = {}
-    for o in sichtbar:
-        bereiche.setdefault(o["bereich"] or "Sonstige", []).append(o)
-    return render(request, "lagerplaetze.html", bereiche=dict(sorted(bereiche.items(), key=lambda x: (x[0] == "Sonstige", x[0]))),
+    # Bereich (C1, C2 …) → Regal (R1, R2 …) → Plätze; Plätze ohne Regal (z. B. C1-F1) stehen vorne als "Einzelplätze"
+    bereiche: dict[str, dict[str, list]] = {}
+    for o in sorted(sichtbar, key=lambda o: natuerlich(o["code"])):
+        teile = o["code"].split("-")
+        reihe = teile[1] if len(teile) >= 3 else ""
+        bereiche.setdefault(o["bereich"] or "Sonstige", {}).setdefault(reihe, []).append(o)
+    bereiche = {b: dict(sorted(r.items(), key=lambda x: natuerlich(x[0]))) for b, r in
+                sorted(bereiche.items(), key=lambda x: (x[0] == "Sonstige", natuerlich(x[0])))}
+    return render(request, "lagerplaetze.html", bereiche=bereiche,
                   anzahl=len(orte), leere=len(orte) - len([o for o in orte if o["artikel"]]), q=q, leer=leer)
+
+
+def natuerlich(text: str) -> list:
+    """Sortierschlüssel, der Zahlen als Zahlen behandelt: R2 vor R10, C1-R1-2 vor C1-R1-10."""
+    return [(0, int(t), "") if t.isdigit() else (1, 0, t.lower()) for t in re.split(r"(\d+)", text or "") if t]
 
 
 @router.get("/lagerplaetze/ansicht")
@@ -110,6 +122,43 @@ def zusammenfuehren(request: Request, von: str = Form(...), nach: str = Form(...
         return RedirectResponse(f"/lagerplaetze/ansicht?code={von}", status_code=303)
     flash(request, f"{n} Artikel von {von} nach {nach} umgebucht. {von} ist jetzt deaktiviert.")
     return RedirectResponse(f"/lagerplaetze/ansicht?code={nach}", status_code=303)
+
+
+@router.post("/lagerplaetze/loeschen")
+def platz_loeschen(request: Request, code: str = Form(""), bestaetigung: str = Form("")):
+    """Lagerplatz endgültig löschen (z. B. Tippfehler). Nur leere Plätze; die Historie behält den Code als Text."""
+    require(request, "admin")
+    zurueck_url = f"/lagerplaetze/ansicht?code={quote(code, safe='')}"
+    if bestaetigung.strip() != code:
+        flash(request, f"Zum Löschen bitte den Code {code} genau so eintippen.", "fehler")
+        return RedirectResponse(zurueck_url, status_code=303)
+    with db.schreiben() as con:
+        p = con.execute(select(lagerplaetze).where(lagerplaetze.c.code == code)).mappings().first()
+        if not p:
+            flash(request, f"Den Lagerplatz {code} gibt es nicht.", "fehler")
+            return RedirectResponse("/lagerplaetze", status_code=303)
+        belegt = con.execute(select(func.count()).select_from(bestand).where(bestand.c.lagerplatz_id == p["id"], bestand.c.menge != 0)).scalar()
+        if belegt:
+            flash(request, f"Auf {code} liegen noch {belegt} Artikel. Bitte erst umbuchen oder mit einem anderen Platz zusammenführen.", "fehler")
+            return RedirectResponse(zurueck_url, status_code=303)
+        offen = con.execute(select(inventuren.c.name).select_from(inventur_pos.join(inventuren, inventuren.c.id == inventur_pos.c.inventur_id))
+                            .where(inventur_pos.c.lagerplatz_id == p["id"], inventuren.c.status != "abgeschlossen")).scalar()
+        if offen is not None:
+            flash(request, f"{code} gehört zur laufenden Inventur „{offen}“. Erst nach deren Abschluss löschen.", "fehler")
+            return RedirectResponse(zurueck_url, status_code=303)
+        gezaehlt = con.execute(select(func.count()).select_from(inventur_pos).where(
+            inventur_pos.c.lagerplatz_id == p["id"], (func.coalesce(inventur_pos.c.soll, 0) != 0) | (func.coalesce(inventur_pos.c.ist, 0) != 0))).scalar()
+        if gezaehlt:
+            flash(request, f"An {code} wurden in einer abgeschlossenen Inventur Mengen gezählt. Damit diese nachvollziehbar bleibt, "
+                           "kann der Platz nicht gelöscht werden. Leere Plätze sind in der Übersicht ohnehin ausgeblendet.", "fehler")
+            return RedirectResponse(zurueck_url, status_code=303)
+        con.execute(delete(inventur_pos).where(inventur_pos.c.lagerplatz_id == p["id"]))  # nur Nullzeilen (siehe oben)
+        con.execute(delete(bestand).where(bestand.c.lagerplatz_id == p["id"]))  # nur Nullbestände
+        n = con.execute(update(bewegungen).where(bewegungen.c.lagerplatz_id == p["id"]).values(lagerplatz_id=None)).rowcount
+        con.execute(delete(lagerplaetze).where(lagerplaetze.c.id == p["id"]))
+        audit(con, request.session["user"]["username"], "Lagerplatz gelöscht", code, {"beschreibung": p["beschreibung"], "buchungen_in_historie": n})
+    flash(request, f"Lagerplatz {code} gelöscht." + (f" Die {n} früheren Buchungen bleiben in der Historie mit dem Code {code} erhalten." if n else ""))
+    return RedirectResponse("/lagerplaetze", status_code=303)
 
 
 @router.post("/lagerplaetze/etikett")

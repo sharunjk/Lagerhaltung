@@ -1,10 +1,10 @@
-# Lagerverwaltung 2.3.0 – Installation
+# Lagerverwaltung 2.3.1 – Installation
 
 Eigenständige Lagerverwaltung mit eigener Datenbank. Sie braucht weder Casper noch MySQL noch den MIS Communicator. Die bisherigen Daten werden einmalig aus einem HeidiSQL-Export übernommen. Dauer: etwa 20 Minuten.
 
 ## Was Sie brauchen
 
-- Das Paket `Lagerverwaltung_v2.3.0.zip`
+- Das Paket `Lagerverwaltung_v2.3.1.zip`
 - Die Datei **python-3.12.10-embed-amd64.zip** von python.org (*Downloads → Windows → Python 3.12.10 → „Windows embeddable package (64-bit)“*). Keine Installation, keine Adminrechte nötig.
 - Den SQL-Export der Casper-Datenbank (HeidiSQL → Rechtsklick auf `daten` → *Datenbank als SQL exportieren*, Daten: „Einfügen“). Frisch exportieren, damit die letzten Buchungen enthalten sind.
 - Für Handscanner/Smartphones und andere PCs: einmalig Adminrechte für die Firewall-Freigabe (IT)
@@ -104,7 +104,7 @@ Die Lagerverwaltung muss dafür nicht beendet werden. Handscanner sollten ihre o
 
 ### Lager-PC defekt – Umzug auf einen neuen PC
 
-1. Auf dem neuen PC die Lagerverwaltung nach Abschnitt 1 einrichten. Dafür das **vollständige** Paket `Lagerverwaltung_v2.3.0.zip` nehmen, nicht ein Update-Paket. Die Datenübernahme aus Casper entfällt.
+1. Auf dem neuen PC die Lagerverwaltung nach Abschnitt 1 einrichten. Dafür das **vollständige** Paket `Lagerverwaltung_v2.3.1.zip` nehmen, nicht ein Update-Paket. Die Datenübernahme aus Casper entfällt.
 2. Einen vorläufigen Administrator anlegen, anmelden.
 3. Externe Festplatte anschließen → *Einstellungen → Datensicherung → Sicherung auswählen …* → neueste Sicherung → *Wiederherstellen*. Danach gelten die Benutzer aus der Sicherung, der vorläufige Administrator ist weg.
 4. Speicherorte, Drucker und E-Mail neu einstellen. Diese Einstellungen stehen in `config.toml` und sind nicht Teil der Sicherung. Firewall-Freigabe und Dienst wie bei der Ersteinrichtung.
@@ -112,7 +112,7 @@ Die Lagerverwaltung muss dafür nicht beendet werden. Handscanner sollten ihre o
 
 ## Updates einspielen
 
-Updates kommen als **Update-Paket** `Lagerverwaltung_Update_<alt>_auf_<neu>.zip`. Es enthält nur geänderte Programmdateien, nie `daten`, `backups`, `logs`, `python`, `lib`, `config.toml` oder `.secret_key`. Daten, Einstellungen, Benutzer und Zertifikate bleiben also unverändert.
+Updates kommen als **Update-Paket** `Lagerverwaltung_Update_auf_<neu>.zip`; es gilt für alle älteren Versionen ab der in `UPDATE_LIESMICH.txt` genannten. Es enthält nur geänderte Programmdateien, nie `daten`, `backups`, `logs`, `python`, `lib`, `config.toml` oder `.secret_key`. Daten, Einstellungen, Benutzer und Zertifikate bleiben also unverändert.
 
 1. Lagerverwaltung beenden: `windows\4_AUTOSTART_AUS.bat` (beim Dienst mit Rechtsklick *Als Administrator ausführen*). Das Programmfenster zu schließen genügt nicht.
 2. Update-Paket entpacken (Rechtsklick → *Alle extrahieren …*), nicht direkt aus der ZIP ziehen.

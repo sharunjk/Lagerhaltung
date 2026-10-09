@@ -4,7 +4,7 @@ Aufruf am PC: Symbol **Lagerverwaltung** auf dem Desktop (öffnet ein eigenes Pr
 
 ## Scannen am PC
 
-Das Suchfeld oben ist zugleich Scanfeld (**F2** springt hinein). Ein USB-Barcodescanner funktioniert auf jeder Seite, auch ohne ins Feld zu klicken: Artikel-Barcode → Buchen, Lagerplatz-Barcode → Platzinhalt.
+Der Pfeil **←** links oben führt zur vorherigen Seite, auch im Programmfenster ohne Browserleiste. In der Scanner-App auf dem Handheld gibt es ihn ebenfalls. Das Suchfeld oben ist zugleich Scanfeld (**F2** springt hinein). Ein USB-Barcodescanner funktioniert auf jeder Seite, auch ohne ins Feld zu klicken: Artikel-Barcode → Buchen, Lagerplatz-Barcode → Platzinhalt.
 
 ## Buchen
 
@@ -42,7 +42,10 @@ Fehlbuchung? Bei der Buchung **Storno** – es entsteht eine Gegenbuchung, nicht
 
 ## Lagerplätze
 
-Übersicht nach Bereichen, Inhalt je Platz, Platz-Etiketten. Tippfehler aus dem Altsystem: Platz öffnen → **umbenennen** oder **zusammenführen** (bucht alles auf den richtigen Platz um).
+Übersicht nach Bereichen (C1, C2 …) und darin nach Regalen (R1, R2 …). Plätze ohne Regal, z. B. Flächen wie C1-F1, stehen als *Einzelplätze* vorne. Ein Klick zeigt den Inhalt; dort gibt es auch das Platz-Etikett.
+
+- **Tippfehler korrigieren:** Platz öffnen → **umbenennen**. Liegt schon etwas auf dem richtigen Platz: **zusammenführen**. Das bucht alles auf den richtigen Platz um.
+- **Falsch angelegten Platz löschen** (nur Administratoren): Platz öffnen → *Platz löschen* → Code zur Bestätigung eintippen → *Löschen* → Rückfrage bestätigen. Das geht nur bei leeren Plätzen. Liegt noch etwas darauf, erst umbuchen oder zusammenführen. Frühere Buchungen bleiben in der Historie mit dem alten Code erhalten. Plätze aus einer laufenden Inventur oder mit gezählten Mengen in einer abgeschlossenen Inventur lassen sich nicht löschen.
 
 ## Auswertungen
 

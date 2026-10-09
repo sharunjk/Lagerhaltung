@@ -55,6 +55,17 @@
       <div class="flex gap-2"><input name="nach" list="alle" class="field" required placeholder="Zielplatz"><button class="btn btn-danger">Zusammenführen</button></div>
       <datalist id="alle">{% for o in alle %}<option value="{{ o }}">{% endfor %}</datalist>
     </form>
+    <form method="post" action="/lagerplaetze/loeschen" class="panel p-4 space-y-2 border-l-4 border-l-crit"
+          onsubmit="return confirm('Lagerplatz {{ p.code }} endgültig löschen? Das kann nicht rückgängig gemacht werden.')">
+      <h2>Platz löschen</h2>
+      {% if rows|selectattr("menge")|list %}
+      <p class="text-sm text-muted">Hier liegen noch Artikel. Erst umbuchen oder oben mit einem anderen Platz zusammenführen – danach lässt sich {{ p.code }} löschen.</p>
+      {% else %}
+      <p class="text-sm text-muted">Für falsch angelegte Plätze. Frühere Buchungen bleiben in der Historie mit dem Code erhalten. Zur Bestätigung den Code <b>{{ p.code }}</b> eintippen:</p>
+      <input type="hidden" name="code" value="{{ p.code }}">
+      <div class="flex gap-2"><input name="bestaetigung" class="field" required autocomplete="off" placeholder="{{ p.code }}" aria-label="Code zur Bestätigung"><button class="btn btn-danger">Löschen</button></div>
+      {% endif %}
+    </form>
     {% endif %}
   </aside>
 </div>
