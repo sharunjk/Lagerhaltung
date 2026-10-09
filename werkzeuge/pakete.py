@@ -74,7 +74,7 @@ def update(basis: str, alt: str, neu: str) -> Path:
                 f"1. Lagerverwaltung beenden: windows\\4_AUTOSTART_AUS.bat\r\n"
                 f"   (laeuft sie als Dienst: Rechtsklick -> Als Administrator ausfuehren).\r\n"
                 f"   Das Programmfenster zu schliessen genuegt NICHT.\r\n"
-                f"2. Zur Sicherheit: in der Lagerverwaltung vorher \"Speichern und jetzt sichern\"\r\n"
+                f"2. Zur Sicherheit vorher eine Sicherung erstellen (Einstellungen -> Datensicherung)\r\n"
                 f"   oder den Ordner daten an eine andere Stelle kopieren.\r\n"
                 f"3. Den Ordner Lagerverwaltung2 in diesem Paket oeffnen, alles markieren (Strg+A)\r\n"
                 f"   und in den Programmordner (z. B. C:\\Lagerverwaltung2) ziehen -> \"Dateien im Ziel ersetzen\".\r\n"

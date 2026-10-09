@@ -299,6 +299,33 @@ Browser-Regression nach der Härtung: Offline-Szenario 16/16, 19 mobile Seiten o
 - Der Dienst unter NETZWERKDIENST druckt auf den HT100 und schreibt die Sicherung auf das Netzlaufwerk.
 - Büro-PC: Arbeitsplatz-Skript mit Sicherheitsabfrage, danach öffnet die Lagerverwaltung ohne Warnung.
 
+## Nachtrag: Datensicherung 2.3.0
+
+Auf Wunsch ergänzt: Wenn der alte Lager-PC ausfällt, sollen die Daten auf einer dauerhaft angeschlossenen externen Festplatte bzw. einem USB-Stick liegen. Sicherungen sollen mehrmals am Tag möglich sein. Am Buchungsverhalten ändert sich nichts. Das Update erfolgt als **Update-Paket** mit nur den geänderten Dateien; Daten, `config.toml`, `.secret_key` und Zertifikate bleiben unberührt.
+
+| Funktion | Umsetzung | Beleg |
+|---|---|---|
+| Mehrere Speicherorte | Hauptspeicherort plus beliebig viele weitere (`weitere_ziele`), je eigene Aufbewahrungsfrist. ZIP wird einmal gebaut und in jeden Ort kopiert (`.teil` → `fsync` → CRC-Prüfung → Umbenennen) | `test_sichern_in_alle_speicherorte_gleicher_inhalt` (beide Dateien bitgleich, keine `.teil`-Reste) |
+| Ausfall eines Speicherorts | Andere Orte werden trotzdem beschrieben. Der fehlende wird alle 30 Minuten gezielt erneut versucht, ohne die anderen neu zu beschreiben. Klartext-Meldung, z. B. „Laufwerk S: ist nicht vorhanden“ | `test_ausgefallener_speicherort_haelt_andere_nicht_auf`, `test_zeitplaner_termine_und_nachholen` |
+| Mehrere Uhrzeiten | `uhrzeit = "07:00, 12:00, 22:00"`. Ein verpasster Termin wird beim Start einmal nachgeholt | `test_uhrzeiten_lesen_und_pruefen`, `test_faelliger_termin`, `test_zeitplaner_termine_und_nachholen` |
+| Nur bei Änderung | SHA-256-Fingerabdruck über alle Tabellen und Anhänge; Login-Zeit und Sicherungsstatus zählen nicht. Ein neuer oder geleerter Speicherort bekommt sofort eine Sicherung | `test_nur_bei_aenderung`, `test_neuer_speicherort_bekommt_sofort_eine_sicherung` |
+| Aufbewahrung | Frist je Ort; **die neuesten 3 bleiben immer** – sonst würde „nur bei Änderung“ zusammen mit der Frist nach langer Ruhe alle Sicherungen löschen. Verhaltensänderung gegenüber 2.2.2, Test entsprechend angepasst | `test_aufraeumen_behaelt_die_neuesten`, `test_backup_aufbewahrung_loescht_nur_alte_sicherungen` |
+| Zustand und Warnung | Tabelle je Ort (letzte Sicherung, Größe, frei, Fehler). Rote Meldung auf der Startseite nur für Administratoren: Fehler, keine Sicherung, älter als 26 h, Platz knapp. Optional eine Mail pro Tag und Ort | `test_warnung_bei_alter_sicherung_und_ausgeschaltet`, `test_startseite_warnt_nur_admins`, `test_sicherungen_aus_alter_version_werden_erkannt` |
+| Ordnerauswahl und Prüfen | Laufwerke/Ordner des Lager-PCs aus Sicht des Lagerverwaltungs-Prozesses; neuer Ordner; Schreibtest mit Rückleseprüfung | `test_ordnerauswahl_pruefen_und_anlegen` |
+| Wiederherstellen | Vorschau (Vergleich aktuell ↔ Sicherung), Passwort + Bestätigung, Prüfung **vor** jeder Änderung (ZIP-CRC, keine Pfade außerhalb `anhaenge/`, `integrity_check`, Pflichttabellen, aktiver Administrator), Sicherung des aktuellen Stands als `vor_wiederherstellung_…`, Datenbank per SQLite-Backup-API im laufenden Betrieb, fehlende Tabellen älterer Versionen werden ergänzt | `test_wiederherstellen_ueber_oberflaeche`, `test_wiederherstellen_rueckgaengig`, `test_ungueltige_sicherungen_werden_abgelehnt` (7 Fälle, Stand jeweils unverändert), `test_wiederherstellen_per_hochladen`, `test_wiederherstellen_aeltere_sicherung_ergaenzt_tabellen` |
+| Rechte | Alle neuen Seiten nur für Administratoren | `test_einstellungen_speichern_und_rechte`; Rollenmatrix: 8 neue Routen, Gast → Login, *lesen*/*lager* → 403 |
+| Konfiguration | Alte `config.toml` (2.2.x) gilt unverändert weiter; Listen werden als TOML-Inline-Tabellen geschrieben, Pfade mit `\` und `"` bleiben lesbar | `test_konfiguration_weitere_ziele_bleibt_lesbar` |
+| Versionsnummer | Unten in der Seitenleiste, damit ein Update überprüfbar ist | Browserprüfung |
+
+**Prüfung:** 91 Tests grün (69 bisherige + 22 neue), auch mit dem echten Export. Ruff (Pyflakes-Regeln) ohne Befund. Browserprüfung `werkzeuge/pruefung/sicherung.cjs` mit 18/18 Schritten, hell und dunkel, ohne JS-Fehler; 136 PC-Seitenaufrufe ohne Fehler. Dabei gefunden und vor Auslieferung behoben: „Prüfen“ war bei einem neu hinzugefügten Speicherort gesperrt.
+
+**Update-Probe:** Das vollständige Paket 2.2.2 wurde mit Daten (39 Artikel, 45 Buchungen, 1 Anhang) und einer alten Sicherung betrieben. Darüber kam das Update-Paket per „Dateien ersetzen“. Danach waren Anmeldung mit altem Passwort, Zahlen, `config.toml` und `.secret_key` (Prüfsummen) unverändert. Die alte Sicherung wurde erkannt, und die neue Sicherung auf einem zweiten Speicherort enthielt auch den Anhang.
+
+**Zusätzlich vor Ort testen (Windows):**
+- Externe Festplatte mit festem Laufwerksbuchstaben: Sie erscheint in der Ordnerauswahl, *Prüfen* ist in Ordnung, und auch beim **Dienst** (NETZWERKDIENST) ist *Speichern und jetzt sichern* erfolgreich.
+- Festplatte abziehen → nach dem nächsten Termin rote Meldung auf der Startseite. Wieder anstecken → spätestens nach 30 Minuten wieder in Ordnung.
+- Wiederherstellen einer Sicherung mit Fotos, danach öffnen die Fotos. Zurück über `vor_wiederherstellung_…`.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |
