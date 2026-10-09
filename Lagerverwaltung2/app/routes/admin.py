@@ -18,7 +18,7 @@ from ..services import betrieb, casper_import, labels, queries, sicherung
 from ..services.excel import import_lesen, import_vorlage, tabelle_xlsx
 from ..services.lager import BuchungsFehler, audit, parse_num
 from ..services.zertifikat import lokale_adressen
-from ..web import MIN_PASSWORT, ROLLEN, flash, pw_kennung, render, require
+from ..web import MIN_PASSWORT, ROLLEN, flash, pw_kennung, render, require, sicheres_ziel
 from .artikel import etiketten_drucken, lager
 
 router = APIRouter()
@@ -446,28 +446,30 @@ def passwort_form(request: Request):
 
 
 @router.post("/passwort")
-def passwort(request: Request, alt: str = Form(...), neu: str = Form(...), neu2: str = Form(...)):
+def passwort(request: Request, alt: str = Form(...), neu: str = Form(...), neu2: str = Form(...), weiter: str = Form("")):
     me = require(request)
+    mobil = weiter.startswith("/m")
+    vorlage = "m/passwort.html" if mobil else "passwort.html"
     sperre, ip = request.app.state.anmeldesperre, (request.client.host if request.client else "?")
     if sperre.sperre_sekunden(ip, me["username"]):
-        antwort = render(request, "passwort.html", fehler="Zu viele Fehlversuche. Bitte später erneut versuchen.")
+        antwort = render(request, vorlage, weiter=weiter, fehler="Zu viele Fehlversuche. Bitte später erneut versuchen.")
         antwort.status_code = 429
         return antwort
     with db.schreiben() as con:
         u = con.execute(select(users).where(users.c.id == me["id"])).mappings().first()
         if not betrieb.check_pw(alt, u["pw_hash"] or ""):
             sperre.fehlschlag(ip, me["username"])
-            return render(request, "passwort.html", fehler="Aktuelles Passwort ist falsch.")
+            return render(request, vorlage, weiter=weiter, fehler="Aktuelles Passwort ist falsch.")
         if len(neu) < MIN_PASSWORT or neu != neu2:
-            return render(request, "passwort.html", fehler=f"Neue Passwörter stimmen nicht überein oder sind kürzer als {MIN_PASSWORT} Zeichen.")
+            return render(request, vorlage, weiter=weiter, fehler=f"Neue Passwörter stimmen nicht überein oder sind kürzer als {MIN_PASSWORT} Zeichen.")
         if neu == alt:
-            return render(request, "passwort.html", fehler="Das neue Passwort muss sich vom bisherigen unterscheiden.")
+            return render(request, vorlage, weiter=weiter, fehler="Das neue Passwort muss sich vom bisherigen unterscheiden.")
         neu_hash = betrieb.hash_pw(neu)
         con.execute(update(users).where(users.c.id == me["id"]).values(pw_hash=neu_hash))
         audit(con, me["username"], "Passwort geändert", me["username"])
     request.session["user"] = {**me, "pw": pw_kennung(neu_hash)}
     flash(request, "Passwort geändert. Andere Anmeldungen mit dem alten Passwort sind beendet.")
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse(sicheres_ziel(weiter, "/"), status_code=303)
 
 
 # ------------------------------------------------------------------ Excel-Import

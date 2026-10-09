@@ -326,7 +326,7 @@ Auf Wunsch ergänzt: Wenn der alte Lager-PC ausfällt, sollen die Daten auf eine
 - Festplatte abziehen → nach dem nächsten Termin rote Meldung auf der Startseite. Wieder anstecken → spätestens nach 30 Minuten wieder in Ordnung.
 - Wiederherstellen einer Sicherung mit Fotos, danach öffnen die Fotos. Zurück über `vor_wiederherstellung_…`.
 
-## Nachtrag: Lagerplätze und Navigation 2.3.1
+## Nachtrag: Lagerplätze, Navigation und Profil 2.3.1
 
 Auf Wunsch aus dem Betrieb ergänzt:
 
@@ -335,8 +335,11 @@ Auf Wunsch aus dem Betrieb ergänzt:
 | Übersicht nach Regal | In jedem Bereich (C1, C2 …) eine Zeile je Regal (zweiter Teil des Codes, R1, R2 …). Codes ohne Regal (C1-F1) stehen als „Einzelplätze“ vorn. Sortierung natürlich: R2 vor R10, C1-R1-2 vor C1-R1-10 | `test_natuerliche_sortierung`, `test_uebersicht_nach_bereich_und_regal` |
 | Zurück-Knopf | Pfeil links oben am PC und in der Scanner-App (44 × 44 px). Gibt es eine vorherige Seite der Lagerverwaltung, geht es dorthin, sonst zur Startseite (App direkt auf einer Unterseite geöffnet) | `test_zurueck_knopf`, Browserprüfung |
 | Lagerplatz löschen | Nur Administratoren, nur leere Plätze. Bestätigung durch Eintippen des Codes plus Rückfrage. Buchungen behalten den Code als Text (`lagerplatz_id` → leer). Abgelehnt bei laufender Inventur oder gezählten Mengen in einer abgeschlossenen Inventur. Eintrag im Protokoll | `test_platz_loeschen_mit_bestaetigung`, `test_platz_loeschen_nur_admin`, `test_platz_loeschen_und_inventur` |
+| Profil in der Scanner-App | Fünfter Punkt „Profil“ in der Leiste unten: Abmelden/Benutzer wechseln (wartet eine Offline-Buchung, wird sie vorher übertragen; sonst Rückfrage, weil sie sonst dem nächsten Benutzer zugeordnet würde), Passwort ändern in der App, Ton, Vibration und Darstellung je Gerät, Offline-Daten aktualisieren, Version und Verbindung. Anmeldung unter `/m/login` innerhalb der App | `test_profil_und_leiste`, `test_anmelden_innerhalb_der_app`, `test_abmelden_und_benutzer_wechseln`, `test_passwort_in_der_app`, `test_kurzes_passwort_am_handy_fuehrt_in_die_app` |
+| PC ↔ Scanner-Ansicht | PC-Knopf oben in der Scanner-App entfernt, stattdessen *Profil → PC-Ansicht öffnen*. In der PC-Ansicht ist „Scanner-Ansicht“ jetzt auch auf dem Handy sichtbar (Symbol) und steht im Menü | `test_pc_ansicht_hat_weg_zurueck`, Browserprüfung bei 360 px |
+| Dateiversion aus Inhalt | CSS/JS-Adressen und der Cache der Scanner-App tragen Version **und Prüfsumme** der Dateien: Geänderte Dateien kommen auch bei gleicher Versionsnummer sicher auf den Geräten an | `test_dateiversion_aendert_sich_mit_dem_inhalt` |
 
-Prüfung: 97 Tests grün. Browserprüfung `werkzeuge/pruefung/lagerplaetze.cjs` mit 12/12 Schritten (dunkles Design, PC und 360 px), ohne JS-Fehler.
+Prüfung: 104 Tests grün. Browserprüfungen `werkzeuge/pruefung/lagerplaetze.cjs` mit 12/12 Schritten und `profil.cjs` mit 18/18 Schritten (dreimal in Folge), jeweils ohne JS-Fehler. `profil.cjs` deckt auch Benutzerwechsel mit wartender Offline-Buchung ab. Dabei gefunden und behoben: Lief beim Abmelden gerade eine automatische Übertragung, kam fälschlich die Rückfrage. Jetzt wird das Ende der Übertragung abgewartet.
 
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 

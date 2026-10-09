@@ -47,6 +47,8 @@ Beim ersten Öffnen zeigt Chrome „Ihre Verbindung ist nicht privat“. Das ist
 - **Rückgabe:** offene Ausleihen mit einem Tipp zurückbuchen.
 - **Inventur:** Laufende Inventur antippen, Lagerplatz scannen, gezählte Mengen eintragen, speichern, nächster Platz.
 - **Foto aufnehmen:** Beim Artikel „Foto aufnehmen“ – das Bild erscheint danach auch am PC und in der Scanner-Ansicht.
+- **Profil** (Leiste unten rechts): **Abmelden / Benutzer wechseln** – teilen sich mehrere Personen ein Gerät, vor der Übergabe abmelden, denn jede Buchung trägt den Namen des Angemeldeten. Noch nicht übertragene Offline-Buchungen werden vorher übertragen. Außerdem: Passwort ändern, Ton und Vibration, hell/dunkel, Offline-Daten aktualisieren und **PC-Ansicht öffnen**. Aus der PC-Ansicht führt der Knopf mit dem Scanner-Symbol oben rechts zurück.
+- **←** oben links führt zur vorherigen Seite.
 
 ## Etiketten
 

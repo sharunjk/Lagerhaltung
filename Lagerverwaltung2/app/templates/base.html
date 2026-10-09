@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Lager{% endblock %} – {{ cfg.server.firmenname }} Lagerverwaltung</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23FFC72C'/><path d='M8 10v12M12 10v12M15 10v12M19 10v12M23 10v12' stroke='%2318222E' stroke-width='2'/></svg>">
-  <link rel="stylesheet" href="/static/app.css?v={{ request.app.state.version }}">
+  <link rel="stylesheet" href="/static/app.css?v={{ request.app.state.static_v }}">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#1C2A38">
   <script>try{const t=localStorage.getItem("lv-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
@@ -58,6 +58,7 @@
           <div class="absolute left-0 mt-2 w-60 rounded-lg bg-nav p-2 shadow-xl z-30">
             {% for href, ic, label in nav %}<a href="{{ href }}" class="navlink">{{ icon(ic) }}{{ label }}</a>{% endfor %}
             {% if user.rolle == "admin" %}<a href="/einstellungen" class="navlink">{{ icon("settings") }}Einstellungen</a>{% endif %}
+            <a href="/m" class="navlink">{{ icon("scan") }}Scanner-Ansicht</a>
             <a href="/logout" class="navlink">{{ icon("logout") }}Abmelden</a>
           </div>
         </details>
@@ -71,7 +72,7 @@
           <span class="absolute right-3 top-1/2 -translate-y-1/2 kbd hidden sm:inline-block">F2</span>
           <div id="suchergebnis" x-show="offen" class="absolute left-0 right-0 mt-1 z-30"></div>
         </form>
-        <a href="/m" class="btn hidden md:inline-flex" title="Ansicht für Handscanner und Smartphone">Scanner-Ansicht</a>
+        <a href="/m" class="btn px-2.5 md:px-3.5" title="Ansicht für Handscanner und Smartphone" aria-label="Scanner-Ansicht">{{ icon("scan", "w-5 h-5 md:hidden") }}<span class="hidden md:inline">Scanner-Ansicht</span></a>
         <a href="/buchen" class="btn btn-primary hidden sm:inline-flex">{{ icon("scan", "w-4 h-4") }}Buchen</a>
       </div>
     </header>

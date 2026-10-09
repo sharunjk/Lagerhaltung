@@ -32,6 +32,20 @@ class SitzungJeProtokoll:
         await (self.https if scope.get("scheme") in ("https", "wss") else self.http)(scope, receive, send)
 
 
+def static_version() -> str:
+    """Versionskennung für CSS/JS-Adressen (``?v=…``) und den Cache der Scanner-App: Versionsnummer plus Prüfsumme der
+    Dateien. Ändert sich eine Datei, holen Browser und Service Worker sie neu – auch bei gleicher Versionsnummer."""
+    import hashlib
+    h = hashlib.sha256()
+    st = Path(__file__).parent / "static"
+    for f in ("app.css", "js/scan.js", "js/offline.js"):
+        try:
+            h.update((st / f).read_bytes())
+        except OSError:
+            pass
+    return f"{VERSION}-{h.hexdigest()[:8]}"
+
+
 def server_plan(cfg, https_bereit: bool) -> list[dict]:
     """Welche Server auf welcher Adresse lauschen. HTTP nur auf 127.0.0.1, wenn HTTPS läuft und ``http_nur_lokal`` gesetzt ist."""
     https = bool(int(cfg.server.https_port or 0)) and https_bereit
@@ -60,6 +74,7 @@ def create_app(cfg=None, start_scheduler: bool = True) -> FastAPI:
     app = FastAPI(title="Lagerverwaltung", version=VERSION, lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url="/api/openapi.json")
     app.state.cfg = cfg
     app.state.version = VERSION
+    app.state.static_v = static_version()
     app.state.anmeldesperre = Anmeldesperre()
 
     @app.middleware("http")
@@ -78,7 +93,8 @@ def create_app(cfg=None, start_scheduler: bool = True) -> FastAPI:
         if request.headers.get("hx-request"):
             return HTMLResponse("", headers={"HX-Redirect": "/login"})
         ziel = request.url.path + (f"?{request.url.query}" if request.url.query else "")
-        return RedirectResponse(f"/login?weiter={quote(ziel, safe='')}", status_code=303)
+        anmelden = "/m/login" if request.url.path.startswith("/m/") or request.url.path == "/m" else "/login"
+        return RedirectResponse(f"{anmelden}?weiter={quote(ziel, safe='')}", status_code=303)
 
     @app.exception_handler(Forbidden)
     async def _forbidden(request: Request, exc):

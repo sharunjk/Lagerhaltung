@@ -10,11 +10,11 @@
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <title>{% block title %}Scanner{% endblock %} – Lager</title>
   <link rel="icon" href="/static/icon.svg">
-  <link rel="stylesheet" href="/static/app.css?v={{ request.app.state.version }}">
+  <link rel="stylesheet" href="/static/app.css?v={{ request.app.state.static_v }}">
   <script>try{const t=localStorage.getItem("lv-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
   <script src="/static/vendor/zxing.min.js" defer></script>
-  <script src="/static/js/scan.js?v={{ request.app.state.version }}" defer></script>
-  <script src="/static/js/offline.js?v={{ request.app.state.version }}" defer></script>
+  <script src="/static/js/scan.js?v={{ request.app.state.static_v }}" defer></script>
+  <script src="/static/js/offline.js?v={{ request.app.state.static_v }}" defer></script>
   <script src="/static/vendor/alpine.min.js" defer></script>
   <script>// Doppeltes Absenden verhindern (Doppelklick/Doppel-Tipp würde sonst zweimal buchen)
 function lvZurueck(start){let intern=false;try{intern=!!document.referrer&&new URL(document.referrer).origin===location.origin}catch(e){}
@@ -47,7 +47,6 @@ document.addEventListener("submit", function(e){
     <a href="/m" class="grid place-items-center w-9 h-9 rounded bg-tag text-tagink" aria-label="Start">{{ icon("scan", "w-6 h-6") }}</a>
     <div class="flex-1 min-w-0"><div class="font-cond font-bold text-lg leading-tight truncate">{% block kopf %}Lager{% endblock %}</div><div class="text-xs text-navink truncate">{{ user.name }}</div></div>
     <a id="offline-badge" href="/m/offline" class="hidden rounded-full px-2.5 py-1 text-xs font-bold text-white bg-warn"></a>
-    <a href="/" class="text-xs text-navink underline px-2">PC</a>
   </div>
 </header>
 {% for f in flashes %}
@@ -55,8 +54,8 @@ document.addEventListener("submit", function(e){
 {% endfor %}
 <main class="px-4 py-4 max-w-xl mx-auto">{% block content %}{% endblock %}</main>
 
-<nav class="fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line grid grid-cols-4" style="padding-bottom: env(safe-area-inset-bottom)">
-  {% for href, ic, lab in [("/m", "home", "Start"), ("/m/buchen?typ=ausgang", "scan", "Entnahme"), ("/m/suche", "search", "Suchen"), ("/m/rueckgabe", "history", "Rückgabe")] %}
+<nav class="fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line grid grid-cols-5" style="padding-bottom: env(safe-area-inset-bottom)">
+  {% for href, ic, lab in [("/m", "home", "Start"), ("/m/buchen?typ=ausgang", "scan", "Entnahme"), ("/m/suche", "search", "Suchen"), ("/m/rueckgabe", "history", "Rückgabe"), ("/m/profil", "user", "Profil")] %}
   <a href="{{ href }}" class="flex flex-col items-center justify-center py-2 text-xs font-semibold {{ 'text-primary' if pfad == href.split('?')[0] else 'text-muted' }}">{{ icon(ic, "w-6 h-6 mb-0.5") }}{{ lab }}</a>
   {% endfor %}
 </nav>

@@ -56,6 +56,8 @@ Test: In der App *Suchen* öffnen und ein Etikett scannen – der Artikel muss e
 | Reservierte Teile | Kachel *Reserviert* → Reservierung antippen → Entnahme ist vorausgefüllt und erledigt die Reservierung |
 | Wareneingang | Kachel *Wareneingang* → bestellte Position → Platz scannen → Buchen |
 | Ausleihe / Rückgabe | Werkzeug an Personen oder Firmen verleihen und zurückbuchen |
+| Profil (Leiste unten rechts) | Abmelden bzw. Benutzer wechseln, Passwort ändern, Ton/Vibration, hell/dunkel, Offline-Daten aktualisieren, PC-Ansicht öffnen |
+| ← (oben links) | zurück zur vorherigen Seite |
 | Inventur | Laufende Inventur antippen → Platz scannen → gezählte Mengen eintragen |
 
 Grüne Meldung mit kurzem Ton = gebucht. Rote Meldung mit Doppelvibration = nicht gebucht (Grund steht dabei, z. B. zu wenig Bestand am Platz).

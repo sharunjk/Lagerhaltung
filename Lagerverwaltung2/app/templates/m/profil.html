@@ -1,0 +1,91 @@
+{% extends "m/base.html" %}
+{% from "_macros.html" import icon %}
+{% block kopf %}Profil{% endblock %}
+{% block content %}
+<section class="rounded-lg border border-line bg-surface p-4 mb-4">
+  <div class="flex items-center gap-3">
+    <span class="grid place-items-center w-12 h-12 rounded-full bg-soft text-muted shrink-0">{{ icon("user", "w-7 h-7") }}</span>
+    <div class="min-w-0"><div class="font-cond text-xl font-bold truncate">{{ user.name }}</div>
+      <div class="text-sm text-muted">{{ user.username }} · {{ ROLLEN_NAMEN[user.rolle] }}</div></div>
+  </div>
+  <div class="grid gap-2 mt-4" x-data="{laeuft: false}">
+    <button type="button" class="btn btn-primary h-12 w-full" :disabled="laeuft" @click="laeuft = true; await lvAbmelden(); laeuft = false">Abmelden / Benutzer wechseln</button>
+    <a href="/m/passwort" class="btn h-12 w-full">Passwort ändern</a>
+  </div>
+  <p class="text-sm text-muted mt-3">Jede Buchung wird unter dem angemeldeten Namen gespeichert. Teilen sich mehrere Personen ein Gerät, vor der Übergabe abmelden.</p>
+</section>
+
+<h2 class="mb-2">Dieses Gerät</h2>
+<section class="rounded-lg border border-line bg-surface divide-y divide-line mb-4" x-data="lvGeraet()" x-init="init()">
+  <div class="p-4">
+    <div class="font-semibold mb-2">Darstellung</div>
+    <div class="seg w-full grid grid-cols-[1.5fr_1fr_1fr]">
+      {% for wert, lab in [("", "Automatisch"), ("light", "Hell"), ("dark", "Dunkel")] %}
+      <label class="text-center px-1"><input type="radio" name="design" value="{{ wert }}" class="sr-only" x-model="design" @change="designSetzen()"><span class="block py-2 rounded">{{ lab }}</span></label>
+      {% endfor %}
+    </div>
+  </div>
+  <label class="flex items-center justify-between gap-3 p-4"><span><span class="font-semibold block">Ton beim Scannen</span><span class="text-sm text-muted">Kurzer Ton bei Erfolg, tiefer Ton bei Fehler</span></span>
+    <input type="checkbox" x-model="ton" @change="setzen('lv-ton', ton)"></label>
+  <label class="flex items-center justify-between gap-3 p-4"><span><span class="font-semibold block">Vibration</span><span class="text-sm text-muted">bei Erfolg und Fehler</span></span>
+    <input type="checkbox" x-model="vibration" @change="setzen('lv-vibration', vibration)"></label>
+  <div class="p-4">
+    <div class="flex items-center justify-between gap-3">
+      <span><span class="font-semibold block">Offline-Daten</span><span class="text-sm text-muted" x-text="katalogText"></span></span>
+      <button type="button" class="btn" @click="katalog()" :disabled="laedt">Aktualisieren</button>
+    </div>
+    <a href="/m/offline" class="flex w-full items-center justify-between gap-3 mt-3 text-sm"><span>Warteschlange (offline erfasst)</span><span class="font-semibold" :class="wartet ? 'text-warn' : 'text-muted'" x-text="wartet + ' wartet'"></span></a>
+  </div>
+  <div class="p-4">
+    <div class="font-semibold">PC-Ansicht</div>
+    <p class="text-sm text-muted mb-2">Alle Funktionen wie am PC (Auswertungen, Einstellungen …). Zurück zur Scanner-Ansicht über den Knopf mit dem Scanner-Symbol oben rechts.</p>
+    <a href="/" class="btn w-full h-12">PC-Ansicht öffnen</a>
+  </div>
+</section>
+
+<section class="text-sm text-muted space-y-1 mb-4" x-data="{verbunden: null}" x-init="LV.status().then((s) => verbunden = s.ok)">
+  <div>Lagerverwaltung {{ request.app.state.version }} · <span x-text="location.host"></span></div>
+  <div>Verbindung zum Lager-PC: <span class="font-semibold" :class="verbunden ? 'text-ok' : 'text-crit'" x-text="verbunden === null ? '…' : (verbunden ? 'verbunden' : 'keine Verbindung')"></span></div>
+</section>
+
+<script>
+async function lvAbmelden() {
+  // Offline erfasste Buchungen gehören dem, der sie erfasst hat: vor dem Abmelden übertragen
+  // läuft gerade eine automatische Übertragung (z. B. WLAN eben zurück), deren Ende abwarten
+  for (let i = 0; i < 75 && LV.queue.laeuft; i++) await new Promise((ok) => setTimeout(ok, 200));
+  try { await LV.queue.sync(); } catch (e) {}
+  const offen = (await LV.queue.alle().catch(() => [])).filter((x) => x.status === "offen").length;
+  if (offen && !confirm(offen + " offline erfasste Buchung(en) konnten noch nicht übertragen werden. Sie werden beim nächsten Übertragen dem dann angemeldeten Benutzer zugeordnet.\n\nTrotzdem abmelden?")) return;
+  location.href = "/logout?weiter=" + encodeURIComponent("/m");
+}
+function lvGeraet() {
+  const lesen = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  return {
+    design: lesen("lv-theme") || "", ton: lesen("lv-ton") !== "aus", vibration: lesen("lv-vibration") !== "aus",
+    wartet: 0, laedt: false, katalogText: "",
+    async init() {
+      this.katalogZeit();
+      this.wartet = (await LV.queue.alle().catch(() => [])).filter((x) => x.status === "offen").length;
+    },
+    setzen(k, an) { try { an ? localStorage.removeItem(k) : localStorage.setItem(k, "aus"); } catch (e) {} if (an && k === "lv-ton") LV.ton(true); },
+    designSetzen() {
+      try { this.design ? localStorage.setItem("lv-theme", this.design) : localStorage.removeItem("lv-theme"); } catch (e) {}
+      const dunkel = this.design === "dark" || (!this.design && matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.classList.toggle("dark", dunkel);
+    },
+    katalogZeit() {
+      const t = +lesen("lv-katalog-zeit") || 0;
+      this.katalogText = t ? "Artikelliste für den Offline-Modus vom " + new Date(t).toLocaleString("de-DE", {dateStyle: "short", timeStyle: "short"}) : "Noch nicht geladen";
+    },
+    async katalog() {
+      this.laedt = true;
+      const ok = await LV.katalog.laden();
+      if (ok) { try { localStorage.setItem("lv-katalog-zeit", String(Date.now())); } catch (e) {} }
+      this.katalogZeit();
+      LV.meldung(ok ? "Offline-Daten aktualisiert." : "Keine Verbindung – Offline-Daten nicht aktualisiert.", ok);
+      this.laedt = false;
+    },
+  };
+}
+</script>
+{% endblock %}

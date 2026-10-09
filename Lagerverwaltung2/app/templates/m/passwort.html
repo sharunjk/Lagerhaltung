@@ -1,0 +1,12 @@
+{% extends "m/base.html" %}
+{% block kopf %}Passwort ändern{% endblock %}
+{% block content %}
+{% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm flash-fehler" role="alert">{{ fehler }}</div>{% endif %}
+<form method="post" action="/passwort" class="rounded-lg border border-line bg-surface p-4 space-y-4">
+  <input type="hidden" name="weiter" value="{{ weiter or '/m/profil' }}">
+  <div><label class="label" for="alt">Aktuelles Passwort</label><input id="alt" name="alt" type="password" class="field h-12" required autocomplete="current-password"></div>
+  <div><label class="label" for="neu">Neues Passwort (mind. 10 Zeichen)</label><input id="neu" name="neu" type="password" class="field h-12" required minlength="10" autocomplete="new-password"></div>
+  <div><label class="label" for="neu2">Neues Passwort wiederholen</label><input id="neu2" name="neu2" type="password" class="field h-12" required minlength="10" autocomplete="new-password"></div>
+  <button class="btn btn-primary h-12 w-full">Passwort ändern</button>
+</form>
+{% endblock %}

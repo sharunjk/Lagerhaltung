@@ -4,7 +4,7 @@ Aufruf am PC: Symbol **Lagerverwaltung** auf dem Desktop (öffnet ein eigenes Pr
 
 ## Scannen am PC
 
-Der Pfeil **←** links oben führt zur vorherigen Seite, auch im Programmfenster ohne Browserleiste. In der Scanner-App auf dem Handheld gibt es ihn ebenfalls. Das Suchfeld oben ist zugleich Scanfeld (**F2** springt hinein). Ein USB-Barcodescanner funktioniert auf jeder Seite, auch ohne ins Feld zu klicken: Artikel-Barcode → Buchen, Lagerplatz-Barcode → Platzinhalt.
+Der Pfeil **←** links oben führt zur vorherigen Seite, auch im Programmfenster ohne Browserleiste. In der Scanner-App auf dem Handheld gibt es ihn ebenfalls. Der Knopf **Scanner-Ansicht** (auf dem Handy nur das Scanner-Symbol) wechselt in die Scanner-App; dort führt *Profil → PC-Ansicht öffnen* zurück. Das Suchfeld oben ist zugleich Scanfeld (**F2** springt hinein). Ein USB-Barcodescanner funktioniert auf jeder Seite, auch ohne ins Feld zu klicken: Artikel-Barcode → Buchen, Lagerplatz-Barcode → Platzinhalt.
 
 ## Buchen
 

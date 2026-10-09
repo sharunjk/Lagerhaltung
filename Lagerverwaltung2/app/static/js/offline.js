@@ -142,7 +142,7 @@
     await LV.queue.add(d);
     if (st.ok) {
       LV.meldung("Anmeldung abgelaufen – Buchung im Gerät gespeichert. Bitte neu anmelden, dann wird sie übertragen.", true);
-      setTimeout(() => { location.href = "/login?weiter=" + encodeURIComponent("/m/offline?typ=" + (d.typ || "ausgang")); }, 1800);
+      setTimeout(() => { location.href = "/m/login?weiter=" + encodeURIComponent("/m/offline?typ=" + (d.typ || "ausgang")); }, 1800);
       return;
     }
     LV.meldung("Keine Verbindung – Buchung gespeichert, wird automatisch übertragen.", true);

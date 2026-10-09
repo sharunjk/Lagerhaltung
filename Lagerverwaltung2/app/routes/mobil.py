@@ -19,7 +19,7 @@ from ..db import artikel, bestand, bestellungen, inventuren, lagerplaetze, liefe
 from ..services import queries
 from ..services.betrieb import get_setting, set_setting
 from ..services.lager import BuchungsFehler, audit, fmt_num, parse_num
-from ..web import current_user, flash, render, require, templates
+from ..web import current_user, flash, render, require, sicheres_ziel, templates
 from .artikel import etiketten_drucken, form_daten, lager
 from .buchen import TYPEN, buchung_ausfuehren
 from .lager import inventur_positionen, zaehlung_speichern
@@ -81,7 +81,7 @@ def manifest(request: Request):
 
 @router.get("/sw.js")
 def service_worker(request: Request):
-    body = templates.get_template("m/sw.js").render(version=request.app.state.version)
+    body = templates.get_template("m/sw.js").render(version=request.app.state.static_v)
     return Response(body, media_type="application/javascript", headers={"Service-Worker-Allowed": "/m", "Cache-Control": "no-cache"})
 
 
@@ -102,6 +102,29 @@ def start(request: Request):
         best = con.execute(select(func.count()).where(bestellungen.c.status.in_(["bestellt", "teilgeliefert"]))).scalar()
     return render(request, "m/start.html", letzte=letzte, inventuren=inv, ausleihen=ausl, reserviert=res, bestellt=best,
                   korb=len(_korb_lesen(request)))
+
+
+# ------------------------------------------------------------------ Profil und Geräteeinstellungen
+@router.get("/profil")
+def profil(request: Request):
+    require(request)
+    return render(request, "m/profil.html")
+
+
+@router.get("/login")
+def login_mobil(request: Request, weiter: str = "/m"):
+    """Anmeldung innerhalb der App (Bereich /m): Die installierte App zeigt dabei keine Browserleiste."""
+    from .core import login_form
+    weiter = sicheres_ziel(weiter, "/m")
+    if current_user(request):  # schon angemeldet (z. B. zweiter Tab): direkt weiter
+        return RedirectResponse(weiter, status_code=303)
+    return login_form(request, weiter)
+
+
+@router.get("/passwort")
+def passwort_mobil(request: Request):
+    require(request)
+    return render(request, "m/passwort.html", weiter="/m/profil")
 
 
 # ------------------------------------------------------------------ Buchen

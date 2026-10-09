@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from datetime import datetime
 
 from fastapi import APIRouter, Form, Request
@@ -61,16 +63,19 @@ def login(request: Request, username: str = Form(...), passwort: str = Form(""),
     weiter = sicheres_ziel(weiter, "/")
     if len(passwort) < MIN_PASSWORT:
         flash(request, f"Ihr Passwort ist kürzer als {MIN_PASSWORT} Zeichen. Bitte jetzt ein neues vergeben.", "fehler")
-        return RedirectResponse("/passwort", status_code=303)
+        return RedirectResponse("/m/passwort" if weiter.startswith("/m") or ist_mobil(request) else "/passwort", status_code=303)
     if weiter == "/" and ist_mobil(request):
         weiter = "/m"
     return RedirectResponse(weiter, status_code=303)
 
 
 @router.get("/logout")
-def logout(request: Request):
+def logout(request: Request, weiter: str = ""):
     request.session.clear()
-    return RedirectResponse("/login", status_code=303)
+    ziel = sicheres_ziel(weiter, "")
+    if ziel.startswith("/m"):
+        return RedirectResponse(f"/m/login?weiter={quote(ziel, safe='')}", status_code=303)
+    return RedirectResponse(f"/login?weiter={quote(ziel, safe='')}" if ziel else "/login", status_code=303)
 
 
 @router.get("/einrichtung")

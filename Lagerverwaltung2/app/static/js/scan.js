@@ -2,15 +2,17 @@
 (function () {
   const LV = (window.LV = window.LV || {});
 
+  // Je Gerät abschaltbar (Scanner-App → Profil): localStorage lv-ton / lv-vibration = "aus"
+  LV.einstellung = function (k) { try { return localStorage.getItem(k) !== "aus"; } catch (e) { return true; } };
   LV.ton = function (ok) {
-    try {
+    if (LV.einstellung("lv-ton")) try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.connect(g); g.connect(ctx.destination);
       o.frequency.value = ok ? 1320 : 220; g.gain.value = 0.08;
       o.start(); o.stop(ctx.currentTime + (ok ? 0.12 : 0.35));
     } catch (e) {}
-    try { navigator.vibrate && navigator.vibrate(ok ? 60 : [120, 60, 120]); } catch (e) {}
+    if (LV.einstellung("lv-vibration")) try { navigator.vibrate && navigator.vibrate(ok ? 60 : [120, 60, 120]); } catch (e) {}
   };
 
   let stream = null, reader = null, laeuft = false;
