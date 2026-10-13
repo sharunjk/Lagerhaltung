@@ -4,6 +4,9 @@ Neu in 2.4.0:
   (z. B. "Schrauben M8"), dann "Alle Box-Etiketten drucken". Eine Box ist ein normaler Lagerplatz:
   scannen, buchen, Inventur - alles wie gewohnt.
 - Weinrote Lagerplaetze: dort liegt ein Artikel unter Melde- oder Mindestbestand (Nachbestellung noetig).
+- Artikel endgueltig loeschen (nur Administratoren), z. B. falsch angelegte: Artikel oeffnen ->
+  "Artikel endgueltig loeschen" -> Nummer eintippen -> Loeschen -> Rueckfrage bestaetigen. Nur ohne Bestand und
+  ohne offene Reservierung/Bestellung/Ausleihe. Fruehere Buchungen behalten die Nummer in der Historie.
 
 Kommen Sie von einer aelteren Version, ist auch alles aus 2.3.1 und 2.3.0 enthalten:
 - 2.3.1: Lagerplaetze nach Regal unterteilt, Zurueck-Pfeil, Lagerplatz loeschen, "Profil" in der Scanner-App

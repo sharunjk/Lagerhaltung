@@ -158,6 +158,17 @@
       <input type="hidden" name="zurueck" value="{{ 0 if a.aktiv else 1 }}">
       <button class="btn {{ 'btn-danger' if a.aktiv }} w-full" {% if a.aktiv %}onclick="return confirm('Artikel archivieren? Er verschwindet aus den Listen, die Historie bleibt erhalten.')"{% endif %}>{{ "Artikel archivieren" if a.aktiv else "Artikel wieder aktivieren" }}</button>
     </form>
+    <details class="panel p-4 no-print border-l-4 border-l-crit">
+      <summary class="font-semibold cursor-pointer">Artikel endgültig löschen</summary>
+      {% if a.bestand %}
+      <p class="text-sm text-muted mt-2">Der Artikel hat noch {{ a.bestand|num }} {{ a.einheit }} Bestand. Erst ausbuchen oder auf 0 zählen, dann löschen.</p>
+      {% else %}
+      <form method="post" action="/artikel/{{ a.nummer|urlq }}/loeschen" class="mt-2 space-y-2" onsubmit="return confirm('Artikel {{ a.nummer }} endgültig löschen? Das kann nicht rückgängig gemacht werden.')">
+        <p class="text-sm text-muted">Für falsch angelegte Artikel. Stammdaten, Fotos und Dokumente werden gelöscht; frühere Buchungen bleiben in der Historie mit der Nummer erhalten. Zum Aufheben für später lieber <b>archivieren</b>. Zur Bestätigung die Artikelnummer <b>{{ a.nummer }}</b> eintippen:</p>
+        <div class="flex gap-2"><input name="bestaetigung" class="field" required autocomplete="off" placeholder="{{ a.nummer }}" aria-label="Artikelnummer zur Bestätigung"><button class="btn btn-danger">Löschen</button></div>
+      </form>
+      {% endif %}
+    </details>
     {% endif %}
   </aside>
 </div>

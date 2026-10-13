@@ -5,7 +5,7 @@ import io
 import mimetypes
 import uuid
 from datetime import date
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
@@ -183,6 +183,29 @@ def archivieren(request: Request, nr: str, zurueck: int = Form(0)):
     except BuchungsFehler as e:
         flash(request, str(e), "fehler")
     return RedirectResponse(f"/artikel/{nr}", status_code=303)
+
+
+@router.post("/artikel/{nr}/loeschen")
+def artikel_loeschen(request: Request, nr: str, bestaetigung: str = Form("")):
+    """Artikel endgültig löschen – nur Administratoren, mit Eingabe der Artikelnummer zur Bestätigung."""
+    require(request, "admin")
+    if bestaetigung.strip() != nr:
+        flash(request, f"Zum Löschen bitte die Artikelnummer {nr} genau so eintippen.", "fehler")
+        return RedirectResponse(f"/artikel/{quote(nr, safe='')}", status_code=303)
+    try:
+        with db.schreiben() as con:
+            aid = con.execute(select(artikel.c.id).where(artikel.c.nummer == nr)).scalar()
+            if aid is None:
+                raise BuchungsFehler(f"Artikel {nr} gibt es nicht.")
+            dateien = lager(con, request).artikel_loeschen(aid)
+    except BuchungsFehler as e:
+        flash(request, str(e), "fehler")
+        return RedirectResponse(f"/artikel/{quote(nr, safe='')}", status_code=303)
+    ordner = _anhang_ordner(request)
+    for d in dateien:  # erst nach dem Speichern: schlägt das Löschen fehl, bleiben die Dateien
+        (ordner / Path(d).name).unlink(missing_ok=True)
+    flash(request, f"Artikel {nr} gelöscht. Frühere Buchungen bleiben in der Historie mit der Nummer {nr} erhalten.")
+    return RedirectResponse("/artikel", status_code=303)
 
 
 # ------------------------------------------------------------------ Anhänge

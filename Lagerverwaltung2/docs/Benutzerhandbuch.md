@@ -20,7 +20,11 @@ Fehlbuchung? Bei der Buchung **Storno** – es entsteht eine Gegenbuchung, nicht
 - **Kopieren:** neuer Artikel mit den Daten eines vorhandenen.
 - **Melde- und Mindestbestand:** ab Meldebestand → Nachbestellvorschlag, unter Mindestbestand → kritisch. Für viele Artikel auf einmal: Artikelliste als Excel exportieren, Spalten ergänzen, über *Excel-Import* einlesen.
 - **Kritisches Ersatzteil** markieren, **Verwendung/Anlage** (Tag-Nummer) eintragen, **Fotos und Datenblätter** anhängen.
-- **Archivieren** statt löschen: Artikel ohne Bestand verschwinden aus den Listen, die Historie bleibt.
+- **Archivieren:** Artikel ohne Bestand verschwinden aus den Listen, lassen sich aber jederzeit wieder aktivieren. Das ist richtig für Teile, die es nicht mehr gibt.
+- **Endgültig löschen** (nur Administratoren), für falsch angelegte Artikel: Artikel öffnen → *Artikel endgültig löschen* → Artikelnummer eintippen → *Löschen* → Rückfrage bestätigen.
+  - Geht nur ohne Bestand und ohne offene Reservierung, Bestellung, Ausleihe oder laufende Inventur.
+  - Gelöscht werden Stammdaten, Fotos und Dokumente. Frühere Buchungen bleiben in der Historie mit der Artikelnummer erhalten.
+  - Die Nummer ist danach wieder frei. Jedes Löschen steht im Protokoll.
 
 ## Reservierungen und Ausleihen
 

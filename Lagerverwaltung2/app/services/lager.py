@@ -281,6 +281,36 @@ class Lager:
         self.con.execute(update(artikel).where(artikel.c.id == aid).values(geaendert_am=self.zeit, **geaendert))
         audit(self.con, self.benutzer, "Artikel geändert", alt["nummer"], {k: [alt[k], v] for k, v in geaendert.items()})
 
+    def artikel_loeschen(self, aid: int) -> list[str]:
+        """Artikel endgültig löschen (z. B. falsch angelegt). Nur ohne Bestand und ohne offene Vorgänge.
+        Buchungen bleiben in der Historie mit der Artikelnummer (``artikel_id`` wird leer); Bestandszeilen (0),
+        erledigte Reservierungen/Bestellungen, Inventurzeilen und Anhänge werden mit gelöscht.
+        Gibt die Dateinamen der Anhänge zurück – die Dateien löscht der Aufrufer nach dem Speichern."""
+        from ..db import anhaenge, bestellungen, inventur_pos, inventuren
+        from .queries import offene_ausleihen
+        a = self.con.execute(select(artikel).where(artikel.c.id == aid)).mappings().first()
+        if not a:
+            raise BuchungsFehler("Artikel nicht gefunden.")
+        if self.con.execute(select(func.count()).select_from(bestand).where(and_(bestand.c.artikel_id == aid, bestand.c.menge != 0))).scalar():
+            raise BuchungsFehler("Der Artikel hat noch Bestand. Erst ausbuchen oder auf 0 zählen, dann löschen.")
+        if self.con.execute(select(func.count()).select_from(reservierungen).where(and_(reservierungen.c.artikel_id == aid, reservierungen.c.status == "offen"))).scalar():
+            raise BuchungsFehler("Es gibt noch offene Reservierungen für diesen Artikel.")
+        if self.con.execute(select(func.count()).select_from(bestellungen).where(
+                and_(bestellungen.c.artikel_id == aid, bestellungen.c.status.in_(["offen", "bestellt", "teilgeliefert"])))).scalar():
+            raise BuchungsFehler("Es gibt noch offene Bestellungen für diesen Artikel. Erst liefern lassen oder stornieren.")
+        if any(x["artikel_id"] == aid for x in offene_ausleihen(self.con)):
+            raise BuchungsFehler("Der Artikel ist noch ausgeliehen. Erst die Rückgabe buchen.")
+        if self.con.execute(select(func.count()).select_from(inventur_pos.join(inventuren, inventuren.c.id == inventur_pos.c.inventur_id))
+                            .where(and_(inventur_pos.c.artikel_id == aid, inventuren.c.status != "abgeschlossen"))).scalar():
+            raise BuchungsFehler("Der Artikel gehört zu einer laufenden Inventur. Erst nach deren Abschluss löschen.")
+        dateien = [r[0] for r in self.con.execute(select(anhaenge.c.speichername).where(anhaenge.c.artikel_id == aid))]
+        buchungen = self.con.execute(select(func.count()).select_from(bewegungen).where(bewegungen.c.artikel_id == aid)).scalar()
+        self.con.execute(update(bewegungen).where(bewegungen.c.artikel_id == aid).values(artikel_id=None))
+        self.con.execute(artikel.delete().where(artikel.c.id == aid))  # Bestand (0), Reservierungen, Bestellungen, Inventurzeilen, Anhänge: CASCADE
+        audit(self.con, self.benutzer, "Artikel gelöscht", a["nummer"], {"bezeichnung": a["bezeichnung"], "buchungen_in_historie": buchungen,
+                                                                        "anhaenge": len(dateien)})
+        return dateien
+
     def artikel_archivieren(self, aid: int, archiv: bool = True) -> None:
         a = self.con.execute(select(artikel).where(artikel.c.id == aid)).mappings().first()
         if not a:
