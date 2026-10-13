@@ -1,12 +1,23 @@
 {% extends "m/base.html" %}
 {% block title %}{{ p.code }}{% endblock %}
-{% block kopf %}Lagerplatz {{ p.code }}{% endblock %}
+{% block kopf %}{{ "Box" if eltern else "Lagerplatz" }} {{ p.code }}{% endblock %}
 {% block content %}
-<div class="mb-4 flex items-center justify-between gap-3"><div><span class="bintag text-2xl leading-[2.75rem] px-3">{{ p.code }}</span>{% if p.beschreibung %}<p class="text-muted mt-1">{{ p.beschreibung }}</p>{% endif %}</div>
-  {% if user.rolle != "lesen" %}<form method="post" action="/m/platz/etikett"><input type="hidden" name="code" value="{{ p.code }}"><button class="btn h-12">Platz-Etikett</button></form>{% endif %}</div>
+{% if eltern %}<a href="/m/platz?code={{ eltern.code|urlq }}" class="inline-flex items-center gap-1 text-sm text-muted mb-2">gehört zu <span class="bintag">{{ eltern.code }}</span></a>{% endif %}
+<div class="mb-4 flex items-center justify-between gap-3"><div class="min-w-0"><span class="bintag {{ 'bintag-nachbestellen' if rot }} text-2xl leading-[2.75rem] px-3">{{ p.code }}</span>{% if p.beschreibung %}<p class="text-muted mt-1">{{ p.beschreibung }}</p>{% endif %}</div>
+  {% if user.rolle != "lesen" %}<form method="post" action="/m/platz/etikett"><input type="hidden" name="code" value="{{ p.code }}"><button class="btn h-12">Etikett</button></form>{% endif %}</div>
+{% if rot %}<div class="mb-4 rounded-lg border-l-4 border-l-wein bg-surface border border-line p-3 text-sm"><b class="text-weintext">Nachbestellung nötig:</b>
+  {% for x in rot|unique(attribute="nummer") %}<a href="/m/artikel/{{ x.nummer|urlq }}" class="font-semibold underline">{{ x.nummer }}</a>{{ ", " if not loop.last }}{% endfor %}</div>{% endif %}
 {% if user.rolle != "lesen" %}<div class="grid grid-cols-2 gap-2 mb-4"><a href="/m/neu?platz={{ p.code|urlq }}" class="btn h-12">Neuer Artikel hier</a><a href="/m/buchen?typ=eingang&platz={{ p.code|urlq }}" class="btn h-12">Eingang hier</a></div>{% endif %}
 <ul class="rounded-lg border border-line bg-surface divide-y divide-line">
-  {% for r in rows if r.menge %}<li><a href="/m/artikel/{{ r.nummer|urlq }}" class="flex items-center gap-3 px-4 py-3"><span class="flex-1 min-w-0"><span class="font-semibold">{{ r.nummer }}</span><span class="block text-sm text-muted truncate">{{ r.bezeichnung }}</span></span><span class="font-cond text-2xl font-bold">{{ r.menge|num }}</span></a></li>
-  {% else %}<li class="px-4 py-4 text-muted">Platz ist leer.</li>{% endfor %}
+  {% for r in rows if r.menge %}<li><a href="/m/artikel/{{ r.nummer|urlq }}" class="flex items-center gap-3 px-4 py-3"><span class="flex-1 min-w-0"><span class="font-semibold {{ 'text-weintext' if r.nummer in rot_nr }}">{{ r.nummer }}</span><span class="block text-sm text-muted truncate">{{ r.bezeichnung }}</span></span><span class="font-cond text-2xl font-bold">{{ r.menge|num }}</span></a></li>
+  {% else %}<li class="px-4 py-4 text-muted">{{ "Direkt auf dem Platz liegt nichts – siehe Boxen." if boxen else "Platz ist leer." }}</li>{% endfor %}
 </ul>
+{% if boxen %}
+<h2 class="mt-5 mb-2">Sichtlagerboxen</h2>
+<ul class="rounded-lg border border-line bg-surface divide-y divide-line">
+  {% for b in boxen %}<li><a href="/m/platz?code={{ b.code|urlq }}" class="flex items-center gap-3 px-4 py-3">
+    <span class="bintag {{ 'bintag-nachbestellen' if b.rot else ('bintag-leer' if not b.rows) }} w-12 justify-center shrink-0">{{ b.code.rsplit("-", 1)[1] }}</span>
+    <span class="flex-1 min-w-0"><span class="block truncate">{{ b.beschreibung or "ohne Bezeichnung" }}</span><span class="block text-sm text-muted truncate">{% for r in b.rows %}{{ r.nummer }} ({{ r.menge|num }}){{ ", " if not loop.last }}{% else %}leer{% endfor %}</span></span></a></li>{% endfor %}
+</ul>
+{% endif %}
 {% endblock %}

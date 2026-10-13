@@ -25,12 +25,23 @@ def lagerplaetze_liste(request: Request, q: str = "", leer: int = 0):
     require(request)
     with db.engine().connect() as con:
         orte = queries.lagerplaetze_uebersicht(con)
+    # Sichtlagerboxen erscheinen nicht als eigene Kacheln, sondern beim Platz ("C1-R2-3 · 10 Boxen")
+    nach_code = {o["code"]: o for o in orte}
+    for o in orte:
+        o["boxen"] = []
+    for o in orte:
+        e = queries.box_eltern(o["code"])
+        if e in nach_code:
+            nach_code[e]["boxen"].append(o)
+            o["ist_box"] = True
+    haupt = [o for o in orte if not o.get("ist_box")]
+    for o in haupt:
+        o["artikel_ges"] = o["artikel"] + sum(b["artikel"] for b in o["boxen"])
+        o["rot"] = o["nachbestellen"] + [x for b in o["boxen"] for x in b["nachbestellen"]]
     if q:
-        orte = [o for o in orte if q.lower() in o["code"].lower() or q.lower() in (o["beschreibung"] or "").lower()]
-    if not leer:
-        sichtbar = [o for o in orte if o["artikel"] or o["beschreibung"]]
-    else:
-        sichtbar = orte
+        t = q.lower()
+        haupt = [o for o in haupt if any(t in x["code"].lower() or t in (x["beschreibung"] or "").lower() for x in [o, *o["boxen"]])]
+    sichtbar = haupt if leer else [o for o in haupt if o["artikel_ges"] or o["beschreibung"] or o["boxen"]]
     # Bereich (C1, C2 …) → Regal (R1, R2 …) → Plätze; Plätze ohne Regal (z. B. C1-F1) stehen vorne als "Einzelplätze"
     bereiche: dict[str, dict[str, list]] = {}
     for o in sorted(sichtbar, key=lambda o: natuerlich(o["code"])):
@@ -39,8 +50,9 @@ def lagerplaetze_liste(request: Request, q: str = "", leer: int = 0):
         bereiche.setdefault(o["bereich"] or "Sonstige", {}).setdefault(reihe, []).append(o)
     bereiche = {b: dict(sorted(r.items(), key=lambda x: natuerlich(x[0]))) for b, r in
                 sorted(bereiche.items(), key=lambda x: (x[0] == "Sonstige", natuerlich(x[0])))}
-    return render(request, "lagerplaetze.html", bereiche=bereiche,
-                  anzahl=len(orte), leere=len(orte) - len([o for o in orte if o["artikel"]]), q=q, leer=leer)
+    alle_haupt = [o for o in orte if not o.get("ist_box")]
+    return render(request, "lagerplaetze.html", bereiche=bereiche, anzahl=len(alle_haupt), boxen=len(orte) - len(alle_haupt),
+                  leere=len([o for o in alle_haupt if not o["artikel_ges"]]), rote=len([o for o in alle_haupt if o["rot"]]), q=q, leer=leer)
 
 
 def natuerlich(text: str) -> list:
@@ -54,15 +66,60 @@ def lagerplatz(request: Request, code: str):
     with db.engine().connect() as con:
         p, rows = queries.platz_inhalt(con, code)
         alle = queries.vorschlaege(con)["plaetze"]
+        if p:
+            boxen, eltern, rot = platz_zusatz(con, p)
     if not p:
         return render(request, "fehler.html", titel="Lagerplatz nicht gefunden", text=f"Den Lagerplatz {code} gibt es nicht.")
     d = request.app.state.cfg.drucker
-    return render(request, "lagerplatz.html", p=p, rows=rows, alle=alle,
+    return render(request, "lagerplatz.html", p=p, rows=rows, alle=alle, boxen=boxen, eltern=eltern, rot=rot,
+                  rot_nr={x["nummer"]: x["status"] for x in rot},
                   svg=labels.etikett_svg(p["code"], p["code"], p["beschreibung"] or "Lagerplatz", d.standard_format, d.barcode, 1.6))
 
 
+def platz_zusatz(con, p: dict) -> tuple[list[dict], dict | None, list[dict]]:
+    """Boxen des Platzes (mit Inhalt und Nachbestell-Hinweis), übergeordneter Platz einer Box, Nachbestell-Artikel des Platzes."""
+    rot_alle = queries.nachbestell_plaetze(con)
+    boxen = queries.boxen_von(con, p["code"])
+    for b in boxen:
+        b["rows"] = [r for r in queries.platz_inhalt(con, b["code"])[1] if r["menge"]]
+        b["rot"] = rot_alle.get(b["id"], [])
+    e = queries.box_eltern(p["code"])
+    eltern = con.execute(select(lagerplaetze).where(lagerplaetze.c.code == e)).mappings().first() if e else None
+    return boxen, dict(eltern) if eltern else None, rot_alle.get(p["id"], [])
+
+
+@router.post("/lagerplaetze/boxen")
+def boxen_anlegen(request: Request, code: str = Form(""), anzahl: str = Form("1")):
+    """Sichtlagerboxen an einem Platz anlegen: C1-R2-3 → C1-R2-3-B1, -B2, … (fortlaufend nach der höchsten vorhandenen Nummer)."""
+    require(request, "lager")
+    zurueck_url = f"/lagerplaetze/ansicht?code={quote(code, safe='')}"
+    n = int(anzahl) if anzahl.strip().isdigit() else 0
+    if not 1 <= n <= 50:
+        flash(request, "Bitte 1 bis 50 Boxen angeben.", "fehler")
+        return RedirectResponse(zurueck_url, status_code=303)
+    with db.schreiben() as con:
+        p = con.execute(select(lagerplaetze).where(lagerplaetze.c.code == code)).mappings().first()
+        if not p or queries.box_eltern(code):
+            flash(request, "Boxen lassen sich nur an einem vorhandenen Lagerplatz anlegen, nicht in einer Box.", "fehler")
+            return RedirectResponse(zurueck_url if p else "/lagerplaetze", status_code=303)
+        start = max([queries.box_nummer(b["code"]) for b in queries.boxen_von(con, code)] or [0]) + 1
+        neu = [f"{code}-B{i}" for i in range(start, start + n)]
+        if len(neu[-1]) > 60:
+            flash(request, "Der Platz-Code ist für Boxen zu lang.", "fehler")
+            return RedirectResponse(zurueck_url, status_code=303)
+        for c in neu:
+            if con.execute(select(lagerplaetze.c.id).where(func.lower(lagerplaetze.c.code) == c.lower())).first():
+                flash(request, f"{c} gibt es schon.", "fehler")
+                return RedirectResponse(zurueck_url, status_code=303)
+            con.execute(insert(lagerplaetze).values(code=c, bereich=p["bereich"], aktiv=True))
+        audit(con, request.session["user"]["username"], "Sichtlagerboxen angelegt", code, {"boxen": neu})
+    flash(request, f"{n} Box(en) angelegt: {neu[0]}" + (f" bis {neu[-1]}" if n > 1 else "") + ". Jetzt Inhalt eintragen und Etiketten drucken.")
+    return RedirectResponse(zurueck_url + "#boxen", status_code=303)
+
+
 @router.post("/lagerplaetze/speichern")
-def platz_speichern(request: Request, code: str = Form(...), bereich: str = Form(""), beschreibung: str = Form(""), alt: str = Form("")):
+def platz_speichern(request: Request, code: str = Form(...), bereich: str = Form(""), beschreibung: str = Form(""), alt: str = Form(""),
+                    weiter: str = Form("")):
     require(request, "lager")
     code = " ".join(code.split())
     if not code or len(code) > 60:
@@ -80,16 +137,26 @@ def platz_speichern(request: Request, code: str = Form(...), bereich: str = Form
             if vorhanden and vorhanden != pid:
                 flash(request, f"Den Platz {code} gibt es schon. Zum Zusammenlegen „Zusammenführen“ verwenden.", "fehler")
                 return RedirectResponse(f"/lagerplaetze/ansicht?code={alt}", status_code=303)
+            boxen = queries.boxen_von(con, alt) if alt != code else []
+            for b in boxen:  # Boxen wandern mit: C1-R2-3-B4 → <neuer Code>-B4
+                ziel = code + b["code"][len(alt):]
+                if con.execute(select(lagerplaetze.c.id).where(func.lower(lagerplaetze.c.code) == ziel.lower())).first():
+                    flash(request, f"Beim Umbenennen würde die Box {ziel} entstehen – die gibt es schon. Nichts geändert.", "fehler")
+                    return RedirectResponse(f"/lagerplaetze/ansicht?code={quote(alt, safe='')}", status_code=303)
             con.execute(update(lagerplaetze).where(lagerplaetze.c.id == pid).values(**werte))
             if alt != code:
                 con.execute(update(bewegungen).where(bewegungen.c.lagerplatz_id == pid).values(lagerplatz=code))
+            for b in boxen:
+                ziel = code + b["code"][len(alt):]
+                con.execute(update(lagerplaetze).where(lagerplaetze.c.id == b["id"]).values(code=ziel))
+                con.execute(update(bewegungen).where(bewegungen.c.lagerplatz_id == b["id"]).values(lagerplatz=ziel))
         elif vorhanden:
             con.execute(update(lagerplaetze).where(lagerplaetze.c.id == vorhanden).values(**werte))
         else:
             con.execute(insert(lagerplaetze).values(aktiv=True, **werte))
         audit(con, request.session["user"]["username"], "Lagerplatz gespeichert", code, {**werte, "alt": alt})
     flash(request, f"Lagerplatz {code} gespeichert.")
-    return RedirectResponse(f"/lagerplaetze/ansicht?code={code}", status_code=303)
+    return RedirectResponse(sicheres_ziel(weiter, f"/lagerplaetze/ansicht?code={quote(code, safe='')}"), status_code=303)
 
 
 @router.post("/lagerplaetze/zusammenfuehren")
@@ -137,6 +204,9 @@ def platz_loeschen(request: Request, code: str = Form(""), bestaetigung: str = F
         if not p:
             flash(request, f"Den Lagerplatz {code} gibt es nicht.", "fehler")
             return RedirectResponse("/lagerplaetze", status_code=303)
+        if boxen := queries.boxen_von(con, code):
+            flash(request, f"{code} hat noch {len(boxen)} Sichtlagerbox(en). Bitte zuerst die Boxen löschen.", "fehler")
+            return RedirectResponse(zurueck_url, status_code=303)
         belegt = con.execute(select(func.count()).select_from(bestand).where(bestand.c.lagerplatz_id == p["id"], bestand.c.menge != 0)).scalar()
         if belegt:
             flash(request, f"Auf {code} liegen noch {belegt} Artikel. Bitte erst umbuchen oder mit einem anderen Platz zusammenführen.", "fehler")
@@ -158,7 +228,8 @@ def platz_loeschen(request: Request, code: str = Form(""), bestaetigung: str = F
         con.execute(delete(lagerplaetze).where(lagerplaetze.c.id == p["id"]))
         audit(con, request.session["user"]["username"], "Lagerplatz gelöscht", code, {"beschreibung": p["beschreibung"], "buchungen_in_historie": n})
     flash(request, f"Lagerplatz {code} gelöscht." + (f" Die {n} früheren Buchungen bleiben in der Historie mit dem Code {code} erhalten." if n else ""))
-    return RedirectResponse("/lagerplaetze", status_code=303)
+    e = queries.box_eltern(code)
+    return RedirectResponse(f"/lagerplaetze/ansicht?code={quote(e, safe='')}#boxen" if e else "/lagerplaetze", status_code=303)
 
 
 @router.post("/lagerplaetze/etikett")
@@ -166,9 +237,16 @@ async def platz_etikett(request: Request):
     require(request, "lager")
     f = await request.form()
     codes = f.getlist("code")
+    with db.engine().connect() as con:
+        texte = dict(con.execute(select(lagerplaetze.c.code, lagerplaetze.c.beschreibung).where(lagerplaetze.c.code.in_(codes))).all()) if codes else {}
+
+    def text(c: str) -> str:  # ein Etikett: eingegebener Text; mehrere (Boxen): jeweils der eingetragene Inhalt
+        if len(codes) == 1 and f.get("text"):
+            return f.get("text")
+        return texte.get(c) or ("Sichtlagerbox" if queries.box_eltern(c) else "Lagerplatz")
     try:
         anzahl = int(f.get("anzahl")) if str(f.get("anzahl") or "").isdigit() else 1
-        flash(request, etiketten_drucken(request, [(c, c, f.get("text") or "Lagerplatz", max(1, min(anzahl, 99))) for c in codes]))
+        flash(request, etiketten_drucken(request, [(c, c, text(c), max(1, min(anzahl, 99))) for c in codes]))
     except labels.DruckFehler as e:
         flash(request, f"Druck fehlgeschlagen: {e}", "fehler")
     return RedirectResponse(zurueck(request, "/lagerplaetze"), status_code=303)

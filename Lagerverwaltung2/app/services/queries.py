@@ -1,6 +1,7 @@
 """Lesende Abfragen für Listen, Übersicht und Auswertungen."""
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
@@ -191,11 +192,49 @@ def offene_ausleihen(con: Connection) -> list[dict]:
 def lagerplaetze_uebersicht(con: Connection) -> list[dict]:
     stats = {pid: (n, s) for pid, n, s in con.execute(
         select(bestand.c.lagerplatz_id, func.count(), func.sum(bestand.c.menge)).where(bestand.c.menge != 0).group_by(bestand.c.lagerplatz_id))}
+    rot = nachbestell_plaetze(con)
     out = []
     for p in con.execute(select(lagerplaetze).order_by(lagerplaetze.c.code)).mappings():
         n, s = stats.get(p["id"], (0, 0))
-        out.append({**dict(p), "artikel": n, "menge": float(s or 0)})
+        out.append({**dict(p), "artikel": n, "menge": float(s or 0), "nachbestellen": rot.get(p["id"], [])})
     return out
+
+
+# ------------------------------------------------------------------ Sichtlagerboxen
+# Eine Box ist ein eigener Lagerplatz mit dem Code des Platzes plus "-B<Nummer>", z. B. C1-R2-3-B4.
+# Buchen, Scannen, Etiketten, Inventur und Historie funktionieren damit unverändert; die Zuordnung zum Platz
+# ergibt sich aus dem Code.
+_BOX = re.compile(r"^(?P<eltern>.+)-B(?P<nr>\d+)$")
+
+
+def box_eltern(code: str) -> str | None:
+    m = _BOX.match(code or "")
+    return m["eltern"] if m else None
+
+
+def box_nummer(code: str) -> int | None:
+    m = _BOX.match(code or "")
+    return int(m["nr"]) if m else None
+
+
+def boxen_von(con: Connection, code: str) -> list[dict]:
+    """Boxen eines Platzes, nach Nummer sortiert."""
+    rows = con.execute(select(lagerplaetze).where(lagerplaetze.c.code.like(code.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "-B%", escape="\\"))).mappings().all()
+    boxen = [dict(r) for r in rows if box_eltern(r["code"]) == code]
+    return sorted(boxen, key=lambda b: box_nummer(b["code"]))
+
+
+def nachbestell_plaetze(con: Connection) -> dict[int, list[dict]]:
+    """Lagerplätze mit Artikeln unter Melde- bzw. Mindestbestand (dieselben Artikel wie unter „Nachbestellung“).
+    Auch Plätze, an denen der Artikel gerade 0 Stück hat – dort wird nachgefüllt."""
+    arts = {a["id"]: a for a in artikel_liste(con, filter_="melden")}
+    if not arts:
+        return {}
+    out: dict[int, list] = defaultdict(list)
+    for pid, aid, m in con.execute(select(bestand.c.lagerplatz_id, bestand.c.artikel_id, bestand.c.menge).where(bestand.c.artikel_id.in_(list(arts)))):
+        a = arts[aid]
+        out[pid].append({"nummer": a["nummer"], "bezeichnung": a["bezeichnung"], "status": a["status"], "bestand": a["bestand"], "menge": float(m or 0)})
+    return dict(out)
 
 
 def platz_inhalt(con: Connection, code: str) -> tuple[dict | None, list[dict]]:

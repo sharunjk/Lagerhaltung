@@ -1,14 +1,26 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon %}
+{% from "_macros.html" import icon, status %}
 {% block title %}Lagerplatz {{ p.code }}{% endblock %}
 {% block content %}
-<a href="/lagerplaetze" class="text-sm text-muted hover:text-ink">Lagerplätze</a>
+<a href="/lagerplaetze" class="text-sm text-muted hover:text-ink">Lagerplätze</a>{% if eltern %} <span class="text-sm text-muted">›</span> <a href="/lagerplaetze/ansicht?code={{ eltern.code|urlq }}#boxen" class="text-sm text-muted hover:text-ink">{{ eltern.code }}</a>{% endif %}
 <div class="flex flex-wrap items-center gap-4 mt-1 mb-6">
-  <span class="bintag text-3xl leading-[3rem] px-4">{{ p.code }}</span>
+  <span class="bintag {{ 'bintag-nachbestellen' if rot }} text-3xl leading-[3rem] px-4">{{ p.code }}</span>
   <div><div class="text-muted">{{ p.beschreibung or "" }}</div>{% if not p.aktiv %}<div class="text-sm text-warn font-medium">Deaktiviert</div>{% endif %}
     <a class="text-sm text-primary" href="/bewegungen?platz={{ p.code|urlq }}">Buchungen an diesem Platz</a></div>
 </div>
+{% if rot %}
+<section class="panel p-4 mb-6 border-l-4 border-l-wein">
+  <div class="flex flex-wrap items-start gap-3">
+    <div class="flex-1 min-w-0">
+      <h2>Nachbestellung nötig</h2>
+      <ul class="text-sm mt-1 space-y-0.5">{% for x in rot|unique(attribute="nummer") %}<li><a class="font-semibold hover:underline" href="/artikel/{{ x.nummer|urlq }}">{{ x.nummer }}</a> {{ x.bezeichnung }} – gesamt {{ x.bestand|num }} {{ status(x.status) }}</li>{% endfor %}</ul>
+    </div>
+    <a href="/nachbestellung" class="btn">Zur Nachbestellung</a>
+  </div>
+</section>
+{% endif %}
 <div class="grid xl:grid-cols-[1fr_360px] gap-6">
+  <div class="space-y-6 min-w-0">
   <section class="panel overflow-hidden min-w-0">
     <div class="px-4 py-3 border-b border-line flex items-center justify-between"><h2>Inhalt</h2><span class="text-sm text-muted">{{ rows|selectattr("menge")|list|length }} Artikel mit Bestand</span></div>
     <table class="tbl">
@@ -16,14 +28,61 @@
       <tbody>
       {% for r in rows %}
         <tr class="{{ 'text-muted' if not r.menge }}">
-          <td><a class="font-semibold hover:underline" href="/artikel/{{ r.nummer|urlq }}">{{ r.nummer }}</a></td><td>{{ r.bezeichnung }}</td>
+          <td><a class="font-semibold hover:underline" href="/artikel/{{ r.nummer|urlq }}">{{ r.nummer }}</a></td><td>{{ r.bezeichnung }}{% if r.nummer in rot_nr %} {{ status(rot_nr[r.nummer]) }}{% endif %}</td>
           <td class="num font-semibold">{{ r.menge|num }} <span class="text-xs font-normal text-muted">{{ r.einheit }}</span></td>
           <td class="text-right whitespace-nowrap">{% if user.rolle != "lesen" %}<a class="btn btn-sm" href="/buchen?artikel={{ r.nummer|urlq }}&typ=ausgang&ort={{ p.code|urlq }}">Entnehmen</a> <a class="btn btn-sm" href="/buchen?artikel={{ r.nummer|urlq }}&typ=umbuchung&ort={{ p.code|urlq }}">Umbuchen</a>{% endif %}</td>
         </tr>
-      {% else %}<tr><td colspan="4" class="py-8 text-center text-muted">Dieser Platz ist leer.</td></tr>{% endfor %}
+      {% else %}<tr><td colspan="4" class="py-8 text-center text-muted">{{ "Direkt auf dem Platz liegt nichts." if boxen else "Dieser Platz ist leer." }}</td></tr>{% endfor %}
       </tbody>
     </table>
   </section>
+  {% if not eltern %}
+  <section id="boxen" class="panel overflow-hidden min-w-0">
+    <div class="px-4 py-3 border-b border-line flex flex-wrap items-center justify-between gap-2"><h2>Sichtlagerboxen</h2>
+      {% if boxen and user.rolle != "lesen" %}
+      <div class="flex gap-2">
+        <form method="post" action="/lagerplaetze/etikett">{% for b in boxen %}<input type="hidden" name="code" value="{{ b.code }}">{% endfor %}<button class="btn btn-sm">{{ icon("print", "w-4 h-4") }}Alle {{ boxen|length }} Box-Etiketten drucken</button></form>
+        <a class="btn btn-sm" href="/etiketten/druckansicht?{% for b in boxen %}platz={{ b.code|urlq }}{{ '&' if not loop.last }}{% endfor %}">Über den Browser</a>
+      </div>
+      {% endif %}
+    </div>
+    {% if boxen %}
+    <table class="tbl">
+      <thead><tr><th>Box</th><th>Inhalt</th><th>Artikel</th></tr></thead>
+      <tbody>
+      {% for b in boxen %}
+        <tr>
+          <td class="whitespace-nowrap align-top"><a href="/lagerplaetze/ansicht?code={{ b.code|urlq }}" class="bintag {{ 'bintag-nachbestellen' if b.rot else ('bintag-leer' if not b.rows) }}">{{ b.code }}</a></td>
+          <td class="align-top min-w-[12rem]">
+            {% if user.rolle != "lesen" %}
+            <form method="post" action="/lagerplaetze/speichern" class="flex gap-1">
+              <input type="hidden" name="alt" value="{{ b.code }}"><input type="hidden" name="code" value="{{ b.code }}"><input type="hidden" name="bereich" value="{{ b.bereich or '' }}">
+              <input type="hidden" name="weiter" value="/lagerplaetze/ansicht?code={{ p.code|urlq }}#boxen">
+              <input name="beschreibung" value="{{ b.beschreibung or '' }}" class="field py-1" placeholder="z. B. Schrauben M8" aria-label="Inhalt von {{ b.code }}">
+              <button class="btn btn-sm" title="Inhalt speichern">OK</button>
+            </form>
+            {% else %}{{ b.beschreibung or "" }}{% endif %}
+          </td>
+          <td class="align-top text-sm">{% for r in b.rows %}<a class="hover:underline {{ 'text-weintext font-semibold' if r.nummer in (b.rot|map(attribute='nummer')|list) }}" href="/artikel/{{ r.nummer|urlq }}">{{ r.nummer }}</a> <span class="text-muted">{{ r.bezeichnung|truncate(30) }} · {{ r.menge|num }}</span>{% if not loop.last %}<br>{% endif %}{% else %}<span class="text-muted">leer</span>{% endfor %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="px-4 py-4 text-sm text-muted">Noch keine Boxen. Mit Sichtlagerboxen lässt sich ein Regalfach weiter unterteilen, z. B. 10 Boxen für Schrauben, Dichtungen usw. Jede Box bekommt einen eigenen Code ({{ p.code }}-B1, -B2 …) und ein eigenes Etikett.</p>
+    {% endif %}
+    {% if user.rolle != "lesen" %}
+    <form method="post" action="/lagerplaetze/boxen" class="px-4 py-3 border-t border-line flex flex-wrap items-center gap-2">
+      <input type="hidden" name="code" value="{{ p.code }}">
+      <label class="text-sm" for="boxanzahl">Boxen hinzufügen:</label>
+      <input id="boxanzahl" name="anzahl" type="number" min="1" max="50" value="{{ 1 if boxen else 10 }}" class="field w-20 py-1">
+      <button class="btn btn-sm">{{ icon("plus", "w-4 h-4") }}Anlegen</button>
+      <span class="text-xs text-muted">Nummern laufen weiter ({{ p.code }}-B{{ (boxen|length) + 1 }} …)</span>
+    </form>
+    {% endif %}
+  </section>
+  {% endif %}
+  </div>
   <aside class="space-y-6">
     <section class="panel p-4">
       <h2 class="mb-3">Platzetikett</h2>
@@ -41,8 +100,8 @@
     <form method="post" action="/lagerplaetze/speichern" class="panel p-4 space-y-3">
       <h2>Platz bearbeiten</h2>
       <input type="hidden" name="alt" value="{{ p.code }}">
-      <div><label class="label">Code</label><input name="code" class="field font-semibold" value="{{ p.code }}" required maxlength="60"><p class="text-xs text-muted mt-1">Umbenennen ändert den Code überall, auch in der Historie.</p></div>
-      <div><label class="label">Beschreibung</label><input name="beschreibung" class="field" value="{{ p.beschreibung or '' }}"></div>
+      <div><label class="label">Code</label><input name="code" class="field font-semibold" value="{{ p.code }}" required maxlength="60"><p class="text-xs text-muted mt-1">Umbenennen ändert den Code überall, auch in der Historie{% if boxen %} – die {{ boxen|length }} Boxen werden mit umbenannt{% endif %}.</p></div>
+      <div><label class="label">{{ "Inhalt der Box" if eltern else "Beschreibung" }}</label><input name="beschreibung" class="field" value="{{ p.beschreibung or '' }}"{% if eltern %} placeholder="z. B. Schrauben M8"{% endif %}><p class="text-xs text-muted mt-1">Steht auch auf dem Etikett.</p></div>
       <div><label class="label">Bereich</label><input name="bereich" class="field" value="{{ p.bereich or '' }}" placeholder="automatisch aus dem Code"></div>
       <button class="btn w-full">Speichern</button>
     </form>
@@ -58,7 +117,9 @@
     <form method="post" action="/lagerplaetze/loeschen" class="panel p-4 space-y-2 border-l-4 border-l-crit"
           onsubmit="return confirm('Lagerplatz {{ p.code }} endgültig löschen? Das kann nicht rückgängig gemacht werden.')">
       <h2>Platz löschen</h2>
-      {% if rows|selectattr("menge")|list %}
+      {% if boxen %}
+      <p class="text-sm text-muted">{{ p.code }} hat {{ boxen|length }} Sichtlagerbox(en). Zuerst die Boxen leeren und einzeln löschen.</p>
+      {% elif rows|selectattr("menge")|list %}
       <p class="text-sm text-muted">Hier liegen noch Artikel. Erst umbuchen oder oben mit einem anderen Platz zusammenführen – danach lässt sich {{ p.code }} löschen.</p>
       {% else %}
       <p class="text-sm text-muted">Für falsch angelegte Plätze. Frühere Buchungen bleiben in der Historie mit dem Code erhalten. Zur Bestätigung den Code <b>{{ p.code }}</b> eintippen:</p>

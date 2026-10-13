@@ -3,7 +3,8 @@
 {% block title %}Lagerplätze{% endblock %}
 {% block content %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-  <div><h1>Lagerplätze</h1><p class="text-muted">{{ anzahl }} Plätze{% if leere and not leer %}, davon {{ leere }} leer (ausgeblendet){% endif %}. Ein Klick zeigt, was dort liegt.</p></div>
+  <div><h1>Lagerplätze</h1><p class="text-muted">{{ anzahl }} Plätze{% if boxen %} und {{ boxen }} Sichtlagerboxen{% endif %}{% if leere and not leer %}, davon {{ leere }} leer (ausgeblendet){% endif %}. Ein Klick zeigt, was dort liegt.</p>
+    {% if rote %}<a href="/nachbestellung" class="inline-flex items-center gap-2 mt-2 text-sm hover:underline"><span class="bintag bintag-nachbestellen">Platz</span><span><b>{{ rote }}</b> {{ "Platz" if rote == 1 else "Plätze" }} mit Nachbestellbedarf – Artikel unter Melde- bzw. Mindestbestand</span></a>{% endif %}</div>
   <form class="flex gap-2"><input name="q" value="{{ q }}" class="field w-56" placeholder="Platz suchen"><label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="leer" value="1" {% if leer %}checked{% endif %} onchange="this.form.submit()">leere zeigen</label><button class="btn">Suchen</button></form>
 </div>
 {% set auffaellig = [] %}
@@ -22,8 +23,10 @@
           {% endif %}
           <div class="flex flex-wrap gap-2">
           {% for o in orte %}
-            <a href="/lagerplaetze/ansicht?code={{ o.code|urlq }}" class="flex items-center gap-2 rounded-md border border-line px-2 py-1.5 hover:border-primary {{ 'opacity-50' if not o.aktiv }}" title="{{ o.beschreibung or '' }}">
-              <span class="bintag {{ 'bintag-leer' if not o.artikel }}">{{ o.code }}</span><span class="text-sm text-muted tabular-nums">{{ o.artikel }} Art.</span></a>
+            {% set tipp = [o.beschreibung] if o.beschreibung else [] %}
+            {% if o.rot %}{% set _ = tipp.append("Nachbestellen: " ~ (o.rot|map(attribute="nummer")|unique|join(", "))) %}{% endif %}
+            <a href="/lagerplaetze/ansicht?code={{ o.code|urlq }}" class="flex items-center gap-2 rounded-md border px-2 py-1.5 hover:border-primary {{ 'border-wein' if o.rot else 'border-line' }} {{ 'opacity-50' if not o.aktiv }}" title="{{ tipp|join(' – ') }}">
+              <span class="bintag {{ 'bintag-nachbestellen' if o.rot else ('bintag-leer' if not o.artikel_ges) }}">{{ o.code }}</span><span class="text-sm text-muted tabular-nums">{{ o.artikel_ges }} Art.{% if o.boxen %} · {{ o.boxen|length }} {{ "Box" if o.boxen|length == 1 else "Boxen" }}{% endif %}</span></a>
           {% endfor %}
           </div>
         </div>
@@ -36,7 +39,7 @@
     {% if user.rolle != "lesen" %}
     <form method="post" action="/lagerplaetze/speichern" class="panel p-4 space-y-3">
       <h2>Lagerplatz anlegen</h2>
-      <p class="text-sm text-muted">Schema: Bereich-Regal-Fach, z. B. C2-R7-1, oder Bereich-Fläche, z. B. C1-F3.</p>
+      <p class="text-sm text-muted">Schema: Bereich-Regal-Ebene, z. B. C2-R7-1, oder Bereich-Fläche, z. B. C1-F3. Sichtlagerboxen legt man am Platz an („Boxen hinzufügen“), sie heißen dann C2-R7-1-B1, -B2 …</p>
       <div><label class="label">Code</label><input name="code" class="field font-semibold" required maxlength="60" placeholder="C2-R10-1"></div>
       <div><label class="label">Beschreibung</label><input name="beschreibung" class="field" placeholder="z. B. Schwerlastregal Halle 2"></div>
       <button class="btn btn-primary w-full">Anlegen</button>

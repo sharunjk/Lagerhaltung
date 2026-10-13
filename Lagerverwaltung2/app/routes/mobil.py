@@ -22,7 +22,7 @@ from ..services.lager import BuchungsFehler, audit, fmt_num, parse_num
 from ..web import current_user, flash, render, require, sicheres_ziel, templates
 from .artikel import etiketten_drucken, form_daten, lager
 from .buchen import TYPEN, buchung_ausfuehren
-from .lager import inventur_positionen, zaehlung_speichern
+from .lager import inventur_positionen, platz_zusatz, zaehlung_speichern
 
 router = APIRouter(prefix="/m")
 RUECKGAENGIG_MINUTEN = 10
@@ -261,10 +261,12 @@ def platz(request: Request, code: str):
     require(request)
     with db.engine().connect() as con:
         p, rows = queries.platz_inhalt(con, code)
+        if p:
+            boxen, eltern, rot = platz_zusatz(con, p)
     if not p:
         flash(request, f"Lagerplatz {code} nicht gefunden.", "fehler")
         return RedirectResponse("/m", status_code=303)
-    return render(request, "m/platz.html", p=p, rows=rows)
+    return render(request, "m/platz.html", p=p, rows=rows, boxen=boxen, eltern=eltern, rot=rot, rot_nr={x["nummer"]: x["status"] for x in rot})
 
 
 @router.post("/platz/etikett")
@@ -272,7 +274,9 @@ def platz_etikett(request: Request, code: str = Form(...)):
     require(request, "lager")
     from ..services import labels
     try:
-        flash(request, etiketten_drucken(request, [(code, code, "Lagerplatz", 1)]))
+        with db.engine().connect() as con:
+            text = con.execute(select(lagerplaetze.c.beschreibung).where(lagerplaetze.c.code == code)).scalar()
+        flash(request, etiketten_drucken(request, [(code, code, text or ("Sichtlagerbox" if queries.box_eltern(code) else "Lagerplatz"), 1)]))
     except labels.DruckFehler as e:
         flash(request, f"Druck fehlgeschlagen: {e}", "fehler")
     return RedirectResponse(f"/m/platz?code={quote(code)}", status_code=303)

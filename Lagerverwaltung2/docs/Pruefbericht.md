@@ -341,6 +341,17 @@ Auf Wunsch aus dem Betrieb ergänzt:
 
 Prüfung: 104 Tests grün. Browserprüfungen `werkzeuge/pruefung/lagerplaetze.cjs` mit 12/12 Schritten und `profil.cjs` mit 18/18 Schritten (dreimal in Folge), jeweils ohne JS-Fehler. `profil.cjs` deckt auch Benutzerwechsel mit wartender Offline-Buchung ab. Dabei gefunden und behoben: Lief beim Abmelden gerade eine automatische Übertragung, kam fälschlich die Rückfrage. Jetzt wird das Ende der Übertragung abgewartet.
 
+## Nachtrag: Sichtlagerboxen und Nachbestell-Markierung 2.4.0
+
+| Änderung | Umsetzung | Beleg |
+|---|---|---|
+| Sichtlagerboxen | Box = eigener Lagerplatz mit Code `<Platz>-B<n>`, z. B. `C1-R2-3-B4`. Bisherige Platz-Codes bleiben unverändert, die Datenbank bleibt gleich. Anlegen am Platz (1–50 auf einmal, fortlaufend nummeriert, Rolle *Lager*), Inhalt je Box, Sammeldruck der Etiketten mit Box-Inhalt als Text. Übersicht fasst Boxen beim Platz zusammen; die Suche findet Box-Inhalte. Umbenennen nimmt Boxen mit (Konfliktprüfung), Löschen eines Platzes erst nach seinen Boxen | `test_boxen_anlegen_und_nummerieren`, `test_box_ist_ein_normaler_lagerplatz`, `test_umbenennen_nimmt_boxen_mit`, `test_loeschen_mit_boxen`, `test_box_etiketten_mit_inhalt` |
+| Weinrot bei Nachbestellbedarf | Platz-Tag Weinrot (`#801632`, dunkles Design `#962040`) mit weißer Schrift (Kontrast 10 : 1; schwarz wäre 2 : 1), sobald dort ein aktiver Artikel unter Melde- oder Mindestbestand liegt – auch bei 0 Stück am Platz und wenn eine Box betroffen ist. Hinweis mit den Artikeln auf der Platzseite (PC und Scanner-App), Legende mit Anzahl und Link zur Nachbestellung | `test_weinrot_bei_nachbestellbedarf`, `test_weinrot_wenn_eine_box_betroffen_ist` |
+
+Prüfung: 111 Tests grün. Browserprüfung `werkzeuge/pruefung/boxen.cjs` mit 13/13 Schritten (10 Boxen anlegen, Inhalt eintragen, in eine Box buchen, Etiketten-Druckansicht, Box-Etikett per USB-Scanner, hell/dunkel, 360 px), ohne JS-Fehler.
+
+**Offen:** Die genaue CAPHENIA-Firmenfarbe war hier nicht abrufbar. Der Wert steht an einer Stelle (`--wein` in `frontend/input.css`) und lässt sich austauschen.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

@@ -14,12 +14,15 @@
     --bg: 238 241 243; --surface: 255 255 255; --ink: 24 34 46; --muted: 91 103 115; --line: 213 219 224;
     --nav: 28 42 56; --navink: 199 210 220; --tag: 255 199 44; --tagink: 24 24 20;
     --primary: 31 95 175; --ok: 30 122 90; --warn: 176 104 0; --crit: 192 53 43; --soft: 246 248 249; --onprimary: 255 255 255;
+    /* Weinrot für Lagerplätze mit Nachbestellbedarf (Firmenfarbe; hier anpassen) */
+    --wein: 128 22 50; --weinink: 255 255 255; --weintext: 128 22 50;
     color-scheme: light;
   }
   .dark {
     --bg: 18 26 34; --surface: 26 36 46; --ink: 230 235 239; --muted: 154 166 178; --line: 44 58 71;
     --nav: 13 20 27; --navink: 170 184 197; --tag: 245 190 40; --tagink: 20 20 16;
     --primary: 96 150 222; --ok: 72 180 140; --warn: 230 160 60; --crit: 236 100 88; --soft: 31 43 54; --onprimary: 10 18 28;
+    --wein: 150 32 64; --weinink: 255 255 255; --weintext: 240 130 158;
     color-scheme: dark;
   }
   html { font-size: 15.5px; }
@@ -48,6 +51,8 @@
   /* Lagerort als gelbes Regaletikett – das wiedererkennbare Element der Oberfläche */
   .bintag { @apply inline-flex items-center rounded-[3px] bg-tag text-tagink font-cond font-semibold px-1.5 leading-6 text-[0.9rem] whitespace-nowrap; box-shadow: inset 0 -2px 0 rgb(0 0 0 / .12); }
   .bintag-leer { @apply bg-soft text-muted border border-dashed border-line; box-shadow: none; }
+  /* Nachbestellung nötig: Weinrot mit weißer Schrift (Kontrast > 9:1) */
+  .bintag-nachbestellen { @apply bg-wein text-weinink; box-shadow: inset 0 -2px 0 rgb(0 0 0 / .25); }
   .status { @apply inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap; }
   .status::before { content: ""; @apply inline-block w-2 h-2 rounded-full bg-current; }
   .st-ok { @apply text-ok; } .st-melden { @apply text-warn; } .st-kritisch { @apply text-crit; }

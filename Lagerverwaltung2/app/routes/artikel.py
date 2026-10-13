@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Resp
 from sqlalchemy import delete, insert, select
 
 from .. import db
-from ..db import anhaenge, artikel, lieferanten
+from ..db import anhaenge, artikel, lagerplaetze, lieferanten
 from ..services import labels, queries
 from ..services.excel import tabelle_xlsx
 from ..services.lager import BuchungsFehler, Lager, audit, fmt_num, parse_num
@@ -309,7 +309,8 @@ def druckansicht(request: Request, format: str = ""):
     fmt = format if format in labels.LAYOUTS else d.standard_format
     with db.engine().connect() as con:
         bez = dict(con.execute(select(artikel.c.nummer, artikel.c.bezeichnung).where(artikel.c.nummer.in_(nrs))).all()) if nrs else {}
+        pbez = dict(con.execute(select(lagerplaetze.c.code, lagerplaetze.c.beschreibung).where(lagerplaetze.c.code.in_(plaetze))).all()) if plaetze else {}
     svgs = [labels.etikett_svg(n, n, bez.get(n, ""), fmt, d.barcode) for n in nrs]
-    svgs += [labels.etikett_svg(p, p, "Lagerplatz", fmt, d.barcode) for p in plaetze]
+    svgs += [labels.etikett_svg(p, p, pbez.get(p) or ("Sichtlagerbox" if queries.box_eltern(p) else "Lagerplatz"), fmt, d.barcode) for p in plaetze]
     L = labels.LAYOUTS[fmt]
     return render(request, "druckansicht.html", svgs=svgs, breite=L.breite, hoehe=L.hoehe)

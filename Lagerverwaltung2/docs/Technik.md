@@ -32,6 +32,8 @@ Ordnerauswahl: `/einstellungen/backup-ordner` listet Laufwerke (Windows: `GetLog
 
 `artikel`, `lagerplaetze`, `bestand` (Menge je Artikel und Platz), `bewegungen` (jede Buchung mit Zeit, Benutzer, Menge ±, Bestand danach, Empfänger, Kostenstelle, Zweck, Quelle pc/mobil/offline/api/import), `reservierungen`, `bestellungen`, `inventuren`/`inventur_pos`, `lieferanten`, `anhaenge`, `users`, `audit`, `settings`, `sync_log`.
 
+Sichtlagerboxen sind eigene Zeilen in `lagerplaetze` mit dem Code des Platzes plus `-B<Nummer>` (z. B. `C1-R2-3-B4`). Die Zugehörigkeit zum Platz ergibt sich aus dem Code (`queries.box_eltern`), es gibt keine zusätzliche Spalte und keine Datenbankänderung. Buchen, Scannen, Etiketten, Inventur, Sicherung und Import behandeln Boxen wie jeden Platz. Umbenennen eines Platzes benennt seine Boxen mit (auch in `bewegungen.lagerplatz`). Nachbestell-Markierung (`queries.nachbestell_plaetze`): alle Plätze mit einer Bestandszeile eines aktiven Artikels im Status „melden“ oder „kritisch“, wie unter *Nachbestellung*. Die Farbe Weinrot ist als `--wein` in `frontend/input.css` hinterlegt.
+
 Mengen: Komma oder Punkt als Dezimaltrenner; „nan“, „inf“ und Werte über 1 Milliarde werden abgelehnt.
 
 Buchungsarten: `eingang`, `ausgang`, `umbuchung` (zwei verknüpfte Zeilen), `inventur`, `anlage`, `ausleihe`, `rueckgabe`, `info` (nur Historie aus dem Altsystem).

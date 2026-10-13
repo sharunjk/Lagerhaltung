@@ -1,0 +1,12 @@
+Neu in 2.4.0:
+- Sichtlagerboxen: Lagerplatz oeffnen (z. B. C1-R2-3) -> "Sichtlagerboxen" -> Anzahl -> Anlegen.
+  Die Boxen heissen C1-R2-3-B1, -B2 ... (bisherige Platz-Codes bleiben gleich). Je Box den Inhalt eintragen
+  (z. B. "Schrauben M8"), dann "Alle Box-Etiketten drucken". Eine Box ist ein normaler Lagerplatz:
+  scannen, buchen, Inventur - alles wie gewohnt.
+- Weinrote Lagerplaetze: dort liegt ein Artikel unter Melde- oder Mindestbestand (Nachbestellung noetig).
+
+Kommen Sie von einer aelteren Version, ist auch alles aus 2.3.1 und 2.3.0 enthalten:
+- 2.3.1: Lagerplaetze nach Regal unterteilt, Zurueck-Pfeil, Lagerplatz loeschen, "Profil" in der Scanner-App
+  (Abmelden/Benutzer wechseln, Passwort, Ton/Vibration, PC-Ansicht).
+- 2.3.0: Datensicherung mit mehreren Speicherorten (z. B. externe Festplatte) und mehreren Uhrzeiten,
+  Warnung auf der Startseite, Wiederherstellen mit Vorschau.

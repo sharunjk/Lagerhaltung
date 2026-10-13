@@ -189,7 +189,7 @@ def _datum(v, mit_zeit=True):
     return "–"
 
 
-_PLATZ = re.compile(r"^([A-Z]\d+-(R\d+-\d+|F\d+)|[A-ZÄÖÜ][a-zäöüß]+)$")
+_PLATZ = re.compile(r"^([A-Z]\d+-(R\d+-\d+|F\d+)(-B\d+)?|[A-ZÄÖÜ][a-zäöüß]+)$")  # -B<n>: Sichtlagerbox
 templates.env.tests["match_platz"] = lambda v: bool(_PLATZ.match(v or ""))
 templates.env.filters.update(num=_num, eur=_eur, datum=_datum, typ_text=lambda t: TYP_TEXT.get(t, t or ""),
                              urlq=lambda s: quote(str(s or ""), safe=""))

@@ -8,7 +8,7 @@ module.exports = {
       colors: {
         bg: v("bg"), surface: v("surface"), ink: v("ink"), muted: v("muted"), line: v("line"),
         nav: v("nav"), navink: v("navink"), tag: v("tag"), tagink: v("tagink"),
-        primary: v("primary"), ok: v("ok"), warn: v("warn"), crit: v("crit"), soft: v("soft"),
+        primary: v("primary"), ok: v("ok"), warn: v("warn"), crit: v("crit"), soft: v("soft"), wein: v("wein"), weinink: v("weinink"), weintext: v("weintext"),
       },
       fontFamily: {
         sans: ["Barlow", "Segoe UI", "Arial", "sans-serif"],

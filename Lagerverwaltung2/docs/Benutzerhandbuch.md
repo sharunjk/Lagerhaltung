@@ -44,6 +44,11 @@ Fehlbuchung? Bei der Buchung **Storno** – es entsteht eine Gegenbuchung, nicht
 
 Übersicht nach Bereichen (C1, C2 …) und darin nach Regalen (R1, R2 …). Plätze ohne Regal, z. B. Flächen wie C1-F1, stehen als *Einzelplätze* vorne. Ein Klick zeigt den Inhalt; dort gibt es auch das Platz-Etikett.
 
+- **Weinrot** markiert Plätze, an denen ein Artikel unter Melde- oder Mindestbestand liegt. Das sind dieselben Artikel wie unter *Nachbestellung*. Markiert wird auch ein Platz, an dem der Artikel gerade 0 Stück hat, denn dort wird nachgefüllt. Ein Platz wird auch dann weinrot, wenn das in einer seiner Boxen der Fall ist. Am Platz steht, welche Artikel betroffen sind. Nach dem Wareneingang verschwindet die Markierung von selbst.
+- **Sichtlagerboxen:** Ein Regalfach lässt sich in Boxen unterteilen. Dazu den Platz öffnen (z. B. C1-R2-3) → *Sichtlagerboxen* → Anzahl eingeben → *Anlegen*. Die Boxen heißen dann C1-R2-3-B1, C1-R2-3-B2 … und der bisherige Platz-Code bleibt unverändert. Je Box den Inhalt eintragen (z. B. „Schrauben M8“) → *OK*. Danach *Alle Box-Etiketten drucken*: Jedes Etikett trägt den Box-Code als Barcode und den Inhalt als Text.
+  - Eine Box ist ein ganz normaler Lagerplatz. Man bucht auf sie, scannt ihr Etikett, zählt sie in der Inventur, und sie erscheint in der Historie. Beim Buchen einfach die Box scannen statt des Regalfachs.
+  - In der Übersicht erscheinen die Boxen nicht einzeln, sondern beim Platz („2 Art. · 10 Boxen“). Die Suche findet auch Box-Inhalte, z. B. „Schrauben“.
+  - Weitere Boxen nummerieren fortlaufend weiter. Benennt man den Platz um, werden seine Boxen mit umbenannt. Einen Platz mit Boxen löscht man erst, nachdem die Boxen gelöscht sind.
 - **Tippfehler korrigieren:** Platz öffnen → **umbenennen**. Liegt schon etwas auf dem richtigen Platz: **zusammenführen**. Das bucht alles auf den richtigen Platz um.
 - **Falsch angelegten Platz löschen** (nur Administratoren): Platz öffnen → *Platz löschen* → Code zur Bestätigung eintippen → *Löschen* → Rückfrage bestätigen. Das geht nur bei leeren Plätzen. Liegt noch etwas darauf, erst umbuchen oder zusammenführen. Frühere Buchungen bleiben in der Historie mit dem alten Code erhalten. Plätze aus einer laufenden Inventur oder mit gezählten Mengen in einer abgeschlossenen Inventur lassen sich nicht löschen.
 
