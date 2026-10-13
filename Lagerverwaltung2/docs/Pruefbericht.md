@@ -351,6 +351,12 @@ Prüfung: 104 Tests grün. Browserprüfungen `werkzeuge/pruefung/lagerplaetze.cj
 
 Prüfung: 114 Tests grün. Browserprüfung `werkzeuge/pruefung/boxen.cjs` mit 13/13 Schritten (10 Boxen anlegen, Inhalt eintragen, in eine Box buchen, Etiketten-Druckansicht, Box-Etikett per USB-Scanner, hell/dunkel, 360 px), ohne JS-Fehler.
 
+**Nachgang aus dem Betrieb:** Beim ersten Einspielen von 2.4.0 erschienen „Not Found“ beim Löschen und alle Plätze gestrichelt. Ursache war kein Programmfehler. Die Dateien waren ersetzt, aber das alte Programm lief weiter, vermutlich als Dienst, der sich ohne Adminrechte nicht beenden ließ. Die Seitenvorlagen wurden dabei schon frisch geladen, der Programmcode nicht. Nachgestellt: 2.3.1 läuft, die 2.4.0-Dateien werden ohne Neustart darübergelegt, Ergebnis wie gemeldet. Gegenmaßnahmen:
+
+1. `4_AUTOSTART_AUS.bat` prüft danach, ob die Lagerverwaltung noch auf ihrem Port antwortet. Falls ja, meldet es „läuft noch – als Administrator ausführen oder PC neu starten“, statt „beendet“ zu melden.
+2. Die Lagerverwaltung prüft alle 30 Sekunden ihre Programmdateien. Wurden sie ausgetauscht, zeigt sie oben eine rote Meldung „Bitte neu starten“ (`test_hinweis_wenn_programm_nicht_neu_gestartet`).
+3. Die Update-Anleitung lautet jetzt „Dateien ersetzen, dann PC neu starten, Versionsnummer in der Seitenleiste prüfen“.
+
 **Offen:** Die genaue CAPHENIA-Firmenfarbe war hier nicht abrufbar. Der Wert steht an einer Stelle (`--wein` in `frontend/input.css`) und lässt sich austauschen.
 
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)

@@ -49,6 +49,7 @@ document.addEventListener("submit", function(e){
     <a id="offline-badge" href="/m/offline" class="hidden rounded-full px-2.5 py-1 text-xs font-bold text-white bg-warn"></a>
   </div>
 </header>
+{% if request.app.state.neustart_noetig %}<div role="alert" class="px-4 py-4 text-base font-semibold bg-crit text-white">Programm aktualisiert, aber noch nicht neu gestartet. Bitte den Lager-PC neu starten.</div>{% endif %}
 {% for f in flashes %}
 <div data-flash="{{ f.art }}" class="px-4 py-4 text-base font-semibold {{ 'bg-ok text-white' if f.art == 'ok' else 'bg-crit text-white' }}" role="status">{{ f.text }}</div>
 {% endfor %}

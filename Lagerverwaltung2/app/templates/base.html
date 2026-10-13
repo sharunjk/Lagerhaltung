@@ -78,6 +78,7 @@
     </header>
 
     <main class="flex-1 px-4 lg:px-8 py-6 max-w-[1500px] w-full">
+      {% if request.app.state.neustart_noetig %}<div role="alert" class="mb-4 rounded-md border px-4 py-3 text-sm font-semibold flash-fehler">Die Programmdateien wurden aktualisiert, die Lagerverwaltung läuft aber noch mit der alten Version. Bitte neu starten – am einfachsten den Lager-PC neu starten. Bis dahin können einzelne Seiten Fehler zeigen.</div>{% endif %}
       {% for f in flashes %}
       <div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-{{ f.art }}" role="status">{{ f.text }}</div>
       {% endfor %}

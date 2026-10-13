@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote, urlparse
@@ -30,6 +31,22 @@ class SitzungJeProtokoll:
 
     async def __call__(self, scope, receive, send):
         await (self.https if scope.get("scheme") in ("https", "wss") else self.http)(scope, receive, send)
+
+
+def code_kennung() -> str:
+    """Kennung der Programmdateien (Name, Größe, Änderungszeit aller .py-Dateien und Vorlagen). Ändert sie sich, während
+    die Lagerverwaltung läuft, wurden die Dateien ausgetauscht, ohne neu zu starten – dann passen Seiten und Programm
+    nicht mehr zusammen (z. B. „Not Found“ bei neuen Knöpfen)."""
+    import hashlib
+    h = hashlib.sha1()
+    basis = Path(__file__).parent
+    for f in sorted([*basis.rglob("*.py"), *(basis / "templates").rglob("*.html")]):
+        try:
+            st = f.stat()
+        except OSError:
+            continue
+        h.update(f"{f.relative_to(basis).as_posix()}|{st.st_size}|{st.st_mtime_ns}\n".encode())
+    return h.hexdigest()
 
 
 def static_version() -> str:
@@ -75,10 +92,18 @@ def create_app(cfg=None, start_scheduler: bool = True) -> FastAPI:
     app.state.cfg = cfg
     app.state.version = VERSION
     app.state.static_v = static_version()
+    app.state.code_kennung = code_kennung()
+    app.state.code_geprueft = time.monotonic()
+    app.state.neustart_noetig = False
     app.state.anmeldesperre = Anmeldesperre()
 
     @app.middleware("http")
     async def same_origin_check(request: Request, call_next):
+        if not app.state.neustart_noetig and time.monotonic() - app.state.code_geprueft > 30:
+            app.state.code_geprueft = time.monotonic()
+            if code_kennung() != app.state.code_kennung:
+                app.state.neustart_noetig = True
+                logging.getLogger("lagerverwaltung").warning("Programmdateien wurden ausgetauscht – Lagerverwaltung bitte neu starten.")
         if request.method in ("POST", "PUT", "DELETE") and not request.url.path.startswith("/api/"):
             src = request.headers.get("origin") or request.headers.get("referer")
             if src and urlparse(src).netloc != request.headers.get("host"):

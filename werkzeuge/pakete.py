@@ -74,17 +74,17 @@ def update(basis: str, alt: str, neu: str) -> Path:
                 f"Dieses Paket enthaelt nur geaenderte Programmdateien. Daten, Einstellungen (config.toml),\r\n"
                 f"Benutzer, Sicherungen und Zertifikate bleiben unveraendert.\r\n\r\n"
                 f"So geht's:\r\n"
-                f"1. Lagerverwaltung beenden: windows\\4_AUTOSTART_AUS.bat\r\n"
-                f"   (laeuft sie als Dienst: Rechtsklick -> Als Administrator ausfuehren).\r\n"
-                f"   Das Programmfenster zu schliessen genuegt NICHT.\r\n"
-                f"2. Zur Sicherheit vorher eine Sicherung erstellen (Einstellungen -> Datensicherung)\r\n"
-                f"   oder den Ordner daten an eine andere Stelle kopieren.\r\n"
-                f"3. Den Ordner Lagerverwaltung2 in diesem Paket oeffnen, alles markieren (Strg+A)\r\n"
-                f"   und in den Programmordner (z. B. C:\\Lagerverwaltung2) ziehen -> \"Dateien im Ziel ersetzen\".\r\n"
-                + (f"4. Diese Dateien im Programmordner loeschen (gibt es nicht mehr):\r\n{weg}\r\n" if geloescht else "")
-                + f"{5 if geloescht else 4}. Wieder starten: Dienst -> PC neu starten oder als Administrator\r\n"
-                f"   schtasks /Run /TN Lagerverwaltung ; sonst windows\\3_AUTOSTART_EIN.bat und Symbol Lagerverwaltung.\r\n"
-                f"   Unten in der Seitenleiste steht danach \"Version {neu}\".\r\n\r\n"
+                f"1. Zur Sicherheit vorher eine Sicherung erstellen (Einstellungen -> Datensicherung).\r\n"
+                f"2. Dieses Paket entpacken (Rechtsklick -> Alle extrahieren). Den Ordner Lagerverwaltung2 darin oeffnen,\r\n"
+                f"   alles markieren (Strg+A) und in den Programmordner (z. B. C:\\Lagerverwaltung2) ziehen\r\n"
+                f"   -> \"Dateien im Ziel ersetzen\". Das geht auch, waehrend die Lagerverwaltung laeuft.\r\n"
+                + (f"3. Diese Dateien im Programmordner loeschen (gibt es nicht mehr):\r\n{weg}\r\n" if geloescht else "")
+                + f"{4 if geloescht else 3}. Den Lager-PC NEU STARTEN. Wichtig: Erst dann laeuft die neue Version. Vorher passen Seiten\r\n"
+                f"   und Programm nicht zusammen (z. B. \"Not Found\" bei neuen Knoepfen).\r\n"
+                f"   Ohne PC-Neustart: windows\\4_AUTOSTART_AUS.bat mit Rechtsklick -> Als Administrator ausfuehren,\r\n"
+                f"   danach starten (Dienst: schtasks /Run /TN Lagerverwaltung als Administrator, sonst Symbol Lagerverwaltung).\r\n"
+                f"{5 if geloescht else 4}. Pruefen: Unten in der Seitenleiste muss \"Version {neu}\" stehen. Steht dort noch die alte Nummer,\r\n"
+                f"   laeuft noch das alte Programm -> PC neu starten.\r\n\r\n"
                 + (f"Was ist neu / was ist zu tun:\r\n{hinweise}\r\n\r\n" if hinweise else "")
                 + f"Geaenderte bzw. neue Dateien ({len(geaendert)}):\r\n{liste}\r\n")
     with zipfile.ZipFile(ziel, "w", zipfile.ZIP_DEFLATED) as z:

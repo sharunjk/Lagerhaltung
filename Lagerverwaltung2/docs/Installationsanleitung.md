@@ -114,10 +114,12 @@ Die Lagerverwaltung muss dafür nicht beendet werden. Handscanner sollten ihre o
 
 Updates kommen als **Update-Paket** `Lagerverwaltung_Update_auf_<neu>.zip`; es gilt für alle älteren Versionen ab der in `UPDATE_LIESMICH.txt` genannten. Es enthält nur geänderte Programmdateien, nie `daten`, `backups`, `logs`, `python`, `lib`, `config.toml` oder `.secret_key`. Daten, Einstellungen, Benutzer und Zertifikate bleiben also unverändert.
 
-1. Lagerverwaltung beenden: `windows\4_AUTOSTART_AUS.bat` (beim Dienst mit Rechtsklick *Als Administrator ausführen*). Das Programmfenster zu schließen genügt nicht.
-2. Update-Paket entpacken (Rechtsklick → *Alle extrahieren …*), nicht direkt aus der ZIP ziehen.
-3. Im entpackten Ordner `Lagerverwaltung2` öffnen, alles markieren (Strg+A) und in `C:\Lagerverwaltung2` ziehen → **Dateien im Ziel ersetzen**.
-4. Wieder starten: beim Dienst den PC neu starten oder `schtasks /Run /TN Lagerverwaltung` als Administrator, sonst `windows\3_AUTOSTART_EIN.bat` und das Symbol *Lagerverwaltung*. Unten in der Seitenleiste steht die neue Versionsnummer.
+1. Zur Sicherheit eine Sicherung erstellen (*Einstellungen → Datensicherung → Speichern und jetzt sichern*).
+2. Das Update-Paket entpacken (Rechtsklick → *Alle extrahieren …*), nicht direkt aus der ZIP ziehen.
+3. Im entpackten Ordner `Lagerverwaltung2` öffnen, alles markieren (Strg+A) und in `C:\Lagerverwaltung2` ziehen → **Dateien im Ziel ersetzen**. Das geht auch, während die Lagerverwaltung läuft.
+4. **Den Lager-PC neu starten.** Erst danach läuft die neue Version. Bis zum Neustart passen Seiten und Programm nicht zusammen, z. B. erscheint bei neuen Knöpfen „Not Found“. Ab 2.4.0 zeigt die Lagerverwaltung dann oben eine rote Meldung „Bitte neu starten“.
+   Ohne PC-Neustart geht es so: `windows\4_AUTOSTART_AUS.bat` mit Rechtsklick → *Als Administrator ausführen*. Das Skript meldet jetzt, falls die Lagerverwaltung noch läuft. Danach starten: beim Dienst `schtasks /Run /TN Lagerverwaltung` als Administrator, sonst das Symbol *Lagerverwaltung*.
+5. **Prüfen:** Unten in der Seitenleiste steht die neue Versionsnummer. Steht dort noch die alte, läuft noch das alte Programm, dann den PC neu starten.
 
 `UPDATE_LIESMICH.txt` im Paket listet die geänderten Dateien und Besonderheiten des jeweiligen Updates. Die Scanner-App lädt sich beim nächsten Öffnen selbst neu.
 

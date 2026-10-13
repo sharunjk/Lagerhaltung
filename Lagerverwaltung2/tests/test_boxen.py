@@ -173,3 +173,29 @@ def test_weinrot_wenn_eine_box_betroffen_ist(env):
     assert re.findall(r'<span class="bintag bintag-nachbestellen">([^<]+)</span><span class="text-sm', t) == ["C1-R2-3"]
     d = c.get("/lagerplaetze/ansicht?code=C1-R2-3").text
     assert 'class="bintag bintag-nachbestellen">C1-R2-3-B2</a>' in d and 'class="bintag bintag-leer">C1-R2-3-B1</a>' in d
+
+
+def test_farben_gelb_gestrichelt_weinrot(env):
+    """Gelb = etwas gelagert, gestrichelt = leer, Weinrot = Nachbestellung nötig."""
+    from app import db
+    cfg, _ = env
+    c = client(cfg, "lesen")
+    with schreib(db.engine()) as con:
+        L(con).artikel_anlegen({"nummer": "1", "bezeichnung": "Ventil"}, "C1-R1-1", 5)
+        L(con).artikel_anlegen({"nummer": "2", "bezeichnung": "Filter", "meldebestand": 5}, "C1-R1-2", 1)
+        L(con).platz("C1-R1-3", anlegen=True)
+    t = c.get("/lagerplaetze?leer=1").text
+    klassen = dict((code, cls.strip()) for cls, code in re.findall(r'<span class="bintag([^"]*)">([^<]+)</span><span class="text-sm', t))
+    assert klassen == {"C1-R1-1": "", "C1-R1-2": "bintag-nachbestellen", "C1-R1-3": "bintag-leer"}
+
+
+def test_hinweis_wenn_programm_nicht_neu_gestartet(env, monkeypatch):
+    import app.main as m
+    cfg, _ = env
+    c = client(cfg, "lager")
+    assert "noch mit der alten Version" not in c.get("/").text
+    c.app.state.code_geprueft = 0  # Prüfung fällig
+    monkeypatch.setattr(m, "code_kennung", lambda: "andere Dateien")
+    c.get("/")
+    assert "noch mit der alten Version" in c.get("/").text
+    assert "noch nicht neu gestartet" in c.get("/m").text
