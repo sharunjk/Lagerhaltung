@@ -36,7 +36,7 @@ async function login(page) {
   const inhalte = ["Schrauben M6", "Schrauben M8", "Muttern M8", "Unterlegscheiben", "O-Ringe", "Dichtungen DN25", "Dichtungen DN50", "Kabelbinder", "Sicherungen", "Splinte"];
   for (let i = 0; i < 3; i++) {
     await page.locator("#boxen tbody tr").nth(i).locator("input[name=beschreibung]").fill(inhalte[i]);
-    await Promise.all([page.waitForNavigation(), page.locator("#boxen tbody tr").nth(i).locator("button").click()]);
+    await Promise.all([page.waitForNavigation(), page.locator("#boxen tbody tr").nth(i).locator("button[title='Inhalt speichern']").click()]);
   }
   schritt("Inhalt gespeichert, Seite bleibt beim Platz", page.url().includes("code=C1-R2-1") && (await page.locator("#boxen input[value='Muttern M8']").count()) === 1, page.url());
   // Buchen in eine Box über das normale Buchungsformular
@@ -66,6 +66,22 @@ async function login(page) {
   await page.evaluate(() => document.activeElement && document.activeElement.blur());
   await Promise.all([page.waitForNavigation(), page.keyboard.type("C1-R2-1-B3\n", { delay: 8 })]);
   schritt("Box-Etikett scannen öffnet die Box", page.url().endsWith("code=C1-R2-1-B3") && (await page.textContent("main")).includes("Muttern M8"), page.url());
+  // Box entfernen: aufklappen, Code eintippen, Rückfrage
+  await page.goto(BASE + "/lagerplaetze/ansicht?code=C1-R2-1", { waitUntil: "networkidle" });
+  const zeileB10 = page.locator("#boxen tbody tr", { hasText: "C1-R2-1-B10" });
+  await zeileB10.locator("summary:has-text('Entfernen')").click();
+  await zeileB10.locator("input[name=bestaetigung]").fill("C1-R2-1-B10");
+  let frage = "";
+  page.once("dialog", (d) => { frage = d.message(); d.dismiss(); });
+  await zeileB10.locator("form button.btn-danger").click();
+  await page.waitForTimeout(300);
+  schritt("Box entfernen: Rückfrage, Abbrechen lässt sie stehen", /B10 entfernen/.test(frage) && (await page.locator("#boxen tbody tr").count()) === 10, frage);
+  page.once("dialog", (d) => d.accept());
+  await Promise.all([page.waitForNavigation(), zeileB10.locator("form button.btn-danger").click()]);
+  schritt("Box entfernt, zurück bei den Boxen", (await page.locator("#boxen tbody tr").count()) === 9 && page.url().includes("code=C1-R2-1"), page.url());
+  const b2 = page.locator("#boxen tbody tr", { hasText: "C1-R2-1-B2" });
+  schritt("Box mit Inhalt nicht entfernbar", (await b2.locator("summary:has-text('Entfernen')").count()) === 0 && /nicht leer/.test(await b2.textContent()));
+  await page.screenshot({ path: `${OUT}/box_entfernt.png`, fullPage: true });
   // dunkel
   const d = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: "dark" });
   const dp = await d.newPage();
@@ -84,7 +100,7 @@ async function login(page) {
   await mp.goto(BASE + "/m/platz?code=C1-R2-1", { waitUntil: "networkidle" });
   const boxenM = await mp.locator("main ul").nth(1).locator("li").count();
   const hs = await mp.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
-  schritt("Handy: Boxen am Platz, ohne Querscrollen", boxenM === 10 && !hs, `${boxenM} hs=${hs}`);
+  schritt("Handy: Boxen am Platz, ohne Querscrollen", boxenM === 9 && !hs, `${boxenM} hs=${hs}`);
   await mp.screenshot({ path: `${OUT}/handy_platz.png`, fullPage: true });
   await Promise.all([mp.waitForNavigation(), mp.locator("main ul").nth(1).locator("li a").nth(1).click()]);
   schritt("Handy: Box öffnen", mp.url().includes("C1-R2-1-B2") && (await mp.textContent("main")).includes("gehört zu"), mp.url());

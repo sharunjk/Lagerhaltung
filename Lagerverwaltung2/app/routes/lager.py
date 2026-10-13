@@ -13,7 +13,7 @@ from ..db import artikel, bestand, bestellungen, bewegungen, inventur_pos, inven
 from ..services import labels, queries
 from ..services.excel import tabelle_xlsx
 from ..services.lager import BuchungsFehler, audit, fmt_num, parse_num
-from ..web import flash, render, require, sicheres_ziel, zurueck
+from ..web import Forbidden, flash, render, require, sicheres_ziel, zurueck
 from .artikel import etiketten_drucken, lager
 
 router = APIRouter()
@@ -193,9 +193,13 @@ def zusammenfuehren(request: Request, von: str = Form(...), nach: str = Form(...
 
 @router.post("/lagerplaetze/loeschen")
 def platz_loeschen(request: Request, code: str = Form(""), bestaetigung: str = Form("")):
-    """Lagerplatz endgültig löschen (z. B. Tippfehler). Nur leere Plätze; die Historie behält den Code als Text."""
-    require(request, "admin")
-    zurueck_url = f"/lagerplaetze/ansicht?code={quote(code, safe='')}"
+    """Lagerplatz endgültig löschen (z. B. Tippfehler). Nur leere Plätze; die Historie behält den Code als Text.
+    Leere Sichtlagerboxen darf auch die Rolle *Lager* entfernen (wer Boxen anlegen darf, darf sie auch wieder entfernen)."""
+    me = require(request, "lager")
+    box = queries.box_eltern(code)
+    if not box and me["rolle"] != "admin":
+        raise Forbidden()
+    zurueck_url = f"/lagerplaetze/ansicht?code={quote(box or code, safe='')}" + ("#boxen" if box else "")
     if bestaetigung.strip() != code:
         flash(request, f"Zum Löschen bitte den Code {code} genau so eintippen.", "fehler")
         return RedirectResponse(zurueck_url, status_code=303)
@@ -227,7 +231,7 @@ def platz_loeschen(request: Request, code: str = Form(""), bestaetigung: str = F
         n = con.execute(update(bewegungen).where(bewegungen.c.lagerplatz_id == p["id"]).values(lagerplatz_id=None)).rowcount
         con.execute(delete(lagerplaetze).where(lagerplaetze.c.id == p["id"]))
         audit(con, request.session["user"]["username"], "Lagerplatz gelöscht", code, {"beschreibung": p["beschreibung"], "buchungen_in_historie": n})
-    flash(request, f"Lagerplatz {code} gelöscht." + (f" Die {n} früheren Buchungen bleiben in der Historie mit dem Code {code} erhalten." if n else ""))
+    flash(request, (f"Box {code} entfernt." if box else f"Lagerplatz {code} gelöscht.") + (f" Die {n} früheren Buchungen bleiben in der Historie mit dem Code {code} erhalten." if n else ""))
     e = queries.box_eltern(code)
     return RedirectResponse(f"/lagerplaetze/ansicht?code={quote(e, safe='')}#boxen" if e else "/lagerplaetze", status_code=303)
 

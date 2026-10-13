@@ -3,6 +3,7 @@ Neu in 2.4.0:
   Die Boxen heissen C1-R2-3-B1, -B2 ... (bisherige Platz-Codes bleiben gleich). Je Box den Inhalt eintragen
   (z. B. "Schrauben M8"), dann "Alle Box-Etiketten drucken". Eine Box ist ein normaler Lagerplatz:
   scannen, buchen, Inventur - alles wie gewohnt.
+  Leere Boxen lassen sich in der Box-Liste wieder entfernen (Box-Code eintippen, Rueckfrage bestaetigen).
 - Weinrote Lagerplaetze: dort liegt ein Artikel unter Melde- oder Mindestbestand (Nachbestellung noetig).
 - Artikel endgueltig loeschen (nur Administratoren), z. B. falsch angelegte: Artikel oeffnen ->
   "Artikel endgueltig loeschen" -> Nummer eintippen -> Loeschen -> Rueckfrage bestaetigen. Nur ohne Bestand und

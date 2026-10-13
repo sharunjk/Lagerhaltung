@@ -199,3 +199,35 @@ def test_hinweis_wenn_programm_nicht_neu_gestartet(env, monkeypatch):
     c.get("/")
     assert "noch mit der alten Version" in c.get("/").text
     assert "noch nicht neu gestartet" in c.get("/m").text
+
+
+def test_boxen_entfernen_mit_bestaetigung(env):
+    from app import db
+    cfg, _ = env
+    c = client(cfg, "lager")  # wer Boxen anlegen darf, darf leere Boxen auch entfernen
+    eng = db.engine()
+    with schreib(eng) as con:
+        L(con).artikel_anlegen({"nummer": "1", "bezeichnung": "Schraube"}, "C1-R2-3", 0)
+    c.post("/lagerplaetze/boxen", data={"code": "C1-R2-3", "anzahl": "3"})
+    with schreib(eng) as con:
+        L(con).eingang("1", "C1-R2-3-B2", 5)
+    seite = c.get("/lagerplaetze/ansicht?code=C1-R2-3").text
+    assert seite.count(">Entfernen</summary>") == 2 and "nicht leer" in seite  # B2 hat Bestand: kein Entfernen
+    # falsche Bestätigung -> bleibt, zurück zur Box-Liste
+    r = c.post("/lagerplaetze/loeschen", data={"code": "C1-R2-3-B3", "bestaetigung": "B3"})
+    assert r.headers["location"] == "/lagerplaetze/ansicht?code=C1-R2-3#boxen" and "C1-R2-3-B3" in codes(eng)
+    # Box mit Bestand -> abgelehnt
+    c.post("/lagerplaetze/loeschen", data={"code": "C1-R2-3-B2", "bestaetigung": "C1-R2-3-B2"})
+    assert "C1-R2-3-B2" in codes(eng)
+    # richtig
+    r = c.post("/lagerplaetze/loeschen", data={"code": "C1-R2-3-B3", "bestaetigung": "C1-R2-3-B3"})
+    assert r.headers["location"] == "/lagerplaetze/ansicht?code=C1-R2-3#boxen"
+    assert [x for x in codes(eng) if "-B" in x] == ["C1-R2-3-B1", "C1-R2-3-B2"]
+    # nächste neue Box nummeriert ab der höchsten vorhandenen weiter
+    c.post("/lagerplaetze/boxen", data={"code": "C1-R2-3", "anzahl": "1"})
+    assert "C1-R2-3-B3" in codes(eng)
+    # Rolle Lager darf keine normalen Plätze löschen, Rolle Lesen gar nichts
+    assert c.post("/lagerplaetze/loeschen", data={"code": "C1-R2-3", "bestaetigung": "C1-R2-3"}).status_code == 403
+    lesen = client(cfg, "lesen")
+    assert lesen.post("/lagerplaetze/loeschen", data={"code": "C1-R2-3-B1", "bestaetigung": "C1-R2-3-B1"}).status_code == 403
+    assert ">Entfernen</summary>" not in lesen.get("/lagerplaetze/ansicht?code=C1-R2-3").text

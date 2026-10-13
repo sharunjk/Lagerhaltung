@@ -48,7 +48,7 @@
     </div>
     {% if boxen %}
     <table class="tbl">
-      <thead><tr><th>Box</th><th>Inhalt</th><th>Artikel</th></tr></thead>
+      <thead><tr><th>Box</th><th>Inhalt</th><th>Artikel</th>{% if user.rolle != "lesen" %}<th></th>{% endif %}</tr></thead>
       <tbody>
       {% for b in boxen %}
         <tr>
@@ -64,6 +64,21 @@
             {% else %}{{ b.beschreibung or "" }}{% endif %}
           </td>
           <td class="align-top text-sm">{% for r in b.rows %}<a class="hover:underline {{ 'text-weintext font-semibold' if r.nummer in (b.rot|map(attribute='nummer')|list) }}" href="/artikel/{{ r.nummer|urlq }}">{{ r.nummer }}</a> <span class="text-muted">{{ r.bezeichnung|truncate(30) }} · {{ r.menge|num }}</span>{% if not loop.last %}<br>{% endif %}{% else %}<span class="text-muted">leer</span>{% endfor %}</td>
+          {% if user.rolle != "lesen" %}
+          <td class="align-top text-right">
+            {% if b.rows %}<span class="text-xs text-muted" title="Erst die Artikel umbuchen">nicht leer</span>
+            {% else %}
+            <details class="inline-block text-left">
+              <summary class="btn btn-sm btn-danger list-none">Entfernen</summary>
+              <form method="post" action="/lagerplaetze/loeschen" class="mt-2 flex gap-1 w-80" onsubmit="return confirm('Box {{ b.code }} entfernen? Das kann nicht rückgängig gemacht werden.')">
+                <input type="hidden" name="code" value="{{ b.code }}">
+                <input name="bestaetigung" class="field py-1" required autocomplete="off" placeholder="{{ b.code }} eintippen" aria-label="Code {{ b.code }} zur Bestätigung eintippen">
+                <button class="btn btn-sm btn-danger">Endgültig entfernen</button>
+              </form>
+            </details>
+            {% endif %}
+          </td>
+          {% endif %}
         </tr>
       {% endfor %}
       </tbody>
@@ -118,7 +133,7 @@
           onsubmit="return confirm('Lagerplatz {{ p.code }} endgültig löschen? Das kann nicht rückgängig gemacht werden.')">
       <h2>Platz löschen</h2>
       {% if boxen %}
-      <p class="text-sm text-muted">{{ p.code }} hat {{ boxen|length }} Sichtlagerbox(en). Zuerst die Boxen leeren und einzeln löschen.</p>
+      <p class="text-sm text-muted">{{ p.code }} hat {{ boxen|length }} Sichtlagerbox(en). Zuerst die Boxen leeren und in der Box-Liste einzeln entfernen.</p>
       {% elif rows|selectattr("menge")|list %}
       <p class="text-sm text-muted">Hier liegen noch Artikel. Erst umbuchen oder oben mit einem anderen Platz zusammenführen – danach lässt sich {{ p.code }} löschen.</p>
       {% else %}
