@@ -46,7 +46,8 @@ Beim ersten Öffnen zeigt Chrome „Ihre Verbindung ist nicht privat“. Das ist
 - **Entnahme / Eingang / Umbuchen / Zählen / Ausleihe:** 1. Artikel scannen, 2. Lagerplatz antippen oder Platz-Etikett scannen, 3. Menge eingeben (+/−), **Buchen**. Grüne Meldung mit Ton = gebucht, rote Meldung mit Doppelvibration = Fehler (z. B. zu wenig Bestand).
 - **Rückgabe:** offene Ausleihen mit einem Tipp zurückbuchen.
 - **Inventur:** Laufende Inventur antippen, Lagerplatz scannen, gezählte Mengen eintragen, speichern, nächster Platz.
-- **Foto aufnehmen:** Beim Artikel „Foto aufnehmen“ – das Bild erscheint danach auch am PC und in der Scanner-Ansicht.
+- **Neuer Artikel:** Startseite → *Neuer Artikel*, oder am Lagerplatz/an der Box *Neuer Artikel hier* (Platz ist dann eingetragen). Fotos gleich beim Anlegen: *Foto aufnehmen* (Kamera) oder *Aus Galerie*, auch mehrere; mit × wieder entfernen. Beim Lieferanten werden vorhandene Namen vorgeschlagen, ein neuer Name wird automatisch angelegt.
+- **Foto aufnehmen:** Beim Artikel *Foto aufnehmen* (Kamera) oder *Aus Galerie* – das Bild erscheint danach auch am PC und in der Scanner-Ansicht.
 - **Sichtlagerboxen:** Box-Etikett scannen (z. B. C1-R2-3-B4) – die Box verhält sich wie ein Lagerplatz, auch beim Buchen. Der Regalplatz zeigt seine Boxen mit Inhalt; die Box zeigt, zu welchem Platz sie gehört.
 - **Weinroter Platz** = dort liegt ein Artikel unter Melde-/Mindestbestand (nachbestellen).
 - **Profil** (Leiste unten rechts): **Abmelden / Benutzer wechseln** – teilen sich mehrere Personen ein Gerät, vor der Übergabe abmelden, denn jede Buchung trägt den Namen des Angemeldeten. Noch nicht übertragene Offline-Buchungen werden vorher übertragen. Außerdem: Passwort ändern, Ton und Vibration, hell/dunkel, Offline-Daten aktualisieren und **PC-Ansicht öffnen**. Aus der PC-Ansicht führt der Knopf mit dem Scanner-Symbol oben rechts zurück.

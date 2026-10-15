@@ -73,7 +73,7 @@ def lagerplatz(request: Request, code: str):
     d = request.app.state.cfg.drucker
     return render(request, "lagerplatz.html", p=p, rows=rows, alle=alle, boxen=boxen, eltern=eltern, rot=rot,
                   rot_nr={x["nummer"]: x["status"] for x in rot},
-                  svg=labels.etikett_svg(p["code"], p["code"], p["beschreibung"] or "Lagerplatz", d.standard_format, d.barcode, 1.6))
+                  svg=labels.etikett_svg(p["code"], p["code"], p["beschreibung"] or "Lagerplatz", d.standard_format, d.barcode, 1.6, d.schrift))
 
 
 def platz_zusatz(con, p: dict) -> tuple[list[dict], dict | None, list[dict]]:

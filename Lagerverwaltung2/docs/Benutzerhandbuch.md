@@ -17,6 +17,9 @@ Fehlbuchung? Bei der Buchung **Storno** – es entsteht eine Gegenbuchung, nicht
 ## Artikel
 
 - **Neuer Artikel:** nächste freie Nummer wird vorgeschlagen; Lagerplatz und Anfangsbestand gleich mitgeben, danach Etikett drucken.
+  - **Direkt am Lagerplatz:** Platz oder Sichtlagerbox öffnen → *Artikel hier anlegen*. Der Platz ist dann schon eingetragen.
+  - **Fotos gleich mit:** *Fotos / Dateien auswählen* (mehrere möglich). In der Scanner-App *Foto aufnehmen* (Kamera) oder *Aus Galerie*.
+  - **Lieferant:** Namen eintippen; vorhandene Lieferanten werden vorgeschlagen. Ein neuer Name wird beim Speichern automatisch unter *Lieferanten* angelegt (Groß-/Kleinschreibung egal, es entstehen keine Doppelten).
 - **Kopieren:** neuer Artikel mit den Daten eines vorhandenen.
 - **Melde- und Mindestbestand:** ab Meldebestand → Nachbestellvorschlag, unter Mindestbestand → kritisch. Für viele Artikel auf einmal: Artikelliste als Excel exportieren, Spalten ergänzen, über *Excel-Import* einlesen.
 - **Kritisches Ersatzteil** markieren, **Verwendung/Anlage** (Tag-Nummer) eintragen, **Fotos und Datenblätter** anhängen.
@@ -46,7 +49,7 @@ Fehlbuchung? Bei der Buchung **Storno** – es entsteht eine Gegenbuchung, nicht
 
 ## Lagerplätze
 
-Übersicht nach Bereichen (C1, C2 …) und darin nach Regalen (R1, R2 …). Plätze ohne Regal, z. B. Flächen wie C1-F1, stehen als *Einzelplätze* vorne. Ein Klick zeigt den Inhalt; dort gibt es auch das Platz-Etikett.
+Übersicht nach Bereichen (C1, C2 …) und darin nach Regalen (R1, R2 …). Plätze ohne Regal, z. B. Flächen wie C1-F1, stehen als *Einzelplätze* vorne. Ein Klick zeigt den Inhalt; dort gibt es auch das Platz-Etikett und *Artikel hier anlegen*.
 
 - **Weinrot** markiert Plätze, an denen ein Artikel unter Melde- oder Mindestbestand liegt. Das sind dieselben Artikel wie unter *Nachbestellung*. Markiert wird auch ein Platz, an dem der Artikel gerade 0 Stück hat, denn dort wird nachgefüllt. Ein Platz wird auch dann weinrot, wenn das in einer seiner Boxen der Fall ist. Am Platz steht, welche Artikel betroffen sind. Nach dem Wareneingang verschwindet die Markierung von selbst.
 - **Sichtlagerboxen:** Ein Regalfach lässt sich in Boxen unterteilen. Dazu den Platz öffnen (z. B. C1-R2-3) → *Sichtlagerboxen* → Anzahl eingeben → *Anlegen*. Die Boxen heißen dann C1-R2-3-B1, C1-R2-3-B2 … und der bisherige Platz-Code bleibt unverändert. Je Box den Inhalt eintragen (z. B. „Schrauben M8“) → *OK*. Danach *Alle Box-Etiketten drucken*: Jedes Etikett trägt den Box-Code als Barcode und den Inhalt als Text.
@@ -64,5 +67,7 @@ Verbrauch je Artikel und Kostenstelle, Lagerwert, Bestand je Gruppe, Ladenhüter
 ## Einstellungen (Administrator)
 
 Benutzer und Rollen (*Nur lesen*, *Lager*, *Administrator*), Etikettendrucker, tägliche Meldebestands-Mail, Datensicherung (mehrere Uhrzeiten und Speicherorte, z. B. externe Festplatte; Wiederherstellen mit Vorschau), Datenübernahme aus Casper, Handscanner-Zugang mit QR-Code, Schnittstelle (API) für andere Programme. *Protokoll* zeigt jede Änderung mit Benutzer und Zeit.
+
+**Etiketten-Schriftgröße** (*Einstellungen → Etikettendrucker → Schriftgröße der Bezeichnung*): *Automatisch* (empfohlen) verkleinert lange Bezeichnungen und bricht sie auf zwei Zeilen um, damit nichts abgeschnitten wird. *Groß*, *Normal* und *Klein* sind feste Größen; was nicht passt, wird dort gekürzt. Beim einzelnen Artikel lässt sich die Größe beim Drucken abweichend wählen; die Vorschau zeigt das Ergebnis.
 
 Meldet die Startseite **„Datensicherung prüfen“**, konnte ein Speicherort nicht beschrieben werden (z. B. externe Festplatte abgezogen) oder die letzte Sicherung ist älter als einen Tag. Details unter *Einstellungen → Datensicherung → Zustand*.

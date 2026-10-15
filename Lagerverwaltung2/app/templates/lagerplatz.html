@@ -22,7 +22,8 @@
 <div class="grid xl:grid-cols-[1fr_360px] gap-6">
   <div class="space-y-6 min-w-0">
   <section class="panel overflow-hidden min-w-0">
-    <div class="px-4 py-3 border-b border-line flex items-center justify-between"><h2>Inhalt</h2><span class="text-sm text-muted">{{ rows|selectattr("menge")|list|length }} Artikel mit Bestand</span></div>
+    <div class="px-4 py-3 border-b border-line flex flex-wrap items-center gap-3"><h2>Inhalt</h2><span class="text-sm text-muted flex-1">{{ rows|selectattr("menge")|list|length }} Artikel mit Bestand</span>
+      {% if user.rolle != "lesen" %}<a class="btn btn-sm btn-primary" href="/artikel/neu?platz={{ p.code|urlq }}">{{ icon("plus", "w-4 h-4") }}Artikel hier anlegen</a>{% endif %}</div>
     <table class="tbl">
       <thead><tr><th>Artikel</th><th>Bezeichnung</th><th class="num">Menge</th><th></th></tr></thead>
       <tbody>

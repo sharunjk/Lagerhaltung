@@ -125,12 +125,14 @@
   <aside class="space-y-6">
     <section class="panel p-4">
       <h2 class="mb-3">Etikett</h2>
-      <div class="flex justify-center bg-soft rounded p-4"><div class="shadow-sm border border-line bg-white">{{ etikett_svg|safe }}</div></div>
+      <div class="flex justify-center bg-soft rounded p-4"><div id="etikett-vorschau" class="shadow-sm border border-line bg-white">{{ etikett_svg|safe }}</div></div>
       {% if ln %}
-      <form method="post" action="/artikel/{{ a.nummer|urlq }}/etikett" class="flex items-end gap-2 mt-3 no-print">
-        <div class="w-20"><label class="label">Anzahl</label><input type="number" name="anzahl" min="1" max="99" value="1" class="field"></div>
-        <div class="flex-1"><label class="label">Format</label><select name="format" class="field"><option value="">Standard ({{ cfg.drucker.standard_format }})</option><option value="45x23">45 × 23 mm</option><option value="60x20">60 × 20 mm</option></select></div>
-        <button class="btn btn-primary {{ 'ring-4 ring-tag' if zeige_etikett }}">{{ icon("print", "w-4 h-4") }}Drucken</button>
+      <form method="post" action="/artikel/{{ a.nummer|urlq }}/etikett" class="grid grid-cols-[5rem_1fr] items-end gap-2 mt-3 no-print"
+            x-data="{format: '', schrift: ''}" x-effect="vorschau(format, schrift)">
+        <div><label class="label">Anzahl</label><input type="number" name="anzahl" min="1" max="99" value="1" class="field"></div>
+        <div><label class="label">Format</label><select name="format" x-model="format" class="field"><option value="">Standard ({{ cfg.drucker.standard_format }})</option><option value="45x23">45 × 23 mm</option><option value="60x20">60 × 20 mm</option></select></div>
+        <div class="col-span-2"><label class="label">Schriftgröße</label><select name="schrift" x-model="schrift" class="field"><option value="">Standard ({{ SCHRIFTEN[cfg.drucker.schrift]|default(cfg.drucker.schrift) }})</option>{% for k, lab in SCHRIFTEN.items() %}<option value="{{ k }}">{{ lab }}</option>{% endfor %}</select></div>
+        <button class="btn btn-primary col-span-2 {{ 'ring-4 ring-tag' if zeige_etikett }}">{{ icon("print", "w-4 h-4") }}Drucken</button>
       </form>
       <a href="/etiketten/druckansicht?nr={{ a.nummer|urlq }}" class="text-xs text-primary mt-2 inline-block">Über den Browser drucken</a>
       {% endif %}
@@ -174,6 +176,15 @@
 </div>
 {% endblock %}
 {% block scripts %}
+<script>
+// Etikett-Vorschau passend zu Format/Schriftgröße im Druckformular
+let _vorschauStart = true;
+function vorschau(format, schrift) {
+  if (_vorschauStart) { _vorschauStart = false; return; }
+  const q = new URLSearchParams({code: {{ a.nummer|tojson }}, z1: {{ a.nummer|tojson }}, z2: {{ a.bezeichnung|tojson }}, format, schrift});
+  fetch("/etikett/vorschau?" + q).then(r => r.ok ? r.text() : "").then(t => { if (t) document.getElementById("etikett-vorschau").innerHTML = t; });
+}
+</script>
 {% if verlauf|length > 2 %}
 <script>
 document.addEventListener("DOMContentLoaded", () => {

@@ -9,7 +9,7 @@ from datetime import date, datetime
 from sqlalchemy import and_, func, insert, select, update
 from sqlalchemy.engine import Connection
 
-from ..db import artikel, audit as audit_t, bestand, bewegungen, lagerplaetze, reservierungen
+from ..db import artikel, audit as audit_t, bestand, bewegungen, lagerplaetze, lieferanten, reservierungen
 
 
 class BuchungsFehler(ValueError):
@@ -280,6 +280,18 @@ class Lager:
             return
         self.con.execute(update(artikel).where(artikel.c.id == aid).values(geaendert_am=self.zeit, **geaendert))
         audit(self.con, self.benutzer, "Artikel geändert", alt["nummer"], {k: [alt[k], v] for k, v in geaendert.items()})
+
+    def lieferant_id(self, name: str | None) -> int | None:
+        """Lieferant per Name (Groß-/Kleinschreibung egal); neue Namen werden unter „Lieferanten“ angelegt."""
+        name = " ".join((name or "").split())[:200]
+        if not name:
+            return None
+        for lid, vorhanden in self.con.execute(select(lieferanten.c.id, lieferanten.c.name)):  # casefold: auch „SÜD“ = „Süd“
+            if " ".join(vorhanden.split()).casefold() == name.casefold():
+                return lid
+        lid = self.con.execute(insert(lieferanten).values(name=name)).inserted_primary_key[0]
+        audit(self.con, self.benutzer, "Lieferant angelegt", name)
+        return lid
 
     def artikel_loeschen(self, aid: int) -> list[str]:
         """Artikel endgültig löschen (z. B. falsch angelegt). Nur ohne Bestand und ohne offene Vorgänge.

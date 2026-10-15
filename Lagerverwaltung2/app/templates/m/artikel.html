@@ -23,12 +23,11 @@
   <a href="/m/buchen?typ=umbuchung&artikel={{ a.nummer|urlq }}" class="btn h-14 text-lg">Umbuchen</a>
   <a href="/m/buchen?typ=inventur&artikel={{ a.nummer|urlq }}" class="btn h-14 text-lg">Zählen</a>
 </div>
-<div class="grid grid-cols-2 gap-2 mb-4">
-  <form method="post" action="/artikel/{{ a.nummer|urlq }}/anhang?weiter=/m/artikel/{{ a.nummer|urlq }}" enctype="multipart/form-data">
-    <label class="btn w-full h-12 cursor-pointer">Foto aufnehmen<input type="file" name="datei" accept="image/*" capture="environment" class="hidden" onchange="this.form.submit()"></label>
-  </form>
-  <form method="post" action="/m/artikel/{{ a.nummer|urlq }}/etikett" class="flex gap-1"><input name="anzahl" value="1" inputmode="numeric" class="field h-12 w-14 text-center"><button class="btn h-12 flex-1">Etikett</button></form>
-</div>
+<form method="post" action="/artikel/{{ a.nummer|urlq }}/anhang?weiter=/m/artikel/{{ a.nummer|urlq }}" enctype="multipart/form-data" class="grid grid-cols-2 gap-2 mb-2">
+  <label class="btn w-full h-12 cursor-pointer">{{ icon("camera", "w-5 h-5") }}Foto aufnehmen<input type="file" name="datei" accept="image/*" capture="environment" class="hidden" onchange="this.form.submit()"></label>
+  <label class="btn w-full h-12 cursor-pointer">{{ icon("image", "w-5 h-5") }}Aus Galerie<input type="file" name="dateien" accept="image/*" multiple class="hidden" onchange="this.form.submit()"></label>
+</form>
+<form method="post" action="/m/artikel/{{ a.nummer|urlq }}/etikett" class="flex gap-1 mb-4"><input name="anzahl" value="1" inputmode="numeric" class="field h-12 w-14 text-center"><button class="btn h-12 flex-1">{{ icon("print", "w-5 h-5") }}Etikett drucken</button></form>
 <details class="rounded-lg border border-line bg-surface p-3 mb-4" {% if not a.meldebestand and not a.mindestbestand %}open{% endif %}>
   <summary class="font-semibold">Melde-/Mindestbestand und Infos</summary>
   <form method="post" action="/m/artikel/{{ a.nummer|urlq }}/werte" class="space-y-3 mt-3">

@@ -49,6 +49,7 @@ class DruckerCfg:
     dichte: int = 8
     geschwindigkeit: int = 4
     luecke_mm: float = 2.0
+    schrift: str = "auto"  # Schriftgröße der Bezeichnung: auto | gross | normal | klein
 
 
 @dataclass

@@ -10,6 +10,7 @@ from urllib.parse import quote, urlsplit
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
+from .services.labels import SCHRIFTEN
 from .services.lager import fmt_num
 from .services.queries import TYP_TEXT
 
@@ -198,4 +199,4 @@ def _qr(text: str) -> str:
     return qr_svg(text, 0, 0, 40)
 
 
-templates.env.globals.update(qr=_qr, ROLLEN=ROLLEN, ROLLEN_NAMEN=ROLLEN_NAMEN, now=datetime.now, TYP_TEXT=TYP_TEXT)
+templates.env.globals.update(qr=_qr, ROLLEN=ROLLEN, ROLLEN_NAMEN=ROLLEN_NAMEN, now=datetime.now, TYP_TEXT=TYP_TEXT, SCHRIFTEN=SCHRIFTEN)

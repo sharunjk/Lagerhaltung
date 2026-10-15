@@ -94,7 +94,8 @@ def einstellungen(request: Request, tab: str = "allgemein"):
         sich = sicherung.uebersicht(cfg, con) if tab == "backup" else []
     for u in sich:
         u["dateien"] = sicherung.sicherungen_in(Path(u["pfad"]), 10)
-    svg = labels.etikett_svg("10001", "10001", "Testetikett Kugelhahn DN15", cfg.drucker.standard_format, cfg.drucker.barcode, 2)
+    svg = labels.etikett_svg("10001", "10001", "Testetikett Kugelhahn DN15 PN40 Edelstahl, Flanschanschluss", cfg.drucker.standard_format,
+                             cfg.drucker.barcode, 2, cfg.drucker.schrift)
     import socket
     return render(request, "einstellungen.html", tab=tab, users=nutzer, sich=sich, groesse=sicherung.groesse_text,
                   drucker_liste=labels.windows_drucker() if tab == "drucker" else [], svg=svg, hat_daten=hat_daten,
@@ -143,6 +144,7 @@ async def drucker(request: Request):
             "versatz_y_mm": float(str(f.get("versatz_y_mm") or 0).replace(",", ".")),
             "dichte": max(0, min(15, int(f.get("dichte") or 8))), "geschwindigkeit": max(2, min(5, int(f.get("geschwindigkeit") or 4))),  # HT100: 2–5 (Handbuch)
             "luecke_mm": float(str(f.get("luecke_mm") or 2).replace(",", ".")),
+            "schrift": f.get("schrift") if f.get("schrift") in labels.SCHRIFTEN else "auto",
         }
     except ValueError:
         flash(request, "Ungültige Zahl in den Druckereinstellungen.", "fehler")
@@ -150,7 +152,7 @@ async def drucker(request: Request):
     _cfg_update(request, "drucker", werte)
     if f.get("aktion") == "test":
         try:
-            flash(request, "Testdruck: " + etiketten_drucken(request, [("10001", "10001", "Testetikett Kugelhahn DN15", 1)]))
+            flash(request, "Testdruck: " + etiketten_drucken(request, [("10001", "10001", "Testetikett Kugelhahn DN15 PN40 Edelstahl, Flanschanschluss", 1)]))
         except labels.DruckFehler as e:
             flash(request, f"Testdruck fehlgeschlagen: {e}", "fehler")
     else:

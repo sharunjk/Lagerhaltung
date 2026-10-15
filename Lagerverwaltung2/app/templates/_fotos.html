@@ -1,0 +1,47 @@
+{# Fotos/Dateien schon beim Anlegen eines Artikels: Kamera oder Galerie, mehrere möglich, mit Vorschau.
+   Jede Auswahl ist ein eigenes <input type="file" name="dateien">, damit man nacheinander mehrere Fotos aufnehmen kann. #}
+{% from "_macros.html" import icon %}
+{% macro foto_auswahl(mobil=False) %}
+<div>
+  <label class="label">Fotos {% if not mobil %}/ Dateien {% endif %}(optional)</label>
+  <div id="lv-fotos" class="flex flex-wrap gap-2"></div>
+  {% if mobil %}
+  <div class="grid grid-cols-2 gap-2 mt-1">
+    <button type="button" class="btn h-12" onclick="lvFoto(true)">{{ icon("camera", "w-5 h-5") }}Foto aufnehmen</button>
+    <button type="button" class="btn h-12" onclick="lvFoto(false)">{{ icon("image", "w-5 h-5") }}Aus Galerie</button>
+  </div>
+  {% else %}
+  <button type="button" class="btn mt-1" onclick="lvFoto(false)">{{ icon("image", "w-4 h-4") }}Fotos / Dateien auswählen</button>
+  {% endif %}
+  <p class="text-xs text-muted mt-1">Werden mit dem Artikel gespeichert (je Datei bis 25 MB).</p>
+</div>
+<script>
+function lvFoto(kamera) {
+  const box = document.getElementById("lv-fotos");
+  box.querySelectorAll("input[type=file]").forEach((i) => { if (!i.files.length) i.remove(); });  // abgebrochene Auswahl
+  const i = document.createElement("input");
+  i.type = "file"; i.name = "dateien"; i.hidden = true;
+  if ({{ "true" if mobil else "kamera" }}) i.accept = "image/*";
+  if (kamera) i.setAttribute("capture", "environment"); else i.multiple = true;
+  i.addEventListener("change", () => {
+    if (!i.files.length) { i.remove(); return; }
+    const g = document.createElement("div");
+    g.className = "relative flex gap-1 rounded border border-line p-1";
+    for (const f of i.files) {
+      let el;
+      if (f.type.startsWith("image/")) { el = document.createElement("img"); el.src = URL.createObjectURL(f); el.className = "h-20 w-20 object-cover rounded"; }
+      else { el = document.createElement("span"); el.textContent = f.name; el.className = "text-xs max-w-[10rem] truncate self-center px-1"; }
+      el.title = f.name; g.appendChild(el);
+    }
+    const x = document.createElement("button");
+    x.type = "button"; x.textContent = "×"; x.title = "Entfernen"; x.setAttribute("aria-label", "Foto entfernen");
+    x.className = "absolute -top-2 -right-2 h-7 w-7 rounded-full bg-surface border border-line text-lg leading-none";
+    x.onclick = () => { i.remove(); g.remove(); };
+    g.appendChild(x);
+    box.insertBefore(g, i);
+  });
+  box.appendChild(i);
+  i.click();
+}
+</script>
+{% endmacro %}

@@ -20,7 +20,7 @@ from ..services import queries
 from ..services.betrieb import get_setting, set_setting
 from ..services.lager import BuchungsFehler, audit, fmt_num, parse_num
 from ..web import current_user, flash, render, require, sicheres_ziel, templates
-from .artikel import etiketten_drucken, form_daten, lager
+from .artikel import artikel_mit_dateien_anlegen, dateien_lesen, etiketten_drucken, lager
 from .buchen import TYPEN, buchung_ausfuehren
 from .lager import inventur_positionen, platz_zusatz, zaehlung_speichern
 
@@ -295,28 +295,28 @@ def suche(request: Request, q: str = "", neu: int = 0):
 def neu_form(request: Request, nummer: str = "", platz: str = ""):
     require(request, "lager")
     with db.engine().connect() as con:
-        vs = queries.vorschlaege(con)
-        lief = [r[0] for r in con.execute(select(lieferanten.c.name).order_by(lieferanten.c.name))]
-        vorschlag = queries.naechste_nummer(con)
-    return render(request, "m/neu.html", nummer=nummer or vorschlag, platz=platz, vs=vs, lieferanten=lief)
+        return render(request, "m/neu.html", nummer=nummer or queries.naechste_nummer(con), platz=platz, w={}, **_neu_ctx(con))
+
+
+def _neu_ctx(con) -> dict:
+    return dict(vs=queries.vorschlaege(con), lieferanten=[r[0] for r in con.execute(select(lieferanten.c.name).order_by(lieferanten.c.name))])
 
 
 @router.post("/neu")
 async def neu(request: Request):
     require(request, "lager")
-    f = dict(await request.form())
+    roh = await request.form()
+    f = {k: v for k, v in roh.items() if isinstance(v, str)}
+    fotos, zu_gross = await dateien_lesen(roh.getlist("dateien"))
     try:
-        with db.schreiben() as con:
-            daten = form_daten({**f, "nummer": f.get("nummer", "")}, request.app.state.cfg)
-            lname = (f.get("lieferant") or "").strip()
-            if lname:
-                lid = con.execute(select(lieferanten.c.id).where(func.lower(lieferanten.c.name) == lname.lower())).scalar()
-                daten["lieferant_id"] = lid or con.execute(insert(lieferanten).values(name=lname)).inserted_primary_key[0]
-            a = lager(con, request, "mobil").artikel_anlegen(daten, f.get("platz", ""), f.get("anfangsbestand") or 0)
+        a, n = artikel_mit_dateien_anlegen(request, {**f, "nummer": f.get("nummer", "")}, fotos, "mobil")
     except BuchungsFehler as e:
-        flash(request, str(e), "fehler")
-        return RedirectResponse(f"/m/neu?nummer={quote(f.get('nummer', ''))}&platz={quote(f.get('platz', ''))}", status_code=303)
-    msg = f"Artikel {a['nummer']} angelegt."
+        flash(request, str(e) + (" Fotos bitte erneut aufnehmen bzw. auswählen." if fotos else ""), "fehler")
+        with db.engine().connect() as con:
+            return render(request, "m/neu.html", nummer=f.get("nummer", ""), platz=f.get("platz", ""), w=f, **_neu_ctx(con))
+    msg = f"Artikel {a['nummer']} angelegt." + (f" {n} Foto(s) gespeichert." if n else "")
+    if zu_gross:
+        msg += f" Nicht gespeichert (leer oder größer als 25 MB): {', '.join(zu_gross)}."
     if f.get("etikett") == "on":
         from ..services import labels
         try:

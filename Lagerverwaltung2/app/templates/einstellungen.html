@@ -107,6 +107,8 @@
       <div><label class="label">Druckdichte (0–15)</label><input name="dichte" type="number" min="0" max="15" value="{{ d.dichte }}" class="field"></div>
       <div><label class="label">Geschwindigkeit (2–5)</label><input name="geschwindigkeit" type="number" min="2" max="5" value="{{ d.geschwindigkeit }}" class="field"></div>
       <div><label class="label">Abstand zwischen Etiketten (mm)</label><input name="luecke_mm" value="{{ d.luecke_mm }}" class="field"></div>
+      <div class="sm:col-span-2"><label class="label">Schriftgröße der Bezeichnung</label><select name="schrift" class="field">{% for k, lab in SCHRIFTEN.items() %}<option value="{{ k }}" {% if d.schrift == k %}selected{% endif %}>{{ lab }}</option>{% endfor %}</select>
+        <p class="text-xs text-muted mt-1">„Automatisch“ verkleinert lange Bezeichnungen und bricht sie auf zwei Zeilen um, damit nichts abgeschnitten wird. Gilt für alle Etiketten; beim einzelnen Artikel kann sie beim Drucken abweichend gewählt werden.</p></div>
     </div>
     <div class="flex gap-2"><button class="btn btn-primary" name="aktion" value="speichern">Speichern</button><button class="btn" name="aktion" value="test">{{ icon("print", "w-4 h-4") }}Speichern und Testetikett drucken</button></div>
   </form>

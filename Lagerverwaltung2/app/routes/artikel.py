@@ -8,7 +8,7 @@ from datetime import date
 from urllib.parse import quote, urlencode
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, Form, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlalchemy import delete, insert, select
 
@@ -47,6 +47,8 @@ def form_daten(form: dict, cfg) -> dict:
         d[f] = p
     lid = form.get("lieferant_id") or ""
     d["lieferant_id"] = int(lid) if str(lid).isdigit() else None
+    if "lieferant" in form:  # Freitext mit Vorschlägen; neue Namen legt Lager.lieferant_id an
+        d["lieferant"] = (form.get("lieferant") or "").strip()
     d["kritisch"] = form.get("kritisch") in ("on", "1", "ja", "true", True)
     if "nummer" in form:
         d["nummer"] = (form.get("nummer") or "").strip()
@@ -106,28 +108,51 @@ def export(request: Request, fmt: str, q: str = "", filter: str = "", kategorie:
 
 
 @router.get("/artikel/neu")
-def neu_form(request: Request, kopie: str = ""):
+def neu_form(request: Request, kopie: str = "", platz: str = ""):
     require(request, "lager")
     with db.engine().connect() as con:
         a = {"nummer": queries.naechste_nummer(con), "einheit": request.app.state.cfg.lager.standard_einheit}
         if kopie and (src := queries.artikel_detail(con, kopie)):
             a = {**src, "nummer": a["nummer"]}
+        if platz.strip():  # „Artikel hier anlegen“ auf einem Lagerplatz / einer Sichtlagerbox
+            a["platz"] = " ".join(platz.split())
         return render(request, "artikel_form.html", a=a, neu=True, **_form_ctx(con))
 
 
 @router.post("/artikel/neu")
 async def neu(request: Request):
     require(request, "lager")
-    form = dict(await request.form())
+    roh = await request.form()
+    form = {k: v for k, v in roh.items() if isinstance(v, str)}
+    dateien, zu_gross = await dateien_lesen(roh.getlist("dateien"))
+    try:
+        a, n = artikel_mit_dateien_anlegen(request, form, dateien)
+    except BuchungsFehler as e:
+        with db.engine().connect() as con:
+            return render(request, "artikel_form.html", a=form, neu=True, fehler=str(e) + (" Fotos/Dateien bitte erneut auswählen." if dateien else ""),
+                          **_form_ctx(con))
+    flash(request, f"Artikel {a['nummer']} angelegt." + (f" {n} Foto(s)/Datei(en) gespeichert." if n else "")
+          + (f" Nicht gespeichert (leer oder größer als 25 MB): {', '.join(zu_gross)}." if zu_gross else ""), "fehler" if zu_gross else "ok")
+    return RedirectResponse(f"/artikel/{a['nummer']}" + ("?etikett=1" if form.get("etikett") == "on" else ""), status_code=303)
+
+
+def artikel_mit_dateien_anlegen(request, form: dict, dateien: list[tuple[str, str, bytes]], quelle: str = "pc") -> tuple[dict, int]:
+    """Artikel anlegen (Lieferant per Name, ggf. neu) und gleich Fotos/Dateien anhängen – alles in einer Transaktion."""
+    geschrieben: list[Path] = []
     try:
         with db.schreiben() as con:
             daten = form_daten(form, request.app.state.cfg)
-            a = lager(con, request).artikel_anlegen(daten, form.get("platz", ""), form.get("anfangsbestand") or 0)
-    except BuchungsFehler as e:
-        with db.engine().connect() as con:
-            return render(request, "artikel_form.html", a=form, neu=True, fehler=str(e), **_form_ctx(con))
-    flash(request, f"Artikel {a['nummer']} angelegt.")
-    return RedirectResponse(f"/artikel/{a['nummer']}" + ("?etikett=1" if form.get("etikett") == "on" else ""), status_code=303)
+            lg = lager(con, request, quelle)
+            if "lieferant" in daten:
+                daten["lieferant_id"] = lg.lieferant_id(daten.pop("lieferant"))
+            a = lg.artikel_anlegen(daten, form.get("platz", ""), form.get("anfangsbestand") or 0)
+            for name, typ, inhalt in dateien:
+                geschrieben.append(anhang_speichern(request, con, a["id"], a["nummer"], name, typ, inhalt))
+    except Exception:
+        for p in geschrieben:  # Artikel wurde nicht angelegt -> keine verwaisten Dateien
+            p.unlink(missing_ok=True)
+        raise
+    return a, len(dateien)
 
 
 @router.get("/artikel/{nr}")
@@ -141,7 +166,7 @@ def detail(request: Request, nr: str, etikett: int = 0):
         verlauf = queries.bestandsverlauf(con, a["id"], a["bestand"])
     d = request.app.state.cfg.drucker
     return render(request, "artikel_detail.html", a=a, hist=hist, hist_total=total, verlauf=verlauf, zeige_etikett=etikett,
-                  etikett_svg=labels.etikett_svg(a["nummer"], a["nummer"], a["bezeichnung"], d.standard_format, d.barcode, scale=1.6))
+                  etikett_svg=labels.etikett_svg(a["nummer"], a["nummer"], a["bezeichnung"], d.standard_format, d.barcode, scale=1.6, schrift=d.schrift))
 
 
 @router.get("/artikel/{nr}/bearbeiten")
@@ -164,7 +189,10 @@ async def bearbeiten(request: Request, nr: str):
             daten = form_daten(form, request.app.state.cfg)
             if not daten.get("bezeichnung"):
                 raise BuchungsFehler("Bitte eine Bezeichnung angeben.")
-            lager(con, request).artikel_aendern(aid, daten)
+            lg = lager(con, request)
+            if "lieferant" in daten:
+                daten["lieferant_id"] = lg.lieferant_id(daten.pop("lieferant"))
+            lg.artikel_aendern(aid, daten)
     except BuchungsFehler as e:
         with db.engine().connect() as con:
             return render(request, "artikel_form.html", a={**form, "nummer": form.get("nummer") or nr, "_alt": nr}, neu=False, fehler=str(e), **_form_ctx(con))
@@ -215,8 +243,45 @@ def _anhang_ordner(request) -> Path:
     return p
 
 
+async def datei_lesen(datei: UploadFile) -> bytes | None:
+    """Inhalt einer hochgeladenen Datei; None, wenn leer oder größer als MAX_ANHANG."""
+    teile, groesse = [], 0
+    while chunk := await datei.read(1024 * 1024):  # stückweise, damit eine riesige Datei nicht komplett in den Speicher wandert
+        groesse += len(chunk)
+        if groesse > MAX_ANHANG:
+            return None
+        teile.append(chunk)
+    return b"".join(teile) or None
+
+
+async def dateien_lesen(liste: list) -> tuple[list[tuple[str, str, bytes]], list[str]]:
+    """Mehrere hochgeladene Dateien (Formularfeld „dateien“). Leere Auswahlfelder werden übergangen.
+    Gibt (Name, Typ, Inhalt) und die Namen der zu großen/leeren Dateien zurück."""
+    gut, schlecht = [], []
+    for d in liste:
+        if isinstance(d, str) or not d.filename:
+            continue
+        inhalt = await datei_lesen(d)
+        if inhalt is None:
+            schlecht.append(Path(d.filename).name)
+        else:
+            gut.append((d.filename, d.content_type or "", inhalt))
+    return gut, schlecht
+
+
+def anhang_speichern(request, con, aid: int, nr: str, dateiname: str, content_type: str, inhalt: bytes) -> Path:
+    endung = "".join(c for c in Path(dateiname or "").suffix.lower()[:10] if c.isalnum() or c == ".")
+    ziel = _anhang_ordner(request) / f"{uuid.uuid4().hex}{endung}"
+    ziel.write_bytes(inhalt)
+    typ = mimetypes.guess_type(dateiname or "")[0] or content_type or "application/octet-stream"
+    con.execute(insert(anhaenge).values(artikel_id=aid, dateiname=Path(dateiname or "datei").name, speichername=ziel.name, typ=typ,
+                                        groesse=len(inhalt), ist_bild=typ.startswith("image/"), hochgeladen_von=request.session["user"]["username"]))
+    audit(con, request.session["user"]["username"], "Anhang hochgeladen", nr, {"datei": dateiname})
+    return ziel
+
+
 @router.post("/artikel/{nr}/anhang")
-async def anhang_hochladen(request: Request, nr: str, datei: UploadFile = File(...)):
+async def anhang_hochladen(request: Request, nr: str):
     require(request, "lager")
     weiter = sicheres_ziel(request.query_params.get("weiter"), f"/artikel/{nr}#anhaenge")
     with db.engine().connect() as con:
@@ -224,25 +289,22 @@ async def anhang_hochladen(request: Request, nr: str, datei: UploadFile = File(.
     if not aid:
         flash(request, f"Artikel {nr} gibt es nicht.", "fehler")
         return RedirectResponse("/artikel", status_code=303)
-    teile, groesse = [], 0
-    while chunk := await datei.read(1024 * 1024):  # stückweise, damit eine riesige Datei nicht komplett in den Speicher wandert
-        groesse += len(chunk)
-        if groesse > MAX_ANHANG:
-            break
-        teile.append(chunk)
-    if not groesse or groesse > MAX_ANHANG:
+    roh = await request.form()
+    dateien, zu_gross = await dateien_lesen([*roh.getlist("datei"), *roh.getlist("dateien")])
+    if not dateien:
         flash(request, "Datei ist leer oder größer als 25 MB.", "fehler")
         return RedirectResponse(weiter, status_code=303)
-    inhalt = b"".join(teile)
-    endung = "".join(c for c in Path(datei.filename or "").suffix.lower()[:10] if c.isalnum() or c == ".")
-    speicher = f"{uuid.uuid4().hex}{endung}"
-    (_anhang_ordner(request) / speicher).write_bytes(inhalt)
-    typ = mimetypes.guess_type(datei.filename or "")[0] or datei.content_type or "application/octet-stream"
-    with db.schreiben() as con:
-        con.execute(insert(anhaenge).values(artikel_id=aid, dateiname=Path(datei.filename or "datei").name, speichername=speicher, typ=typ,
-                                            groesse=len(inhalt), ist_bild=typ.startswith("image/"), hochgeladen_von=request.session["user"]["username"]))
-        audit(con, request.session["user"]["username"], "Anhang hochgeladen", nr, {"datei": datei.filename})
-    flash(request, "Datei gespeichert.")
+    geschrieben: list[Path] = []
+    try:
+        with db.schreiben() as con:
+            for name, typ, inhalt in dateien:
+                geschrieben.append(anhang_speichern(request, con, aid, nr, name, typ, inhalt))
+    except Exception:
+        for p in geschrieben:
+            p.unlink(missing_ok=True)
+        raise
+    flash(request, ("Datei gespeichert." if len(dateien) == 1 else f"{len(dateien)} Dateien gespeichert.")
+          + (f" Nicht gespeichert (leer oder größer als 25 MB): {', '.join(zu_gross)}." if zu_gross else ""), "fehler" if zu_gross else "ok")
     return RedirectResponse(weiter, status_code=303)
 
 
@@ -275,28 +337,30 @@ def anhang_loeschen(request: Request, aid: int):
 
 # ------------------------------------------------------------------ Etiketten
 @router.get("/etikett/vorschau", response_class=HTMLResponse)
-def etikett_vorschau(request: Request, code: str, z1: str = "", z2: str = "", format: str = "", barcode: str = ""):
+def etikett_vorschau(request: Request, code: str, z1: str = "", z2: str = "", format: str = "", barcode: str = "", schrift: str = ""):
     require(request)
     d = request.app.state.cfg.drucker
-    return HTMLResponse(labels.etikett_svg(code, z1, z2, format if format in labels.LAYOUTS else d.standard_format, barcode or d.barcode, scale=1.6))
+    return HTMLResponse(labels.etikett_svg(code, z1, z2, format if format in labels.LAYOUTS else d.standard_format, barcode or d.barcode, scale=1.6,
+                                           schrift=schrift if schrift in labels.SCHRIFTEN else d.schrift))
 
 
-def etiketten_drucken(request, eintraege: list[tuple[str, str, str, int]], format_: str | None = None) -> str:
+def etiketten_drucken(request, eintraege: list[tuple[str, str, str, int]], format_: str | None = None, schrift: str | None = None) -> str:
     cfg = request.app.state.cfg
     d = cfg.drucker
     daten = b"".join(labels.etikett_tspl(c, z1, z2, format_ or d.standard_format, d.barcode, n, d.versatz_x_mm, d.versatz_y_mm,
-                                         d.dichte, d.geschwindigkeit, d.luecke_mm) for c, z1, z2, n in eintraege)
+                                         d.dichte, d.geschwindigkeit, d.luecke_mm, schrift or d.schrift) for c, z1, z2, n in eintraege)
     return labels.senden(d, daten, cfg.path)
 
 
 @router.post("/artikel/{nr}/etikett")
-def etikett_drucken(request: Request, nr: str, anzahl: str = Form("1"), format: str = Form("")):
+def etikett_drucken(request: Request, nr: str, anzahl: str = Form("1"), format: str = Form(""), schrift: str = Form("")):
     require(request, "lager")
     with db.engine().connect() as con:
         bez = con.execute(select(artikel.c.bezeichnung).where(artikel.c.nummer == nr)).scalar() or ""
     try:
         n = int(anzahl) if str(anzahl).strip().isdigit() else 1
-        flash(request, etiketten_drucken(request, [(nr, nr, bez, max(1, min(n, 99)))], format if format in labels.LAYOUTS else None))
+        flash(request, etiketten_drucken(request, [(nr, nr, bez, max(1, min(n, 99)))], format if format in labels.LAYOUTS else None,
+                                         schrift if schrift in labels.SCHRIFTEN else None))
     except labels.DruckFehler as e:
         flash(request, f"Druck fehlgeschlagen: {e}", "fehler")
     return RedirectResponse(sicheres_ziel(request.query_params.get("weiter"), f"/artikel/{nr}"), status_code=303)
@@ -333,7 +397,8 @@ def druckansicht(request: Request, format: str = ""):
     with db.engine().connect() as con:
         bez = dict(con.execute(select(artikel.c.nummer, artikel.c.bezeichnung).where(artikel.c.nummer.in_(nrs))).all()) if nrs else {}
         pbez = dict(con.execute(select(lagerplaetze.c.code, lagerplaetze.c.beschreibung).where(lagerplaetze.c.code.in_(plaetze))).all()) if plaetze else {}
-    svgs = [labels.etikett_svg(n, n, bez.get(n, ""), fmt, d.barcode) for n in nrs]
-    svgs += [labels.etikett_svg(p, p, pbez.get(p) or ("Sichtlagerbox" if queries.box_eltern(p) else "Lagerplatz"), fmt, d.barcode) for p in plaetze]
+    svgs = [labels.etikett_svg(n, n, bez.get(n, ""), fmt, d.barcode, schrift=d.schrift) for n in nrs]
+    svgs += [labels.etikett_svg(p, p, pbez.get(p) or ("Sichtlagerbox" if queries.box_eltern(p) else "Lagerplatz"), fmt, d.barcode, schrift=d.schrift)
+             for p in plaetze]
     L = labels.LAYOUTS[fmt]
     return render(request, "druckansicht.html", svgs=svgs, breite=L.breite, hoehe=L.hoehe)

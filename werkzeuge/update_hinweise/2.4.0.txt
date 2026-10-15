@@ -8,6 +8,14 @@ Neu in 2.4.0:
 - Artikel endgueltig loeschen (nur Administratoren), z. B. falsch angelegte: Artikel oeffnen ->
   "Artikel endgueltig loeschen" -> Nummer eintippen -> Loeschen -> Rueckfrage bestaetigen. Nur ohne Bestand und
   ohne offene Reservierung/Bestellung/Ausleihe. Fruehere Buchungen behalten die Nummer in der Historie.
+- Artikel direkt am Lagerplatz anlegen: Platz oder Box oeffnen -> "Artikel hier anlegen" (Platz ist schon eingetragen).
+- Fotos gleich beim Anlegen: am PC "Fotos / Dateien auswaehlen", in der Scanner-App "Foto aufnehmen" (Kamera)
+  oder "Aus Galerie". Auch auf der Artikelseite der Scanner-App gibt es jetzt "Aus Galerie".
+- Lieferant beim Anlegen/Bearbeiten einfach eintippen: vorhandene werden vorgeschlagen, ein neuer Name wird
+  automatisch unter "Lieferanten" angelegt.
+- Etiketten-Schriftgroesse: Einstellungen -> Etikettendrucker -> "Schriftgroesse der Bezeichnung".
+  "Automatisch" (Standard) verkleinert lange Bezeichnungen bzw. bricht sie auf zwei Zeilen um, damit nichts
+  abgeschnitten wird. Beim einzelnen Artikel kann die Groesse beim Drucken abweichend gewaehlt werden.
 
 Kommen Sie von einer aelteren Version, ist auch alles aus 2.3.1 und 2.3.0 enthalten:
 - 2.3.1: Lagerplaetze nach Regal unterteilt, Zurueck-Pfeil, Lagerplatz loeschen, "Profil" in der Scanner-App

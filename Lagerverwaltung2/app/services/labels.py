@@ -95,7 +95,43 @@ def _kuerzen(text: str, max_zeichen: int) -> str:
     return text if len(text) <= max_zeichen else text[: max_zeichen - 1] + "…"
 
 
-def etikett_svg(code: str, zeile1: str, zeile2: str, layout: str = "45x23", barcode: str = "128", scale: float = 1.0) -> str:
+# Interne TSPL-Schriften des HT100: Zeichenbreite × Höhe in Dots
+FONTS = {"1": (8, 12), "2": (12, 20), "3": (16, 24), "4": (24, 32)}
+SCHRIFTEN = {"auto": "Automatisch (empfohlen)", "gross": "Groß", "normal": "Normal", "klein": "Klein"}
+
+
+def text_layout(L: Layout, text: str, schrift: str = "auto") -> tuple[str, list[str]]:
+    """Schrift und Zeilen für die Bezeichnung (Zeile 2). "auto": Standardschrift, wenn der Text passt, sonst kleiner;
+    passt er auch in der kleinsten Schrift nicht, zweizeilig. Feste Größen: eine Zeile, gekürzt –
+    außer in der kleinsten Schrift, dort ebenfalls zweizeilig."""
+    breite = int(L.breite * DOTS_PER_MM)
+    folge = list(FONTS)
+    i = folge.index(L.tspl_font)
+    if schrift == "gross":
+        kandidaten = [folge[min(i + 1, len(folge) - 1)]]
+    elif schrift == "klein":
+        kandidaten = [folge[max(i - 1, 0)]]
+    elif schrift == "normal":
+        kandidaten = [L.tspl_font]
+    else:
+        kandidaten = folge[i::-1]  # Standard, dann kleiner bis Schrift 1
+    text = " ".join((text or "").split())
+    for f in kandidaten:
+        if len(text) * FONTS[f][0] <= breite:
+            return f, [text] if text else []
+    f = kandidaten[-1]
+    max_z = breite // FONTS[f][0]
+    if f == folge[0]:  # kleinste Schrift: auf zwei Zeilen umbrechen
+        import textwrap
+        zeilen = textwrap.wrap(text, max_z, break_long_words=True)
+        if len(zeilen) > 2:
+            zeilen = [zeilen[0], _kuerzen(" ".join(zeilen[1:]), max_z)]
+        return f, zeilen
+    return f, [_kuerzen(text, max_z)]
+
+
+def etikett_svg(code: str, zeile1: str, zeile2: str, layout: str = "45x23", barcode: str = "128", scale: float = 1.0,
+                schrift: str = "auto") -> str:
     L = LAYOUTS[layout]
     if barcode.upper() == "QR":
         size = min(L.bc_h, L.bc_b)
@@ -104,6 +140,11 @@ def etikett_svg(code: str, zeile1: str, zeile2: str, layout: str = "45x23", barc
         bc = code128_svg(code, L.bc_x, L.bc_y, L.bc_b, L.bc_h)
     max_z = int(L.breite * DOTS_PER_MM // L.font_b)
     fs = L.css_pt * 0.3528  # pt -> mm
+    f2, zeilen = text_layout(L, zeile2, schrift)
+    fs2 = fs * FONTS[f2][1] / FONTS[L.tspl_font][1]  # Vorschau im selben Verhältnis wie am Drucker
+    abstand2 = (FONTS[f2][1] + 2) / DOTS_PER_MM
+    texte2 = "".join(f'<text x="{L.breite / 2}" y="{L.zeile2_y + k * abstand2 + fs2 * 0.8:.2f}" font-size="{fs2:.2f}">{escape(z)}</text>'
+                     for k, z in enumerate(zeilen))
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {L.breite} {L.hoehe}" '
         f'width="{L.breite * scale}mm" height="{L.hoehe * scale}mm" class="etikett">'
@@ -111,7 +152,7 @@ def etikett_svg(code: str, zeile1: str, zeile2: str, layout: str = "45x23", barc
         f'<g fill="#000">{bc}</g>'
         f'<g font-family="Arial, Helvetica, sans-serif" font-size="{fs:.2f}" text-anchor="middle" fill="#000">'
         f'<text x="{L.breite / 2}" y="{L.zeile1_y + fs * 0.8:.2f}">{escape(_kuerzen(zeile1, max_z))}</text>'
-        f'<text x="{L.breite / 2}" y="{L.zeile2_y + fs * 0.8:.2f}">{escape(_kuerzen(zeile2, max_z))}</text>'
+        f'{texte2}'
         f"</g></svg>"
     )
 
@@ -124,7 +165,7 @@ def _tspl_str(s: str) -> str:
 
 def etikett_tspl(code: str, zeile1: str, zeile2: str, layout: str = "45x23", barcode: str = "128",
                  anzahl: int = 1, versatz_x_mm: float = 0, versatz_y_mm: float = 0, dichte: int = 8,
-                 geschwindigkeit: int = 4, luecke_mm: float = 2.0) -> bytes:
+                 geschwindigkeit: int = 4, luecke_mm: float = 2.0, schrift: str = "auto") -> bytes:
     L = LAYOUTS[layout]
     d = DOTS_PER_MM
     breite_dots = int(L.breite * d)
@@ -155,10 +196,15 @@ def etikett_tspl(code: str, zeile1: str, zeile2: str, layout: str = "45x23", bar
         x = max(0, int(L.bc_x * d + (L.bc_b * d - bc_w) / 2))
         cmds.append(f'BARCODE {x + ox},{int(L.bc_y * d) + oy},"128",{int(L.bc_h * d)},0,0,{narrow},{narrow},"{_tspl_str(code)}"')
     max_z = breite_dots // L.font_b
-    for txt, y in ((zeile1, L.zeile1_y), (zeile2, L.zeile2_y)):
-        t = _kuerzen(txt, max_z).replace("…", ".")
-        x = max(0, (breite_dots - len(t) * L.font_b) // 2)
-        cmds.append(f'TEXT {x + ox},{int(y * d) + oy},"{L.tspl_font}",0,1,1,"{_tspl_str(t)}"')
+    t = _kuerzen(zeile1, max_z).replace("…", ".")
+    x = max(0, (breite_dots - len(t) * L.font_b) // 2)
+    cmds.append(f'TEXT {x + ox},{int(L.zeile1_y * d) + oy},"{L.tspl_font}",0,1,1,"{_tspl_str(t)}"')
+    f2, zeilen = text_layout(L, zeile2, schrift)
+    fb, fh = FONTS[f2]
+    for k, z in enumerate(zeilen):
+        t = z.replace("…", ".")
+        x = max(0, (breite_dots - len(t) * fb) // 2)
+        cmds.append(f'TEXT {x + ox},{int(L.zeile2_y * d) + k * (fh + 2) + oy},"{f2}",0,1,1,"{_tspl_str(t)}"')
     cmds.append(f"PRINT {max(1, int(anzahl))},1")
     return ("\r\n".join(cmds) + "\r\n").encode("cp1252", errors="replace")
 
