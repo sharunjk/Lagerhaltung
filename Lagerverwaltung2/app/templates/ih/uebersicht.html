@@ -50,7 +50,7 @@
     <section class="panel overflow-hidden">
       <div class="px-4 py-3 border-b border-line"><h2>Letzte Importe</h2></div>
       <table class="tbl"><tbody>
-      {% for l in laeufe %}<tr><td><a class="hover:underline" href="/ih/import/{{ l.id }}">{{ l.dateiname }}</a></td><td class="text-sm text-muted">{{ l.zeit|datum }}</td><td class="text-sm">{{ {"neu": "hochgeladen", "geprueft": "geprüft", "uebernommen": "übernommen"}[l.status] }}</td></tr>{% endfor %}
+      {% for l in laeufe %}<tr><td><a class="hover:underline" href="{{ '/ih/wartung/import/' if l.art == 'plan' else '/ih/import/' }}{{ l.id }}">{{ l.dateiname }}</a>{% if l.art == "plan" %} <span class="text-xs text-muted">Instandhaltungsplan</span>{% endif %}</td><td class="text-sm text-muted">{{ l.zeit|datum }}</td><td class="text-sm">{{ {"neu": "hochgeladen", "geprueft": "geprüft", "uebernommen": "übernommen"}[l.status] }}</td></tr>{% endfor %}
       </tbody></table>
     </section>
     {% endif %}

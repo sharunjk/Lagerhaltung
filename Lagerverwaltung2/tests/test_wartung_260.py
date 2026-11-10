@@ -119,6 +119,11 @@ def test_plan_uebernehmen_vergleich_und_erneut(env):
     c.post(r.headers["location"] + "/uebernehmen", data={"bestaetigt": "ja"})
     assert anzahl(eng, "SELECT intervall_monate FROM ih_kampagnen WHERE schluessel='S-Pumpe'") == 6
     assert anzahl(eng, "SELECT count(*) FROM ih_kampagnen") == 5
+    # Planläufe erscheinen nicht beim Asset-Import und lassen sich dort nicht öffnen
+    assert "plan_v2.xlsx" not in c.get("/ih/import").text and "plan_v2.xlsx" in c.get("/ih/wartung/import").text
+    plan_lid = int(r.headers["location"].rsplit("/", 1)[1])
+    assert c.get(f"/ih/import/{plan_lid}").headers["location"] == "/ih/import"
+    assert c.post(f"/ih/import/{plan_lid}/verwerfen").status_code == 303 and anzahl(eng, f"SELECT count(*) FROM ih_import_laeufe WHERE id={plan_lid}") == 1
     # falsche Datei
     r = c.post("/ih/wartung/import", files={"datei": ("x.xlsx", b"PK kaputt")}, follow_redirects=True)
     assert "nicht als Excel-Datei lesen" in r.text

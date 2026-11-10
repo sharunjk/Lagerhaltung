@@ -344,8 +344,13 @@ def anlage_archivieren(request: Request, aid: int):
 def import_liste(request: Request):
     require_recht(request, "ih.import")
     with db.engine().connect() as con:
-        laeufe = con.execute(select(ih_import_laeufe).order_by(ih_import_laeufe.c.id.desc()).limit(30)).mappings().all()
+        laeufe = con.execute(select(ih_import_laeufe).where(_nur_assets()).order_by(ih_import_laeufe.c.id.desc()).limit(30)).mappings().all()
     return render(request, "ih/import.html", laeufe=laeufe)
+
+
+def _nur_assets():
+    """Asset-Importe (die Übernahmen des Instandhaltungsplans haben eine eigene Seite unter Wartungsplan)."""
+    return or_(ih_import_laeufe.c.art.is_(None), ih_import_laeufe.c.art != "plan")
 
 
 @router.post("/import")
@@ -364,7 +369,7 @@ async def import_hochladen(request: Request, datei: UploadFile | None = None, bl
     optionen = {**ai.Optionen().als_dict(), "blatt": info["blatt"], "blaetter": info["blaetter"]}
     with db.schreiben() as con:
         lid = con.execute(insert(ih_import_laeufe).values(
-            dateiname=datei.filename[:300], benutzer=me["username"], status="neu", zeit=datetime.now(),
+            dateiname=datei.filename[:300], benutzer=me["username"], status="neu", zeit=datetime.now(), art="assets",
             spalten=json.dumps(info["spalten"], ensure_ascii=False), zuordnung=json.dumps(zuordnung),
             optionen=json.dumps(optionen, ensure_ascii=False), zeilen=len(info["zeilen"]))).inserted_primary_key[0]
         con.execute(insert(ih_import_zeilen), [{"lauf_id": lid, "nr": i, "werte": json.dumps(z, ensure_ascii=False)}
@@ -374,7 +379,7 @@ async def import_hochladen(request: Request, datei: UploadFile | None = None, bl
 
 
 def _lauf(con, lid: int) -> dict | None:
-    r = con.execute(select(ih_import_laeufe).where(ih_import_laeufe.c.id == lid)).mappings().first()
+    r = con.execute(select(ih_import_laeufe).where(ih_import_laeufe.c.id == lid, _nur_assets())).mappings().first()
     if not r:
         return None
     lauf = dict(r)
