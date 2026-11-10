@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_ih.html" import mass_symbol, status_chip %}
+{% block title %}A-{{ "%05d"|format(a.id) }}{% endblock %}
+{% block content %}
+{% set pflicht = a.massnahme.startswith("Z") %}
+{% set erg_text = ERGEBNIS_Z if pflicht else ERGEBNIS %}
+{% set fertig = pos|selectattr("ergebnis")|list|length %}
+<div class="text-sm text-muted mb-1"><a href="/ih/auftraege" class="hover:text-ink">Aufträge</a>{% if a.kampagne_id %} · <a class="hover:text-ink" href="/ih/wartung/kampagne/{{ a.kampagne_id }}">Kampagne {{ a.kampagne }}</a>{% endif %}</div>
+<div class="flex flex-wrap items-start justify-between gap-4 mb-4">
+  <div class="flex gap-3 items-start">{{ mass_symbol(m, a.massnahme) }}
+    <div><h1>A-{{ "%05d"|format(a.id) }} {{ a.titel }}</h1>
+      <p class="text-muted">{{ status_chip(a.status, STATUS) }} · Start {{ a.termin|datum(False) }} ({{ kw(a.termin) }}){% if a.dauer_wochen %}, {{ a.dauer_wochen }} {{ "Woche" if a.dauer_wochen == 1 else "Wochen" }}{% endif %}{% if a.verantwortlich %} · verantwortlich {{ a.verantwortlich }}{% endif %}</p></div>
+  </div>
+  <button type="button" class="btn no-print" onclick="window.print()">{{ icon("print", "w-4 h-4") }}Drucken</button>
+</div>
+
+<ol class="flex flex-wrap gap-2 text-sm mb-5 no-print">
+  {% set schritte = ["angelegt", "freigegeben", "in_arbeit", "erledigt", "abgeschlossen"] %}
+  {% for s in schritte %}<li class="rounded-full border px-3 py-1 {{ 'border-primary bg-primary/10 font-semibold' if a.status == s else ('border-line text-muted' if a.status == 'storniert' or schritte.index(s) > (schritte.index(a.status) if a.status in schritte else -1) else 'border-ok text-ok') }}">{{ STATUS[s] }}</li>{% endfor %}
+  {% if a.status == "storniert" %}<li class="rounded-full border border-crit px-3 py-1 text-crit font-semibold">Storniert: {{ a.storno_grund }}</li>{% endif %}
+</ol>
+
+{% if aktionen %}
+<div class="panel p-4 mb-5 flex flex-wrap gap-3 items-end no-print" x-data="{grund: ''}">
+  {% for akt in aktionen %}
+    {% if akt in ("stornieren", "zurueckweisen") %}
+    <form method="post" action="/ih/auftraege/{{ a.id }}/status" class="flex gap-2 items-end">
+      <input type="hidden" name="aktion" value="{{ akt }}">
+      <div><label class="label">{{ "Grund für Storno" if akt == "stornieren" else "Was ist nachzuarbeiten?" }}</label><input name="text" required class="field w-72"></div>
+      <button class="btn">{{ "Stornieren" if akt == "stornieren" else "Zurück in Arbeit" }}</button>
+    </form>
+    {% else %}
+    <form method="post" action="/ih/auftraege/{{ a.id }}/status"{% if akt == "abschliessen" %} onsubmit="return confirm('Auftrag prüfen und abschließen? Danach ist er nicht mehr änderbar.')"{% endif %}>
+      <input type="hidden" name="aktion" value="{{ akt }}">
+      <button class="btn btn-primary">{{ {"freigeben": "Freigeben", "erledigt": "Technisch erledigt melden", "abschliessen": "Prüfen und abschließen"}[akt] }}</button>
+    </form>
+    {% endif %}
+  {% endfor %}
+  <p class="text-xs text-muted basis-full">{% if a.status == "angelegt" %}Nach der Freigabe können die Protokolle erfasst werden. Vor Beginn: Freigabe beim Betrieb einholen, bei sicherheitsgerichteten Messstellen zusätzlich SR 4 Beiblatt 4.{% elif a.status == "erledigt" %}Abschließen prüft die Protokolle (Vier-Augen-Prinzip bei PLT-Sicherheitseinrichtungen).{% elif a.status in ("freigegeben", "in_arbeit") %}„Technisch erledigt“ geht, wenn alle Bauteile ein Protokoll haben{% if pflicht %} und der Nachweis hochgeladen ist{% endif %}.{% endif %}</p>
+</div>
+{% endif %}
+
+<div class="grid xl:grid-cols-[1fr_380px] gap-6">
+  <div class="space-y-6 min-w-0">
+    {% if achtung %}<div class="panel p-4 border-l-4 border-l-crit"><h2 class="text-base text-crit">Achtung</h2><p class="mt-1">{{ achtung }}</p></div>{% endif %}
+    <section class="panel p-5">
+      <h2 class="mb-2">Was ist zu tun</h2>
+      <p class="text-sm">{{ m.beschreibung or "" }}</p>
+      <dl class="text-sm mt-3 space-y-1">
+        {% for lab, wert in [("Wer", a.durchfuehrung or m.wer), ("Nachweis", m.nachweis), ("Grundlage", a.grundlage), ("Rechtsgrundlage", a.rechtsgrundlage), ("Hinweis", a.hinweis)] if wert %}
+        <div class="flex gap-3"><dt class="w-32 shrink-0 text-muted">{{ lab }}</dt><dd>{{ wert }}</dd></div>{% endfor %}
+      </dl>
+      {% if not pflicht %}<p class="text-xs text-muted mt-3">Der Plan sagt WANN – WIE, steht ausschließlich in der Wartungs- bzw. Prüfanweisung des Bauteils. Steht dort nichts: nachfragen, nicht improvisieren.</p>{% endif %}
+    </section>
+
+    {% if pos %}
+    <section id="bauteile" class="panel overflow-x-auto">
+      <div class="px-4 py-3 border-b border-line flex flex-wrap justify-between gap-2"><h2>Bauteile · {{ fertig }} von {{ pos|length }} dokumentiert</h2>
+        <span class="text-sm text-muted">{% if pos|selectattr("formular", "equalto", "WP-02")|list %}WP-02 = Sammelprotokoll Sichtprüfung (direkt in der Liste){% endif %}{% if pos|selectattr("formular", "equalto", "WP-01")|list %} · WP-01 = Protokoll je Bauteil (öffnen){% endif %}</span></div>
+      <form method="post" action="/ih/auftraege/{{ a.id }}/sammel">
+      <table class="tbl">
+        <thead><tr><th>Tag-Nr.</th><th>Bezeichnung</th><th>Formular</th><th class="min-w-[16rem]">Ergebnis</th><th>Durchgeführt</th></tr></thead>
+        <tbody>
+        {% for p in pos %}
+          <tr class="{{ 'bg-ok/5' if p.ergebnis == 'ohne_befund' else ('bg-warn/10' if p.ergebnis else '') }}">
+            <td class="whitespace-nowrap"><a class="font-semibold hover:underline" href="/ih/anlagen/{{ p.platz_id }}">{{ p.code }}</a>{% if p.sicherheitsgerichtet %} <span class="status st-kritisch" title="PLT-Sicherheitseinrichtung">PLT-S</span>{% endif %}{% if p.doku_url %} <a href="{{ p.doku_url }}" target="_blank" rel="noopener noreferrer" class="text-primary" title="Dokumentation">{{ icon("link", "w-4 h-4 inline") }}</a>{% endif %}</td>
+            <td class="text-sm">{{ p.bezeichnung or "" }}</td>
+            <td class="text-sm whitespace-nowrap">{{ "Prüfung" if p.formular == "Z" else p.formular }}</td>
+            <td class="text-sm">
+              {% if p.formular == "WP-01" %}
+                <a class="btn btn-sm {{ 'btn-primary' if bearbeitbar and not p.ergebnis }}" href="/ih/auftraege/{{ a.id }}/position/{{ p.id }}">{{ "Protokoll ausfüllen" if bearbeitbar and not p.ergebnis else "Protokoll ansehen" }}</a>
+                {% if p.ergebnis %}<span class="block mt-1">{{ erg_text[p.ergebnis] }}{% if p.befund_nr %} · Befund {{ p.befund_nr }}{% endif %}</span>{% endif %}
+              {% elif bearbeitbar %}
+                <div class="flex flex-wrap gap-x-3 gap-y-1" x-data="{e: '{{ p.ergebnis or '' }}'}">
+                  {% for k, lab in erg_text.items() %}<label class="flex items-center gap-1"><input type="radio" name="p{{ p.id }}_ergebnis" value="{{ k }}" x-model="e" {% if p.ergebnis == k %}checked{% endif %}>{{ lab }}</label>{% endfor %}
+                  <input name="p{{ p.id }}_befund_text" value="{{ p.befund_text or '' }}" class="field mt-1" x-show="e && e !== 'ohne_befund'" placeholder="{{ 'Mangel / Begründung' }}">
+                  <input name="p{{ p.id }}_befund_nr" value="{{ p.befund_nr or '' }}" class="field mt-1 w-40" x-show="e === 'mit_befund'" placeholder="Befundmeldung Nr.">
+                </div>
+              {% else %}{{ erg_text.get(p.ergebnis, "offen") }}{% if p.befund_text %}<span class="block text-muted">{{ p.befund_text }}</span>{% endif %}{% endif %}
+            </td>
+            <td class="text-sm whitespace-nowrap text-muted">{% if p.durchgefuehrt_am %}{{ p.durchgefuehrt_am|datum }}<span class="block text-xs">{{ p.durchgefuehrt_von }}</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if bearbeitbar and pos|rejectattr("formular", "equalto", "WP-01")|list %}<div class="p-4 border-t border-line no-print"><button class="btn btn-primary">Ergebnisse speichern</button> <span class="text-sm text-muted ml-2">Gespeichert werden nur geänderte Zeilen – mit Name und Zeit.</span></div>{% endif %}
+      </form>
+    </section>
+    {% else %}
+    <section class="panel p-5"><h2>Ohne Bauteilliste</h2><p class="text-sm text-muted mt-1">Diese Prüfung gilt für {{ a.gegenstand or "die Anlage als Ganzes" }}. Nachweis unten hochladen, dann „Technisch erledigt“ melden.</p></section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-6">
+    <section id="nachweise" class="panel p-4">
+      <h2 class="mb-2">{{ "Prüfbescheinigung / Nachweise" if pflicht else "Nachweise und Fotos" }}</h2>
+      <ul class="text-sm space-y-1">{% for d in docs %}<li><a class="text-primary hover:underline" href="/ih/dokumente/{{ d.id }}" target="_blank" rel="noopener">{{ d.dateiname }}</a> <span class="text-xs text-muted">{{ d.hochgeladen_am|datum }} · {{ d.hochgeladen_von }}</span></li>{% else %}<li class="text-muted">{% if pflicht %}Noch keine Prüfbescheinigung – ohne Nachweis kann die Prüfung nicht als erledigt gemeldet werden.{% else %}Noch keine.{% endif %}</li>{% endfor %}</ul>
+      {% if a.status not in ("abgeschlossen", "storniert") and darf("ih.auftrag.ausfuehren") %}
+      <form method="post" action="/ih/auftraege/{{ a.id }}/dokument" enctype="multipart/form-data" class="mt-3 space-y-2 no-print">
+        <input type="file" name="datei" multiple class="field" accept=".pdf,image/*,.docx,.xlsx,.txt">
+        <button class="btn btn-sm">{{ icon("upload", "w-4 h-4") }}Hochladen</button>
+      </form>
+      {% endif %}
+    </section>
+    <section class="panel p-4">
+      <h2 class="mb-2">Verlauf</h2>
+      <ul class="text-sm space-y-1.5">{% for l in log %}<li><span class="text-muted">{{ l.zeit|datum }}</span> {{ l.benutzer }}: {{ STATUS.get(l.nach, l.nach) }}{% if l.text %}<span class="block text-xs text-muted">{{ l.text }}</span>{% endif %}</li>{% endfor %}</ul>
+      {% if a.abgeschlossen_von %}<p class="text-sm mt-2">Geprüft und abgeschlossen von <b>{{ a.abgeschlossen_von }}</b>.</p>{% endif %}
+    </section>
+  </aside>
+</div>
+{% endblock %}

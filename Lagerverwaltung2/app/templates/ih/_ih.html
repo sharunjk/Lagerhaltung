@@ -1,0 +1,10 @@
+{# Bausteine der Wartungsplanung #}
+{% macro lage_chip(lage, text) -%}
+<span class="status {{ {'ueberfaellig': 'st-kritisch', 'laeuft': 'text-primary', 'bald': 'st-melden', 'geplant': 'text-muted', 'inaktiv': 'text-muted'}.get(lage, '') }}">{{ text }}</span>
+{%- endmacro %}
+{% macro status_chip(status, STATUS) -%}
+<span class="status {{ {'angelegt': 'text-muted', 'freigegeben': 'text-primary', 'in_arbeit': 'st-melden', 'erledigt': 'text-primary', 'abgeschlossen': 'st-ok', 'storniert': 'text-muted'}.get(status, '') }}">{{ STATUS.get(status, status) }}</span>
+{%- endmacro %}
+{% macro mass_symbol(m, code) -%}
+<span class="inline-grid place-items-center w-7 h-7 rounded {{ 'bg-wein text-white' if code.startswith('Z') else 'bg-primary/10 text-primary' }} font-semibold text-sm" title="{{ m.name if m else code }}">{{ (m.symbol if m and m.symbol else "") or code[:1] }}</span>
+{%- endmacro %}

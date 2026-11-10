@@ -257,6 +257,7 @@ ih_import_laeufe = Table(
     Column("optionen", Text),      # JSON
     Column("ergebnis", Text),      # JSON: Zusammenfassung von Prüfung/Testlauf/Übernahme
     Column("pruef_kennung", String(64)),  # Zuordnung + Optionen + Datenstand der letzten erfolgreichen Prüfung
+    Column("art", String(20)),     # assets (leer) | plan – ab 2.6.0, Migration 2
     Column("zeilen", Integer),
     Column("uebernommen_am", DateTime),
 )
@@ -270,6 +271,120 @@ ih_import_zeilen = Table(
     Column("ergebnis", String(20)),         # neu | geaendert | unveraendert | fehler
     Column("meldungen", Text),              # JSON-Liste
     Column("aenderungen", Text),            # JSON: Feld -> [alt, neu]
+)
+
+# ------------------------------------------------------------------ Wartungsplanung (Instandhaltungsplan, ab 2.6.0)
+ih_massnahmen = Table(
+    "ih_massnahmen", md,  # S, W, F, B, Za, Zi, Zf, Zv, ZE, ZD, ZK, ZW, ZP
+    Column("code", String(10), primary_key=True),
+    Column("symbol", String(4)),
+    Column("name", String(200), nullable=False),
+    Column("beschreibung", Text),     # Was ist zu tun
+    Column("wer", String(200)),       # Wer macht es
+    Column("nachweis", String(200)),
+    Column("pflicht", Boolean, nullable=False, default=False),  # gesetzliche Pflichtprüfung (extern)
+    Column("reihenfolge", Integer),
+)
+
+ih_klassen_intervalle = Table(
+    "ih_klassen_intervalle", md,  # Intervall je Bauteilklasse und Maßnahme – gilt für alle Bauteile der Klasse
+    Column("id", Integer, primary_key=True),
+    Column("schluessel", String(120), nullable=False, unique=True),  # z. B. F-PLTS-Sensor
+    Column("bauteilklasse", String(100), nullable=False, index=True),
+    Column("massnahme", String(10), nullable=False),
+    Column("intervall_monate", Integer),  # leer = laufend (ständige Beobachtung)
+    Column("grundlage", Text),
+    Column("achtung", Text),
+)
+
+ih_kampagnen = Table(
+    "ih_kampagnen", md,  # bündelt gleichartige Bauteile zu einem wiederkehrenden Arbeitspaket (auch Pflichtprüfungen)
+    Column("id", Integer, primary_key=True),
+    Column("schluessel", String(120), nullable=False, unique=True),  # GruppenID, z. B. W-Absperrarmatur, ZE
+    Column("massnahme", String(10), nullable=False),
+    Column("bauteilklasse", String(100)),  # „Anlage“ = ohne Bauteilliste (z. B. Ex-Prüfung der Gesamtanlage)
+    Column("intervall_monate", Integer, nullable=False),
+    Column("erster_termin", Date, nullable=False),
+    Column("aufwand_tage", Float),
+    Column("dauer_wochen", Integer),
+    Column("bauteile_pro_tag", Float),
+    Column("grundlage", Text),
+    Column("aktiv", Boolean, nullable=False, default=True),
+    Column("verantwortlich", String(200)),
+    Column("gegenstand", String(300)),      # Pflichtprüfung: Gegenstand
+    Column("rechtsgrundlage", Text),
+    Column("durchfuehrung", String(200)),   # z. B. ZÜS / befähigte Person
+    Column("nachweis", String(200)),
+    Column("hinweis", Text),
+    Column("vorlauf_wochen", Integer),      # so früh beauftragen/vorbereiten
+    Column("geaendert_am", DateTime, server_default=func.current_timestamp()),
+)
+
+ih_auftraege = Table(
+    "ih_auftraege", md,  # Wartungs-/Prüfauftrag: ein Durchgang einer Kampagne zu einem Termin
+    Column("id", Integer, primary_key=True),
+    Column("kampagne_id", Integer, ForeignKey("ih_kampagnen.id"), index=True),
+    Column("termin", Date, nullable=False),       # geplanter Start (Montag der Startwoche)
+    Column("massnahme", String(10), nullable=False),
+    Column("titel", String(300), nullable=False),
+    Column("status", String(20), nullable=False, default="angelegt"),  # angelegt | freigegeben | in_arbeit | erledigt | abgeschlossen | storniert
+    Column("verantwortlich", String(200)),
+    Column("pruefer", String(200)),               # Pflichtprüfung: prüfende Stelle / Person
+    Column("bemerkung", Text),
+    Column("erstellt_von", String(100)),
+    Column("erstellt_am", DateTime, server_default=func.current_timestamp()),
+    Column("freigegeben_von", String(100)),
+    Column("freigegeben_am", DateTime),
+    Column("erledigt_am", DateTime),
+    Column("abgeschlossen_von", String(100)),
+    Column("abgeschlossen_am", DateTime),
+    Column("storno_grund", String(300)),
+    UniqueConstraint("kampagne_id", "termin"),
+)
+Index("ix_ih_auftraege_status", ih_auftraege.c.status)
+
+ih_auftrag_positionen = Table(
+    "ih_auftrag_positionen", md,  # ein Bauteil im Auftrag = ein Protokoll (WP-01 je Bauteil bzw. Zeile im WP-02-Sammelprotokoll)
+    Column("id", Integer, primary_key=True),
+    Column("auftrag_id", Integer, ForeignKey("ih_auftraege.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("platz_id", Integer, ForeignKey("ih_plaetze.id"), nullable=False, index=True),
+    Column("formular", String(10), nullable=False, default="WP-01"),  # WP-01 | WP-02
+    Column("zustand_beginn", String(20)),    # unauffaellig | auffaellig | gestoert
+    Column("zustand_text", Text),
+    Column("schritte", Text),                # JSON: [{schritt, soll, ist, io, bemerkung}]
+    Column("ergebnis", String(25)),          # ohne_befund | mit_befund | nicht_durchfuehrbar (leer = offen)
+    Column("befund_nr", String(60)),
+    Column("befund_text", Text),
+    Column("abschluss", Text),               # JSON: Abschlusskontrolle (Brückungen entfernt, …)
+    Column("sil", String(10)),
+    Column("durchgefuehrt_von", String(100)),
+    Column("durchgefuehrt_am", DateTime),
+    UniqueConstraint("auftrag_id", "platz_id"),
+)
+
+ih_statuslog = Table(
+    "ih_statuslog", md,
+    Column("id", Integer, primary_key=True),
+    Column("auftrag_id", Integer, ForeignKey("ih_auftraege.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("zeit", DateTime, nullable=False),
+    Column("benutzer", String(100)),
+    Column("von", String(20)),
+    Column("nach", String(20)),
+    Column("text", String(500)),
+)
+
+ih_dokumente = Table(
+    "ih_dokumente", md,  # Nachweise (Prüfbescheinigungen, Protokolle, Fotos) zu Aufträgen; Dateien unter daten/anhaenge
+    Column("id", Integer, primary_key=True),
+    Column("auftrag_id", Integer, ForeignKey("ih_auftraege.id"), index=True),
+    Column("platz_id", Integer, ForeignKey("ih_plaetze.id"), index=True),
+    Column("art", String(30), nullable=False, default="nachweis"),
+    Column("dateiname", String(300), nullable=False),
+    Column("speichername", String(300), nullable=False),
+    Column("typ", String(100)),
+    Column("groesse", Integer),
+    Column("hochgeladen_von", String(100)),
+    Column("hochgeladen_am", DateTime, server_default=func.current_timestamp()),
 )
 
 _engine: Engine | None = None

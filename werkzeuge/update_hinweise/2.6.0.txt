@@ -1,0 +1,20 @@
+Neu in 2.6.0 - Wartungsplanung nach dem Instandhaltungsplan:
+- Wartungsplan: Instandhaltung -> Wartungsplan -> "Instandhaltungsplan uebernehmen" -> Instandhaltungsplan_CAPHENIA_v2.xlsx
+  hochladen -> Vergleich ansehen -> Haekchen -> uebernehmen. Gelesen werden die Blaetter Massnahmen, Intervalle
+  je Klasse, Kampagnen und Pflichtpruefungen. (Die Matrix - welches Bauteil welche Klasse hat - kam schon ueber den
+  Asset-Import.) Danach: Wartungsplan mit Faelligkeiten, Kalender (Kalenderwochen, Techniker-Tage) und Wochenliste.
+- Auftraege: "Faellige Auftraege anlegen" -> Auftrag freigeben -> je Bauteil dokumentieren:
+  Sichtpruefung ohne Sicherheitsfunktion direkt in der Liste (WP-02), sonst Protokoll je Bauteil (WP-01 mit
+  Zustand bei Beginn, Messwerten, Ergebnis, Abschlusskontrolle) -> "Technisch erledigt" -> pruefen und abschliessen
+  (Vier-Augen-Prinzip bei PLT-Sicherheitseinrichtungen). Pflichtpruefungen: Pruefbescheinigung hochladen.
+- Rollen: Techniker und Schichtfuehrer erfassen Protokolle; Ingenieur/Planer und Manager planen, geben frei und
+  schliessen ab.
+- Anlagen von Hand anlegen ("Neue Anlage", an einer Unit "Bauteil hier anlegen") und archivieren.
+- Genaue Filter in der Anlagenliste: "+ Bedingung", z. B. Kuerzel ist nicht CAP01; Excel-Export der Auswahl.
+
+Datenbank-Erweiterung: Beim ersten Start ergaenzt die Lagerverwaltung neue Tabellen und eine Spalte - wie bei 2.5.0
+erst als Probelauf an einer Kopie, mit Sicherung vor_update_... vorher.
+
+Kommen Sie von einer aelteren Version, ist auch alles aus 2.5.0 (Instandhaltung, Asset-Import, Testsystem), 2.4.0,
+2.3.1 und 2.3.0 enthalten. Nach einem Update von vor 2.5.0 ist die Instandhaltung zunaechst ausgeschaltet
+(Einstellungen -> Allgemein -> Instandhaltung (CMMS) aktivieren).

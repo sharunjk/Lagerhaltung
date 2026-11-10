@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_ih.html" import mass_symbol %}
+{% block title %}Wartungskalender{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div><h1>Wartungskalender</h1><p class="text-muted">{{ wochen[0]|datum(False) }} bis {{ (wochen[-1])|datum(False) }} · jede Zeile eine Kampagne, Balken = Wochen, in denen sie läuft, Symbol = Startwoche.</p></div>
+  <div class="flex flex-wrap gap-2 items-center">
+    <a class="btn btn-sm" href="?ab={{ zurueck }}&wochen={{ anzahl }}">← früher</a>
+    <a class="btn btn-sm" href="?wochen={{ anzahl }}">heute</a>
+    <a class="btn btn-sm" href="?ab={{ vor }}&wochen={{ anzahl }}">später →</a>
+    <span class="seg text-sm">{% for n, lab in [(13, "Quartal"), (26, "Halbjahr"), (52, "1 Jahr"), (156, "3 Jahre")] %}<a href="?ab={{ wochen[0] }}&wochen={{ n }}" class="px-2.5 py-1 rounded {{ 'bg-surface shadow-sm font-semibold' if anzahl == n }}">{{ lab }}</a>{% endfor %}</span>
+    <a href="/ih/wartung/wochen?ab={{ wochen[0] }}" class="btn btn-sm">{{ icon("list", "w-4 h-4") }}Als Liste</a>
+  </div>
+</div>
+{% if not kampagnen %}
+<div class="panel p-8 text-muted">Noch kein Instandhaltungsplan übernommen. <a class="text-primary" href="/ih/wartung">Zum Wartungsplan</a></div>
+{% else %}
+<div class="panel overflow-x-auto">
+  <table class="text-xs border-collapse">
+    <thead>
+      <tr class="border-b border-line">
+        <th class="sticky left-0 z-10 bg-surface text-left px-3 py-2 min-w-[15rem]">Kampagne</th>
+        {% for wo in wochen %}{% set jahr, nr, _ = wo.isocalendar() %}<th class="px-0.5 py-2 font-medium text-center min-w-[1.9rem] {{ 'bg-primary/10 text-primary' if wo == diese else 'text-muted' }} {{ 'border-l border-line' if nr == 1 }}" title="KW {{ nr }}/{{ jahr }} ab {{ wo|datum(False) }}">{% if nr == 1 or loop.first %}<span class="block text-[10px]">{{ jahr }}</span>{% endif %}{{ nr }}</th>{% endfor %}
+      </tr>
+      <tr class="border-b border-line bg-soft">
+        <th class="sticky left-0 z-10 bg-soft text-left px-3 py-1.5 font-medium">Techniker-Tage je Woche</th>
+        {% for wo in wochen %}{% set t = last[wo] %}<td class="text-center tabular-nums py-1.5 {{ 'font-semibold text-warn' if t > 5 }}">{{ (t|round(1)|num) if t else "" }}</td>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+    {% for k in kampagnen %}
+      {% set m = mass.get(k.massnahme) %}
+      <tr class="border-b border-line hover:bg-soft">
+        <td class="sticky left-0 z-10 bg-surface px-3 py-1.5 whitespace-nowrap"><a href="/ih/wartung/kampagne/{{ k.id }}" class="flex items-center gap-2 hover:underline">{{ mass_symbol(m, k.massnahme) }}<span><span class="font-semibold">{{ k.gegenstand or k.bauteilklasse }}</span><span class="block text-muted">{{ m.name if m else k.massnahme }} · {{ k.intervall_monate }} Mon.</span></span></a></td>
+        {% for wo in wochen %}
+          {% set z = belegt[k.id].get(wo) %}
+          {% if z %}{% set art, termin, st, ueber = z %}
+          {% set farbe = 'bg-ok/30' if st == 'abgeschlossen' else ('bg-crit/25' if ueber else ('bg-wein/25' if k.massnahme.startswith('Z') else 'bg-primary/25')) %}
+          <td class="p-0 {{ 'border-l border-line' if wo.isocalendar()[1] == 1 }}"><span class="block h-7 leading-7 text-center {{ farbe }} {{ 'rounded-l font-semibold' if art == 'start' }}" title="{{ m.name if m else k.massnahme }} {{ k.gegenstand or k.bauteilklasse }} – Termin {{ termin|datum(False) }}{% if st %} – Auftrag: {{ st }}{% endif %}">{{ (m.symbol if m else k.massnahme[:1]) if art == 'start' else '' }}</span></td>
+          {% else %}<td class="{{ 'border-l border-line' if wo.isocalendar()[1] == 1 }}"></td>{% endif %}
+        {% endfor %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="text-xs text-muted mt-2"><span class="inline-block w-3 h-3 align-middle bg-primary/25"></span> eigene Maßnahme · <span class="inline-block w-3 h-3 align-middle bg-wein/25"></span> Pflichtprüfung (extern) · <span class="inline-block w-3 h-3 align-middle bg-ok/30"></span> abgeschlossen · <span class="inline-block w-3 h-3 align-middle bg-crit/25"></span> überfällig. Techniker-Tage: Aufwand je Kampagne gleichmäßig auf ihre Dauer verteilt (über 5 hervorgehoben).</p>
+{% endif %}
+{% endblock %}

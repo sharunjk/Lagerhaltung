@@ -3,7 +3,7 @@
 {% block title %}Instandhaltung{% endblock %}
 {% block content %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-  <div><h1>Instandhaltung</h1><p class="text-muted">Anlagen und Bauteile der Pilotanlage. Wartungsplanung, Störmeldungen und Aufträge folgen in den nächsten Ausbaustufen.</p></div>
+  <div><h1>Instandhaltung</h1><p class="text-muted">Anlagen und Bauteile der Pilotanlage, Wartungsplan, Kalender und Aufträge. Störmeldungen folgen in der nächsten Ausbaustufe.</p></div>
   {% if darf("ih.import") %}<a href="/ih/import" class="btn btn-primary">{{ icon("upload", "w-4 h-4") }}Asset-Liste importieren</a>{% endif %}
 </div>
 {% if not k.bauteile %}
@@ -17,6 +17,20 @@
   <a href="{{ link }}" class="panel p-4 hover:border-primary"><span class="block text-3xl font-cond font-bold tabular-nums {{ 'text-warn' if loop.index > 2 and wert }}">{{ wert }}</span><span class="text-sm text-muted">{{ text }}</span></a>
   {% endfor %}
 </div>
+{% from "ih/_ih.html" import mass_symbol %}
+<section class="panel p-5 mb-6">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-3"><h2>Wartung und Prüfungen</h2>
+    <div class="flex gap-2"><a class="btn btn-sm" href="/ih/wartung">Wartungsplan</a><a class="btn btn-sm" href="/ih/wartung/kalender">Kalender</a><a class="btn btn-sm" href="/ih/auftraege">Aufträge ({{ offen }} offen)</a></div></div>
+  {% if not hat_plan %}<p class="text-sm text-muted">Noch kein Instandhaltungsplan übernommen.{% if darf("ih.wartung.planen") %} <a class="text-primary" href="/ih/wartung/import">Jetzt übernehmen</a>{% endif %}</p>
+  {% else %}
+  <div class="grid md:grid-cols-3 gap-4">
+    {% for lg, lab, cls in [("ueberfaellig", "Überfällig", "text-crit"), ("laeuft", "Läuft jetzt", "text-primary"), ("bald", "Bald fällig", "text-warn")] %}
+    <div><h3 class="font-semibold {{ cls if wl[lg] }}">{{ lab }} ({{ wl[lg]|length }})</h3>
+      <ul class="text-sm mt-1 space-y-1">{% for kp in wl[lg][:6] %}<li class="flex items-center gap-2">{{ mass_symbol(mass.get(kp.massnahme), kp.massnahme) }}<a class="hover:underline" href="/ih/wartung/kampagne/{{ kp.id }}">{{ kp.gegenstand or kp.bauteilklasse }}</a><span class="text-muted text-xs">{{ kw(kp.naechster) if kp.naechster }}</span></li>{% else %}<li class="text-muted">–</li>{% endfor %}{% if wl[lg]|length > 6 %}<li class="text-muted">… <a class="text-primary" href="/ih/wartung">alle</a></li>{% endif %}</ul></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
 <div class="grid xl:grid-cols-2 gap-6">
   <section class="panel overflow-hidden">
     <div class="px-4 py-3 border-b border-line"><h2>Bereiche und Units</h2></div>

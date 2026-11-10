@@ -37,7 +37,8 @@ def _alte_datenbank(pfad: Path):
     con.execute("DROP TABLE schema_version")
     for t, s in (("bewegungen", "preis"), ("bewegungen", "auftrag_id"), ("reservierungen", "auftrag_id")):
         con.execute(f"ALTER TABLE {t} DROP COLUMN {s}")
-    for t in ("ih_import_zeilen", "ih_import_laeufe", "ih_plaetze", "benutzer_rollen"):
+    for t in ("ih_dokumente", "ih_statuslog", "ih_auftrag_positionen", "ih_auftraege", "ih_kampagnen", "ih_klassen_intervalle",
+              "ih_massnahmen", "ih_import_zeilen", "ih_import_laeufe", "ih_plaetze", "benutzer_rollen"):
         con.execute(f"DROP TABLE {t}")
     con.commit()
     con.close()
@@ -46,7 +47,7 @@ def _alte_datenbank(pfad: Path):
 def test_neue_datenbank_hat_alle_migrationen(env):
     cfg, eng = env
     with eng.connect() as con:
-        assert [r[0] for r in con.exec_driver_sql("SELECT version FROM schema_version")] == [1]
+        assert [r[0] for r in con.exec_driver_sql("SELECT version FROM schema_version")] == [1, 2]
         spalten = {r[1] for r in con.exec_driver_sql("PRAGMA table_info(bewegungen)")}
     assert {"preis", "auftrag_id"} <= spalten
 
@@ -63,7 +64,7 @@ def test_update_von_2_4_probelauf_sicherung_und_daten_unveraendert(env):
     con = sqlite3.connect(str(datei))
     vorher = migrationen.kennzahlen(con)
     con.close()
-    assert migrationen._datei_ausstehend(datei) == [1]
+    assert migrationen._datei_ausstehend(datei) == [1, 2]
     name = migrationen.vor_start(cfg)
     assert name.startswith("vor_update_") and (cfg.path(cfg.backup.ordner) / name).exists()
     db.init_engine(cfg.db_url)  # führt die Migration aus
@@ -71,7 +72,7 @@ def test_update_von_2_4_probelauf_sicherung_und_daten_unveraendert(env):
     try:
         assert migrationen.kennzahlen(con) == vorher
         assert {"preis", "auftrag_id"} <= {r[1] for r in con.execute("PRAGMA table_info(bewegungen)")}
-        assert con.execute("SELECT count(*) FROM schema_version").fetchone()[0] == 1
+        assert con.execute("SELECT count(*) FROM schema_version").fetchone()[0] == 2
     finally:
         con.close()
     assert migrationen._datei_ausstehend(datei) == []
@@ -88,7 +89,7 @@ def test_probelauf_bricht_ab_wenn_lagerdaten_sich_aendern_wuerden(env, monkeypat
     datei = cfg.path(cfg.daten.datenbank)
     _alte_datenbank(datei)
     kaputt = lambda con: con.exec_driver_sql("UPDATE bestand SET menge = menge + 1")  # noqa: E731
-    monkeypatch.setattr(migrationen, "MIGRATIONEN", [*migrationen.MIGRATIONEN, (2, "fehlerhaft", kaputt)])
+    monkeypatch.setattr(migrationen, "MIGRATIONEN", [*migrationen.MIGRATIONEN, (99, "fehlerhaft", kaputt)])
     with pytest.raises(migrationen.MigrationsFehler, match="Lagerdaten"):
         migrationen.vor_start(cfg)
     con = sqlite3.connect(str(datei))

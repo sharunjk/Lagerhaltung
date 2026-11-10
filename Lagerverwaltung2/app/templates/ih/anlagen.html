@@ -2,8 +2,13 @@
 {% from "_macros.html" import icon %}
 {% block title %}Anlagen{% endblock %}
 {% block content %}
+{% set gefiltert = q or ebene or klasse or filter or bedingungen or archiv %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-  <div><h1>Anlagen</h1><p class="text-muted">{{ gesamt }} Bauteile{% if q or ebene or klasse or filter %} gefunden{% endif %}</p></div>
+  <div><h1>Anlagen{% if archiv %} – archiviert{% endif %}</h1><p class="text-muted">{{ gesamt }} Bauteile{% if gefiltert %} gefunden{% endif %}{% if archiviert and not archiv %} · <a class="text-primary" href="/ih/anlagen?archiv=1">{{ archiviert }} archivierte</a>{% elif archiv %} · <a class="text-primary" href="/ih/anlagen">zurück zu den aktiven</a>{% endif %}</p></div>
+  <div class="flex gap-2">
+    <a href="/ih/anlagen/export.xlsx?{{ query }}" class="btn">{{ icon("download", "w-4 h-4") }}Excel (diese Auswahl)</a>
+    {% if darf("ih.anlagen.pflegen") %}<a href="/ih/anlagen/neu" class="btn btn-primary">{{ icon("plus", "w-4 h-4") }}Neue Anlage</a>{% endif %}
+  </div>
 </div>
 <form class="panel p-3 mb-4 flex flex-wrap items-end gap-3">
   <div class="flex-1 min-w-[14rem]"><label class="label">Suche</label><input name="q" value="{{ q }}" class="field" placeholder="Tag-Nr., Bezeichnung, Hersteller, Modell, Seriennr."></div>
@@ -13,8 +18,27 @@
   <div><label class="label">Bauteilklasse</label><select name="klasse" class="field" onchange="this.form.submit()"><option value="">Alle</option>{% for k in klassen %}<option {% if klasse == k %}selected{% endif %}>{{ k }}</option>{% endfor %}<option value="-" {% if klasse == "-" %}selected{% endif %}>ohne Klasse</option></select></div>
   <div><label class="label">Filter</label><select name="filter" class="field" onchange="this.form.submit()"><option value="">–</option><option value="sicher" {% if filter == "sicher" %}selected{% endif %}>nur PLT-Sicherheitseinrichtungen</option><option value="ohne_doku" {% if filter == "ohne_doku" %}selected{% endif %}>ohne Doku-Link</option></select></div>
   <button class="btn">{{ icon("search", "w-4 h-4") }}Suchen</button>
-  {% if q or ebene or klasse or filter %}<a href="/ih/anlagen" class="btn">Zurücksetzen</a>{% endif %}
+  {% if gefiltert %}<a href="/ih/anlagen" class="btn">Zurücksetzen</a>{% endif %}
+  {% if archiv %}<input type="hidden" name="archiv" value="1">{% endif %}
+  <div class="basis-full" x-data='{b: {{ (bedingungen|list or [])|map("list")|list|tojson }}}'>
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="label mb-0">Bedingungen</span>
+      <button type="button" class="btn btn-sm" @click="b.push(['kuerzel', 'ist_nicht', ''])">{{ icon("plus", "w-4 h-4") }}Bedingung</button>
+      {% if not bedingungen %}<a class="text-sm text-primary" href="/ih/anlagen?bf=kuerzel&bo=ist_nicht&bv=CAP01">Beispiel: ohne CAP01</a>{% endif %}
+    </div>
+    <template x-for="(z, i) in b" :key="i">
+      <div class="flex flex-wrap items-center gap-2 mt-2">
+        <select name="bf" class="field w-48" x-model="z[0]">{% for k, lab in FILTER_FELDER.items() %}<option value="{{ k }}">{{ lab }}</option>{% endfor %}</select>
+        <select name="bo" class="field w-44" x-model="z[1]">{% for k, lab in FILTER_OPS.items() %}<option value="{{ k }}">{{ lab }}</option>{% endfor %}</select>
+        <input name="bv" class="field w-56" x-model="z[2]" list="kuerzel-liste" :disabled="z[1] === 'leer' || z[1] === 'nicht_leer'" placeholder="Wert, z. B. CAP01">
+        <button type="button" class="btn btn-sm" title="Bedingung entfernen" @click="b.splice(i, 1)">×</button>
+      </div>
+    </template>
+    <datalist id="kuerzel-liste">{% for k in kuerzel %}<option value="{{ k }}">{% endfor %}</datalist>
+    <p class="text-xs text-muted mt-1" x-show="b.length">Alle Bedingungen müssen zutreffen. Groß-/Kleinschreibung egal. „ist nicht“ und „enthält nicht“ zeigen auch leere Felder.</p>
+  </div>
 </form>
+{% if bedingungen %}<p class="text-sm mb-3">Aktiv: {% for f, o, v in bedingungen %}<span class="inline-block rounded-full border border-line px-2 py-0.5 mr-1">{{ FILTER_FELDER[f] }} {{ FILTER_OPS[o] }} {% if v %}„{{ v }}“{% endif %}</span>{% endfor %}</p>{% endif %}
 <div class="panel overflow-x-auto">
   <table class="tbl">
     <thead><tr><th>Tag-Nr.</th><th>Bezeichnung</th><th>Bauteilklasse</th><th>Unit</th><th>Hersteller / Modell</th><th>Doku</th></tr></thead>
@@ -34,7 +58,7 @@
 </div>
 {% if seiten > 1 %}
 <div class="flex items-center gap-2 mt-4 text-sm">
-  {% set basis = "/ih/anlagen?q=" ~ (q|urlq) ~ "&ebene=" ~ (ebene|urlq) ~ "&klasse=" ~ (klasse|urlq) ~ "&filter=" ~ (filter|urlq) %}
+  {% set basis = "/ih/anlagen?" ~ query %}
   {% if seite > 1 %}<a class="btn btn-sm" href="{{ basis }}&seite={{ seite - 1 }}">Zurück</a>{% endif %}
   <span class="text-muted">Seite {{ seite }} von {{ seiten }}</span>
   {% if seite < seiten %}<a class="btn btn-sm" href="{{ basis }}&seite={{ seite + 1 }}">Weiter</a>{% endif %}

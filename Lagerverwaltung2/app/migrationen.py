@@ -44,9 +44,14 @@ def _m1_buchungen_preis_auftrag(con: Connection) -> None:
     _spalte_ergaenzen(con, "reservierungen", "auftrag_id", "INTEGER")
 
 
+def _m2_importart(con: Connection) -> None:
+    _spalte_ergaenzen(con, "ih_import_laeufe", "art", "VARCHAR(20)")
+
+
 # (Nummer, Beschreibung, Funktion) – nur anhängen, nie ändern oder entfernen
 MIGRATIONEN = [
     (1, "Buchungen: Preis zum Buchungszeitpunkt und Auftragsbezug; Reservierungen: Auftragsbezug", _m1_buchungen_preis_auftrag),
+    (2, "Importläufe: Art (Asset-Liste oder Instandhaltungsplan)", _m2_importart),
 ]
 
 

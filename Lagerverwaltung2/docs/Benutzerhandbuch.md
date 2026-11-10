@@ -68,9 +68,18 @@ Verbrauch je Artikel und Kostenstelle, Lagerwert, Bestand je Gruppe, Ladenhüter
 
 Ab 2.5.0 gibt es neben der Lagerverwaltung einen zweiten Bereich **Instandhaltung**. Er ist zunächst ausgeschaltet. Ein Administrator schaltet ihn unter *Einstellungen → Allgemein → Instandhaltung (CMMS) aktivieren* ein. Solange er aus ist, sieht die Lagerverwaltung genau wie bisher aus.
 
-- **Wer sieht was:** Administratoren haben alle Rechte. Alle anderen brauchen eine **Rolle Instandhaltung** (*Einstellungen → Benutzer*): *Nur lesen*, *Operator / Anlagenfahrer*, *Techniker*, *Schichtführer / Betriebsleiter*, *Instandhaltungsingenieur / Planer*, *Instandhaltungsmanager*. In dieser Ausbaustufe dürfen Ingenieur/Planer und Manager Anlagen bearbeiten und importieren. Alle anderen sehen Anlagen und Dokumentation. Wer nur in der Instandhaltung arbeitet, bekommt im Lager die Rolle *Kein Lagerzugriff*.
+- **Wer sieht was:** Administratoren haben alle Rechte. Alle anderen brauchen eine **Rolle Instandhaltung** (*Einstellungen → Benutzer*): *Nur lesen*, *Operator / Anlagenfahrer*, *Techniker*, *Schichtführer / Betriebsleiter*, *Instandhaltungsingenieur / Planer*, *Instandhaltungsmanager*. Wer nur in der Instandhaltung arbeitet, bekommt im Lager die Rolle *Kein Lagerzugriff*.
+
+  | Was | Wer |
+  |---|---|
+  | Anlagen, Wartungsplan, Kalender, Aufträge, Nachweise ansehen | alle Rollen |
+  | Protokolle erfassen, Nachweise hochladen, „technisch erledigt“ melden | Techniker, Schichtführer, Ingenieur/Planer, Manager |
+  | Anlagen anlegen, bearbeiten, archivieren, importieren, Instandhaltungsplan übernehmen, Aufträge anlegen, freigeben, stornieren, prüfen und abschließen | Ingenieur/Planer, Manager (und Administratoren) |
 - **Bereich wechseln:** Wer beide Bereiche nutzt, wählt nach der ersten Anmeldung *Lagerverwaltung* oder *Instandhaltung*. Danach öffnet sich der zuletzt genutzte Bereich. Oben in der Seitenleiste wechselt *Zur Instandhaltung* bzw. *Zur Lagerverwaltung* ohne neue Anmeldung.
 - **Anlagen:** Bereiche (z. B. 1000, 3000), darunter Units (1010, 1040 …), darunter die Bauteile mit Tag-Nr. Die Suche findet Tag-Nr. auch ohne Leerzeichen (`fic1040` findet *FIC 1040 01-01*), außerdem Bezeichnung, Hersteller, Modell und Seriennummer. Filter: Bereich/Unit, Bauteilklasse, nur PLT-Sicherheitseinrichtungen, ohne Doku-Link.
+- **Genaue Filter:** *+ Bedingung* → Feld (z. B. Kürzel, Tag-Nr., Kategorie, Unit, Hersteller) → Bedingung (*enthält*, *enthält nicht*, *ist genau*, *ist nicht*, *beginnt mit*, *beginnt nicht mit*, *ist leer*, *ist nicht leer*) → Wert. Beispiel: *Kürzel ist nicht CAP01* blendet alle CAP01-Positionen aus. Mehrere Bedingungen müssen alle zutreffen. Groß-/Kleinschreibung ist egal, und „ist nicht“ zeigt auch Bauteile, bei denen das Feld leer ist. *Excel (diese Auswahl)* exportiert genau die gefilterte Liste. Die Adresse der Seite enthält den Filter, so lässt er sich als Lesezeichen speichern.
+- **Anlagen von Hand anlegen:** *Anlagen → Neue Anlage* oder an einer Unit *Bauteil hier anlegen*. Pflicht ist nur die Tag-Nr., und eine schon vorhandene Tag-Nr. (gleich geschrieben bis auf Leerzeichen und Groß-/Kleinschreibung) wird abgelehnt. Ein späterer Import mit derselben Tag-Nr. aktualisiert die Anlage, statt eine zweite anzulegen.
+- **Archivieren:** an der Anlage *Archivieren*. Die Anlage verschwindet aus Listen und Wartungsplänen, ihre Historie bleibt. Unter *Anlagen → archivierte* lässt sie sich wieder aktiv setzen. Eine Unit mit aktiven Bauteilen lässt sich erst archivieren, wenn diese archiviert oder verschoben sind.
 - **Anlagenseite:** Stammdaten, *Dokumentation öffnen* (Link zum SharePoint-Ordner), Unterobjekte, weitere Angaben aus dem Import und *Ersatzteile im Lager*. Dort stehen die Lagerartikel, deren Feld *Verwendung* die Tag-Nr. nennt. Ingenieur/Planer und Manager können die Anlage bearbeiten. Die Tag-Nr. selbst bleibt fest, und jede Änderung steht im Protokoll.
 
 ### Asset-Liste importieren
@@ -89,6 +98,33 @@ Ab 2.5.0 gibt es neben der Lagerverwaltung einen zweiten Bereich **Instandhaltun
 Regeln: Der Import löscht nie etwas. Vorhandene Anlagen werden über die Tag-Nr. erkannt, Groß-/Kleinschreibung und Leerzeichen sind egal. Es ändern sich nur die zugeordneten Spalten, eine leere Zelle lässt den vorhandenen Wert stehen. Anlagen, die nicht in der Datei stehen, bleiben unverändert. Zahlen wie „67.200“ und „2.210,45“ und SharePoint-Datumsangaben (UTC) werden richtig umgerechnet.
 
 So entsteht der Anlagenbestand aus den heutigen Listen: erst die **Asset-Liste** (Stammdaten, Doku-Links, Bestelldaten), danach die **Matrix aus dem Instandhaltungsplan**. Die Matrix ergänzt Bauteilklasse, PLT-Sicherheitseinrichtung und die Intervalle als Zusatzfelder.
+
+### Wartungsplan (nach dem Instandhaltungsplan)
+
+**Einrichten (einmalig, Ingenieur/Planer):**
+1. Asset-Liste importieren (Stammdaten).
+2. Matrix des Instandhaltungsplans importieren (Bauteilklasse, PLT-Sicherheitseinrichtung), beides über *Asset-Import*.
+3. *Wartungsplan → Instandhaltungsplan übernehmen* mit derselben Excel-Datei. Das Programm liest die Blätter *Maßnahmen*, *Intervalle je Klasse*, *Kampagnen* und *Pflichtprüfungen* und zeigt vor der Übernahme, was neu ist und was sich ändert. Vorher sichert es automatisch. Eine neue Fassung des Plans wird genauso übernommen und aktualisiert die Werte. Gelöscht wird dabei nichts.
+
+Die Intervalle hängen an der **Bauteilklasse**. Ein neues Bauteil braucht nur seine Klasse, dann ist es automatisch in den passenden Kampagnen.
+
+- **Wartungsplan:** alle Kampagnen mit Bauteilanzahl (laufend aus dem Anlagenbestand), Intervall, nächstem Termin und Lage: *überfällig*, *läuft jetzt*, *bald fällig* (im Vorlauf) oder *geplant*. Der Filter trennt eigene Maßnahmen und Pflichtprüfungen. Die Kampagne zeigt, was zu tun ist und wer es macht, Grundlage, **Achtung**-Hinweise, die nächsten Termine, die Bauteile und bisherige Aufträge. Planer können Intervall, ersten Termin, Dauer, Aufwand, Vorlauf und Verantwortliche anpassen.
+- **Vorlauf:** So früh gilt ein Termin als „bald fällig“: eigene Maßnahmen 2 Wochen, Pflichtprüfungen 12 Wochen, innere Prüfung und Festigkeitsprüfung 26 Wochen (Entleeren, Reinigen, ZÜS beauftragen). Der Vorlauf ist je Kampagne änderbar.
+- **Kalender:** Kalenderwochen als Balken (Quartal, Halbjahr, 1 Jahr, 3 Jahre). Die oberste Zeile zeigt die Techniker-Tage je Woche. Blau = eigene Maßnahme, weinrot = Pflichtprüfung, grün = abgeschlossen, rot = überfällig. **Wochenliste:** dasselbe untereinander, zum Ausdrucken.
+
+### Aufträge und Protokolle
+
+1. **Anlegen:** *Wartungsplan → Fällige Aufträge anlegen* legt für alle fälligen und bald fälligen Termine einen Auftrag mit der Bauteilliste der Kampagne an. Einzelne Termine gehen auch an der Kampagne über *Auftrag anlegen*. Es gibt je Termin nur einen Auftrag.
+2. **Freigeben** (Ingenieur/Planer): Erst danach lassen sich Protokolle erfassen. Vor Beginn die Freigabe beim Betrieb einholen, bei sicherheitsgerichteten Messstellen zusätzlich SR 4 Beiblatt 4.
+3. **Dokumentieren, je Bauteil:**
+   - **WP-02 Sammelprotokoll** (reine Sichtprüfung an Bauteilen ohne Sicherheitsfunktion): direkt in der Liste je Bauteil *ohne Befund*, *mit Befund* oder *nicht durchführbar* wählen. Bei Befund kommen Beschreibung und Befundmeldung-Nr. dazu, bei „nicht durchführbar“ die Begründung. Dann *Ergebnisse speichern*.
+   - **WP-01 Protokoll je Bauteil** (Wartung, Funktionsprüfung, alle PLT-Sicherheitseinrichtungen): *Protokoll ausfüllen* öffnet *Zustand bei Beginn* (Pflicht), *Schritte und Messwerte* (Soll, Ist, i.O.; Messwerte auch eintragen, wenn sie in Ordnung sind), *Ergebnis* und *Abschluss*. Bei PLT-Sicherheitseinrichtungen ist die Abschlusskontrolle Pflicht: Brückungen entfernt, Kennzeichnung lesbar, Grenzwerte zurückgestellt, Betrieb informiert. *Speichern und nächstes Bauteil* führt der Reihe nach durch den Auftrag.
+   - Name und Zeit des Speichernden stehen im Protokoll (als Unterschrift des Ausführenden). Mit dem ersten Protokoll steht der Auftrag auf *In Arbeit*.
+4. **Technisch erledigt melden:** geht erst, wenn alle Bauteile ein Protokoll haben. Bei Pflichtprüfungen muss außerdem der Nachweis (z. B. die Prüfbescheinigung) hochgeladen sein.
+5. **Prüfen und abschließen** (Ingenieur/Planer): Danach ist der Auftrag nicht mehr änderbar. **Vier-Augen-Prinzip:** Wer eine PLT-Sicherheitseinrichtung selbst geprüft hat, kann den Auftrag nicht abschließen. *Zurück in Arbeit* (mit Begründung) schickt ihn zur Nacharbeit zurück.
+6. **Stornieren:** nur vor Arbeitsbeginn und mit Grund. Der Termin gilt dann als ausgelassen.
+
+Jede Statusänderung steht mit Name und Zeit im *Verlauf* des Auftrags. Die Anlagenseite zeigt *Wartung und Prüfungen* (geltende Maßnahmen mit letzter Durchführung und nächstem Termin) und die *Historie* aller Protokolle. **Pflichtprüfungen** werden extern durchgeführt (ZÜS, befähigte Person, Fachfirma). Das Programm plant, erinnert und verwahrt die Nachweise, es ersetzt die Prüfung nicht.
 
 ## Einstellungen (Administrator)
 

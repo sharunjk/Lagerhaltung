@@ -18,9 +18,13 @@ IH_ROLLEN = {
 
 _PFLEGE = {"ingenieur", "manager"}
 RECHTE: dict[str, set[str]] = {
-    "ih.ansehen": set(IH_ROLLEN),                      # Anlagen, Dokumentation, Historie ansehen
-    "ih.anlagen.pflegen": _PFLEGE,                     # Anlagen anlegen und ändern
+    "ih.ansehen": set(IH_ROLLEN),                      # Anlagen, Dokumentation, Wartungsplan, Aufträge ansehen
+    "ih.anlagen.pflegen": _PFLEGE,                     # Anlagen anlegen, ändern, archivieren
     "ih.import": _PFLEGE,                              # Asset-Liste importieren
+    "ih.wartung.planen": _PFLEGE,                      # Instandhaltungsplan übernehmen, Kampagnen ändern, Aufträge anlegen/stornieren
+    "ih.auftrag.freigeben": _PFLEGE,                   # Wartungsauftrag freigeben
+    "ih.auftrag.ausfuehren": {"techniker", "schichtfuehrer", "ingenieur", "manager"},  # Protokolle erfassen, Nachweise hochladen
+    "ih.auftrag.abschliessen": _PFLEGE,                # technisch erledigte Aufträge prüfen und abschließen (Vier-Augen-Prinzip)
 }
 
 

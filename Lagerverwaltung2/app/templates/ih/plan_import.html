@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Instandhaltungsplan übernehmen{% endblock %}
+{% block content %}
+<div class="text-sm text-muted mb-1"><a href="/ih/wartung" class="hover:text-ink">Wartungsplan</a></div>
+<h1 class="mb-1">Instandhaltungsplan übernehmen</h1>
+<p class="text-muted mb-5 max-w-3xl">Liest aus dem Instandhaltungsplan (Excel) die Blätter <b>Maßnahmen</b>, <b>Intervalle je Klasse</b>, <b>Kampagnen</b> und <b>Pflichtprüfungen</b>. Daraus entstehen Wartungsplan, Kalender und Aufträge. Welche Bauteile zu welcher Klasse gehören, kommt aus dem Blatt <i>Matrix</i> – das läuft über den <a class="text-primary" href="/ih/import">Asset-Import</a>. Vorhandene Einträge werden aktualisiert, nichts wird gelöscht.</p>
+<div class="grid xl:grid-cols-[420px_1fr] gap-6">
+  <form method="post" action="/ih/wartung/import" enctype="multipart/form-data" class="panel p-5 space-y-4 self-start">
+    <h2>Datei hochladen</h2>
+    <input type="file" name="datei" accept=".xlsx,.xlsm" required class="field">
+    <button class="btn btn-primary">{{ icon("upload", "w-4 h-4") }}Hochladen und vergleichen</button>
+  </form>
+  <section class="panel overflow-hidden self-start">
+    <div class="px-4 py-3 border-b border-line"><h2>Bisherige Übernahmen</h2></div>
+    <table class="tbl"><tbody>
+    {% for l in laeufe %}<tr><td><a class="font-semibold hover:underline" href="/ih/wartung/import/{{ l.id }}">{{ l.dateiname }}</a></td><td class="text-sm">{{ l.zeit|datum }} · {{ l.benutzer }}</td><td class="text-sm">{{ "übernommen" if l.status == "uebernommen" else "nicht übernommen" }}</td></tr>
+    {% else %}<tr><td class="text-muted py-6 text-center">Noch keine.</td></tr>{% endfor %}
+    </tbody></table>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_ih.html" import mass_symbol, status_chip %}
+{% block title %}Aufträge{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div><h1>Wartungs- und Prüfaufträge</h1><p class="text-muted">Ein Auftrag ist ein Durchgang einer Kampagne. Dokumentiert wird je Bauteil.</p></div>
+  {% if darf("ih.wartung.planen") %}<form method="post" action="/ih/wartung/auftraege-anlegen"><button class="btn btn-primary">{{ icon("plus", "w-4 h-4") }}Fällige Aufträge anlegen</button></form>{% endif %}
+</div>
+<div class="seg mb-3 text-sm flex-wrap">
+  {% set offen_n = (zahl.get("angelegt", 0) + zahl.get("freigegeben", 0) + zahl.get("in_arbeit", 0) + zahl.get("erledigt", 0)) %}
+  {% for k, lab in [("offen", "Offen (" ~ offen_n ~ ")")] + STATUS.items()|map("list")|list + [["alle", "Alle"]] %}
+  <a href="/ih/auftraege?status={{ k }}" class="px-3 py-1.5 rounded {{ 'bg-surface shadow-sm font-semibold' if status == k }}">{{ lab }}{% if k in STATUS and zahl.get(k) %} ({{ zahl[k] }}){% endif %}</a>
+  {% endfor %}
+</div>
+<div class="panel overflow-x-auto">
+  <table class="tbl">
+    <thead><tr><th></th><th>Auftrag</th><th>Termin</th><th>Status</th><th class="num">Bauteile</th><th>Verantwortlich</th></tr></thead>
+    <tbody>
+    {% for a in rows %}{% set f = fortschritt.get(a.id, (0, 0)) %}
+      <tr>
+        <td>{{ mass_symbol(mass.get(a.massnahme), a.massnahme) }}</td>
+        <td><a class="font-semibold hover:underline" href="/ih/auftraege/{{ a.id }}">A-{{ "%05d"|format(a.id) }}</a> {{ a.titel }}</td>
+        <td class="whitespace-nowrap text-sm">{{ kw(a.termin) }}{% if a.status in ("angelegt", "freigegeben", "in_arbeit") and a.termin < heute %}<span class="block text-xs text-crit">läuft seit {{ a.termin|datum(False) }}</span>{% endif %}</td>
+        <td>{{ status_chip(a.status, STATUS) }}</td>
+        <td class="num whitespace-nowrap">{% if f[1] %}{{ f[0] }} / {{ f[1] }}<span class="block h-1.5 mt-1 rounded bg-soft"><span class="block h-1.5 rounded bg-primary" style="width: {{ (100 * f[0] / f[1])|round|int }}%"></span></span>{% else %}–{% endif %}</td>
+        <td class="text-sm">{{ a.verantwortlich or "" }}</td>
+      </tr>
+    {% else %}<tr><td colspan="6" class="py-8 text-center text-muted">Keine Aufträge in dieser Auswahl.{% if darf("ih.wartung.planen") %} Über „Fällige Aufträge anlegen“ entstehen sie aus dem Wartungsplan.{% endif %}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

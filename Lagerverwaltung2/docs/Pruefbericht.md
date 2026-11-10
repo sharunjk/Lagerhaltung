@@ -384,6 +384,27 @@ Prüfung: 145 Tests grün (2 übersprungen: sie brauchen den vertraulichen Caspe
 
 Die bisherigen 13 Browserprüfungen der Lagerverwaltung laufen unverändert durch.
 
+## Nachtrag: Wartungsplanung, Aufträge und Protokolle 2.6.0
+
+| Änderung | Umsetzung | Beleg |
+|---|---|---|
+| Instandhaltungsplan übernehmen | Liest Maßnahmen, Intervalle je Klasse, Kampagnen und Pflichtprüfungen. Vergleich vor der Übernahme, Sicherung davor, erneute Fassung aktualisiert, nichts wird gelöscht. „laufend“ = ohne Intervall, Jahre → Monate | `test_plan_uebernehmen_vergleich_und_erneut` |
+| Termine und Lage | fester Rhythmus ab erstem Termin, Monatsende-Korrektur, Vorlauf je Maßnahmenart und je Kampagne, Techniker-Tage je Woche | `test_termine_und_lage`, `test_wartungsplan_kalender_wochenliste` |
+| Aufträge | je Kampagne und Termin genau einer, Bauteilliste aus aktiven Anlagen der Klasse (archivierte nicht), „fällige anlegen“ ohne Doppelte | `test_auftrag_ablauf_mit_protokollen_und_vier_augen`, `test_auftrag_von_hand_und_kampagne_bearbeiten` |
+| Protokolle | WP-02 nur für Sichtprüfung ohne Sicherheitsfunktion, sonst WP-01. Zustand bei Beginn Pflicht, Befund braucht Beschreibung oder Nummer, Abschlusskontrolle Pflicht bei PLT-Sicherheitseinrichtungen, Messwerte je Schritt | dieselben |
+| Freigabe und Abschluss | Protokolle erst nach Freigabe. Technisch erledigt nur vollständig, bei Pflichtprüfungen nur mit Nachweis. Vier-Augen-Prinzip bei PLT-Sicherheitseinrichtungen, Zurückweisen und Stornieren nur mit Grund, Verlauf je Statuswechsel. Rechte je Schritt serverseitig | dieselben |
+| Nachweise | Upload zum Auftrag, Anzeige nur für Bild/PDF/Text, alles andere als Download (`nosniff`) | dieselben |
+| Anlagen von Hand, Archivieren | Neue Anlage mit Dublettenprüfung über den Schlüssel, Archivieren/Reaktivieren mit Protokoll, Unit mit aktiven Bauteilen gesperrt | `test_anlage_von_hand_anlegen_und_archivieren` |
+| Genaue Filter | Feld + Bedingung + Wert, beliebig kombinierbar, „ist nicht“ schließt leere Felder ein, `%` und `_` werden wörtlich gesucht, Excel-Export derselben Auswahl | `test_genaue_filter` (8 Fälle) |
+| Migration 2 | `ih_import_laeufe.art` für Datenbanken aus 2.5.0, mit Probelauf und Sicherung | `test_migration_2_von_2_5` |
+
+Prüfung: 160 Tests grün (2 übersprungen, wie in 2.5.0). Browserprüfung `werkzeuge/pruefung/wartung.cjs` mit 19/19 Schritten, mit der echten Asset-Liste und dem echten Instandhaltungsplan:
+- Erkannt: 13 Maßnahmen, 34 Intervalle, 36 Kampagnen. Die Termine stimmen mit dem Wochenkalender der Datei überein, z. B. „W-Absperrarmatur“ ab KW 45/2026.
+- Abläufe: 7 fällige Aufträge angelegt, Sammelprotokoll gespeichert, WP-01 an einer PLT-Sicherheitseinrichtung (Abschlusskontrolle verlangt). Die Protokollseite ist am Handy ohne seitliches Scrollen bedienbar.
+- Filter „Kürzel ist nicht CAP01“: 1.066 → 963 Bauteile. Anlage von Hand angelegt, keine JS-Fehler.
+
+`cmms.cjs` (17/17) und die Lager-Browserprüfungen laufen unverändert.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

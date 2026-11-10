@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Instandhaltungsplan {{ lauf.dateiname }}{% endblock %}
+{% block content %}
+<div class="text-sm text-muted mb-1"><a href="/ih/wartung/import" class="hover:text-ink">Instandhaltungsplan übernehmen</a></div>
+<h1 class="mb-1">{{ lauf.dateiname }}</h1>
+<p class="text-muted mb-5">Hochgeladen {{ lauf.zeit|datum }} von {{ lauf.benutzer }}{% if lauf.status == "uebernommen" %} · <b>übernommen</b> {{ lauf.uebernommen_am|datum }}{% if ergebnis and ergebnis.sicherung %} (Sicherung „{{ ergebnis.sicherung }}“){% endif %}{% endif %}</p>
+{% if plan.meldungen %}<div class="panel p-4 mb-5 border-l-4 border-l-warn"><h2 class="text-base">Hinweise</h2><ul class="text-sm mt-1 list-disc pl-5">{% for t in plan.meldungen %}<li>{{ t }}</li>{% endfor %}</ul></div>{% endif %}
+<div class="grid md:grid-cols-3 gap-3 mb-6">
+  {% for name, lab in [("massnahmen", "Maßnahmen"), ("intervalle", "Intervalle je Klasse"), ("kampagnen", "Kampagnen inkl. Pflichtprüfungen")] %}
+  <div class="panel p-4"><span class="block text-3xl font-cond font-bold tabular-nums">{{ plan[name]|length }}</span><span class="text-sm text-muted">{{ lab }}</span>
+    <span class="block text-sm mt-1">{{ v[name].neu|length }} neu · {{ v[name].geaendert|length }} geändert · {{ v[name].unveraendert }} unverändert{% if v[name].nicht_im_plan %} · {{ v[name].nicht_im_plan|length }} nur im Programm (bleiben){% endif %}</span></div>
+  {% endfor %}
+</div>
+<section class="panel overflow-x-auto mb-6">
+  <div class="px-4 py-3 border-b border-line"><h2>Kampagnen</h2><p class="text-sm text-muted">Bauteile = so viele aktive Anlagen haben im Programm diese Bauteilklasse (Vergleich mit dem Plan).</p></div>
+  <table class="tbl">
+    <thead><tr><th>ID</th><th>Maßnahme</th><th>Bauteilklasse / Gegenstand</th><th class="num">Intervall</th><th>Erster Termin</th><th class="num">Aufwand</th><th class="num">Bauteile</th><th>Änderung</th></tr></thead>
+    <tbody>
+    {% set geaendert = {} %}{% for g in v.kampagnen.geaendert %}{% set _ = geaendert.update({g.schluessel: g.felder}) %}{% endfor %}
+    {% for k in plan.kampagnen %}
+      <tr class="{{ 'opacity-50' if not k.aktiv }}"><td class="whitespace-nowrap font-semibold">{{ k.schluessel }}</td><td>{{ k.massnahme }}</td><td class="text-sm">{{ k.gegenstand or k.bauteilklasse }}</td><td class="num">{{ k.intervall_monate }} Mon.</td>
+        <td class="text-sm">{{ k.erster_termin|datum(False) }}</td><td class="num text-sm">{{ k.aufwand_tage|num if k.aufwand_tage else "" }}</td>
+        <td class="num text-sm">{% if k.bauteilklasse and k.bauteilklasse != "Anlage" %}{{ anzahl.get(k.bauteilklasse.lower(), 0) }}{% endif %}</td>
+        <td class="text-sm">{% if k.schluessel in v.kampagnen.neu %}<span class="status st-ok">neu</span>{% elif k.schluessel in geaendert %}<span class="status st-melden">{{ geaendert[k.schluessel]|list|join(", ") }}</span>{% else %}<span class="text-muted">unverändert</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% if lauf.status != "uebernommen" %}
+<form method="post" action="/ih/wartung/import/{{ lauf.id }}/uebernehmen" class="panel p-5 space-y-3 border-l-4 border-l-primary max-w-3xl">
+  <h2>Übernehmen</h2>
+  <p class="text-sm">Maßnahmen, Intervalle und Kampagnen werden angelegt bzw. mit dem Stand der Datei überschrieben (auch im Programm geänderte Termine und Intervalle). Einträge, die nur im Programm stehen, bleiben. Bestehende Aufträge und Protokolle bleiben unverändert. Vorher wird automatisch gesichert.</p>
+  <label class="flex items-center gap-2"><input type="checkbox" name="bestaetigt" value="ja" required> Ich habe den Vergleich geprüft.</label>
+  <button class="btn btn-primary">Instandhaltungsplan übernehmen</button>
+</form>
+{% endif %}
+{% endblock %}

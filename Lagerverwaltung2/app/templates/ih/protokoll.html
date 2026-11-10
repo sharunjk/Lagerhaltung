@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}{{ p.code }} – Protokoll{% endblock %}
+{% block content %}
+<div class="text-sm text-muted mb-1"><a class="hover:text-ink" href="/ih/auftraege/{{ a.id }}#bauteile">A-{{ "%05d"|format(a.id) }} {{ a.titel }}</a></div>
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div><h1>{{ p.code }} <span class="font-normal text-muted text-xl">{{ p.bezeichnung or "" }}</span></h1>
+    <p class="text-muted">Wartungs- und Prüfprotokoll WP-01 · {{ m.name }} · Bauteil {{ nr }} von {{ pos|length }}{% if p.sicherheitsgerichtet %} · <span class="status st-kritisch">PLT-Sicherheitseinrichtung</span>{% endif %}</p></div>
+  <div class="flex gap-2 no-print">
+    {% if vorige %}<a class="btn btn-sm" href="/ih/auftraege/{{ a.id }}/position/{{ vorige }}">← vorheriges</a>{% endif %}
+    {% if naechste %}<a class="btn btn-sm" href="/ih/auftraege/{{ a.id }}/position/{{ naechste }}">nächstes →</a>{% endif %}
+    {% if p.doku_url %}<a class="btn btn-sm" href="{{ p.doku_url }}" target="_blank" rel="noopener noreferrer">{{ icon("link", "w-4 h-4") }}Dokumentation</a>{% endif %}
+  </div>
+</div>
+{% if achtung %}<div class="panel p-4 mb-4 border-l-4 border-l-crit text-sm"><b class="text-crit">Achtung:</b> {{ achtung }}</div>{% endif %}
+{% if p.sicherheitsgerichtet %}<div class="panel p-4 mb-4 text-sm border-l-4 border-l-wein">Überbrückung oder Außerbetriebnahme nur mit SR 4 Beiblatt 4 und dokumentierten Ersatzmaßnahmen. Keine Grenzwerte verstellen ohne schriftliche Veranlassung des Betreibers.</div>{% endif %}
+{% if not bearbeitbar and not p.ergebnis %}<div class="panel p-4 mb-4 text-sm">{% if a.status == "angelegt" %}Der Auftrag ist noch nicht freigegeben – Protokolle können erst nach der Freigabe erfasst werden.{% else %}Keine Bearbeitung möglich ({{ STATUS[a.status] }}).{% endif %}</div>{% endif %}
+<form method="post" class="space-y-5 max-w-5xl" x-data='{erg: {{ (p.ergebnis or "")|tojson }}, schritte: {{ (p.schritte or [{"schritt": "", "soll": "", "ist": "", "io": "", "bemerkung": ""}])|tojson }}}'>
+  <fieldset {% if not bearbeitbar %}disabled{% endif %} class="space-y-5">
+  <section class="panel p-5">
+    <h2 class="mb-3">2 Zustand bei Beginn</h2>
+    <div class="flex flex-wrap gap-x-6 gap-y-2">{% for k, lab in ZUSTAND.items() %}<label class="flex items-center gap-2"><input type="radio" name="zustand_beginn" value="{{ k }}" {% if p.zustand_beginn == k %}checked{% endif %} required> {{ lab }}</label>{% endfor %}</div>
+    <textarea name="zustand_text" rows="2" class="field mt-3" placeholder="Auffälligkeiten beschreiben">{{ p.zustand_text or "" }}</textarea>
+    {% if p.sicherheitsgerichtet %}<div class="mt-3 w-40"><label class="label">SIL</label><input name="sil" value="{{ p.sil or '' }}" class="field"></div>{% endif %}
+  </section>
+  <section class="panel p-5 overflow-x-auto">
+    <h2 class="mb-1">3 Durchgeführte Schritte und Messwerte</h2>
+    <p class="text-sm text-muted mb-3">Schritte nach der gültigen Wartungs- bzw. Prüfanweisung. Messwerte immer eintragen, auch wenn sie in Ordnung sind – erst die Reihe über mehrere Zyklen zeigt eine Drift.</p>
+    <table class="tbl">
+      <thead><tr><th class="w-8">Nr.</th><th>Schritt nach Anweisung</th><th>Soll / Toleranz</th><th>Ist</th><th>i.O.</th><th>Bemerkung</th><th></th></tr></thead>
+      <tbody>
+        <template x-for="(s, i) in schritte" :key="i">
+          <tr><td class="text-muted" x-text="i + 1"></td>
+            <td><input name="schritt" class="field" x-model="s.schritt"></td>
+            <td><input name="soll" class="field w-32" x-model="s.soll"></td>
+            <td><input name="ist" class="field w-28" x-model="s.ist"></td>
+            <td><select name="io" class="field w-20" x-model="s.io"><option value="">–</option><option value="ja">ja</option><option value="nein">nein</option></select></td>
+            <td><input name="bemerkung" class="field" x-model="s.bemerkung"></td>
+            <td><button type="button" class="btn btn-sm" @click="schritte.splice(i, 1)" x-show="schritte.length > 1" title="Zeile entfernen">×</button></td></tr>
+        </template>
+      </tbody>
+    </table>
+    <button type="button" class="btn btn-sm mt-2 no-print" @click="schritte.push({schritt: '', soll: '', ist: '', io: '', bemerkung: ''})">{{ icon("plus", "w-4 h-4") }}Zeile</button>
+  </section>
+  <section class="panel p-5">
+    <h2 class="mb-3">4 Ergebnis</h2>
+    <div class="flex flex-wrap gap-x-6 gap-y-2">{% for k, lab in ERGEBNIS.items() %}<label class="flex items-center gap-2"><input type="radio" name="ergebnis" value="{{ k }}" x-model="erg" {% if p.ergebnis == k %}checked{% endif %} required> {{ lab }}</label>{% endfor %}</div>
+    <div class="grid sm:grid-cols-[12rem_1fr] gap-3 mt-3" x-show="erg && erg !== 'ohne_befund'">
+      <div x-show="erg === 'mit_befund'"><label class="label">Befundmeldung Nr.</label><input name="befund_nr" value="{{ p.befund_nr or '' }}" class="field"></div>
+      <div :class="erg === 'mit_befund' ? '' : 'sm:col-span-2'"><label class="label" x-text="erg === 'mit_befund' ? 'Befund' : 'Begründung'"></label><textarea name="befund_text" rows="2" class="field">{{ p.befund_text or "" }}</textarea></div>
+    </div>
+  </section>
+  <section class="panel p-5">
+    <h2 class="mb-3">5 Abschluss{% if p.sicherheitsgerichtet %} <span class="text-sm font-normal text-crit">(bei PLT-Sicherheitseinrichtungen Pflicht)</span>{% endif %}</h2>
+    <div class="grid sm:grid-cols-2 gap-2">{% for k, lab in ABSCHLUSS.items() %}<label class="flex items-center gap-2"><input type="checkbox" name="ab_{{ k }}" {% if p.abschluss.get(k) %}checked{% endif %}> {{ lab }}</label>{% endfor %}</div>
+    {% if p.durchgefuehrt_von %}<p class="text-sm text-muted mt-3">Zuletzt gespeichert von {{ p.durchgefuehrt_von }} am {{ p.durchgefuehrt_am|datum }} (zählt als Unterschrift des Ausführenden).</p>{% endif %}
+  </section>
+  </fieldset>
+  {% if bearbeitbar %}
+  <div class="flex flex-wrap gap-2 no-print">
+    {% if naechste %}<button class="btn btn-primary" name="weiter" value="naechste">Speichern und nächstes Bauteil</button>{% endif %}
+    <button class="btn {{ 'btn-primary' if not naechste }}" name="weiter" value="auftrag">Speichern</button>
+    <a class="btn" href="/ih/auftraege/{{ a.id }}#bauteile">Abbrechen</a>
+  </div>
+  {% endif %}
+</form>
+{% endblock %}

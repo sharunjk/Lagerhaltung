@@ -10,7 +10,7 @@ from sqlalchemy import and_, delete, func, insert, or_, select, update
 
 from .. import db
 from ..db import artikel, ih_import_laeufe, ih_import_zeilen, ih_plaetze
-from ..services import asset_import as ai
+from ..services import asset_import as ai, wartung
 from ..services.excel import tabelle_xlsx
 from ..services.lager import audit
 from ..web import flash, render, require_recht
@@ -47,7 +47,12 @@ def uebersicht(request: Request):
         klassen = con.execute(select(ih_plaetze.c.bauteilklasse, func.count()).where(ih_plaetze.c.art == "platz", ih_plaetze.c.aktiv)
                               .group_by(ih_plaetze.c.bauteilklasse).order_by(func.count().desc())).all()
         laeufe = con.execute(select(ih_import_laeufe).order_by(ih_import_laeufe.c.id.desc()).limit(5)).mappings().all()
-    return render(request, "ih/uebersicht.html", k=kennz, ebenen=einheiten, klassen=klassen, laeufe=laeufe)
+        kampagnen = wartung.lage(con)
+        offen = wartung.offene_auftraege_zahl(con)
+        mass = wartung.massnahmen(con)
+    wl = {lg: [k for k in kampagnen if k["lage"] == lg] for lg in ("ueberfaellig", "laeuft", "bald")}
+    return render(request, "ih/uebersicht.html", k=kennz, ebenen=einheiten, klassen=klassen, laeufe=laeufe, wl=wl, offen=offen,
+                  hat_plan=bool(kampagnen), mass=mass, kw=wartung.kw)
 
 
 def _ebenen(con) -> list[dict]:
@@ -68,38 +73,175 @@ def _ebenen(con) -> list[dict]:
 
 
 # ------------------------------------------------------------------ Anlagen
-@router.get("/anlagen")
-def anlagen(request: Request, q: str = "", ebene: str = "", klasse: str = "", filter: str = "", seite: int = 1):
-    require_recht(request, "ih.ansehen")
+# Freie Filterbedingungen: Feld + Bedingung + Wert (alle müssen zutreffen), z. B. „Kürzel ist nicht CAP01“
+FILTER_FELDER = {"code": "Tag-Nr.", "bezeichnung": "Bezeichnung", "kuerzel": "Kürzel", "kategorie": "Kategorie",
+                 "bauteilklasse": "Bauteilklasse", "unit": "Unit / Bereich", "hersteller": "Hersteller", "modell": "Modell / Typ",
+                 "seriennummer": "Seriennummer", "lieferant": "Lieferant", "status": "Status", "kritikalitaet": "Kritikalität",
+                 "bestellnummer": "Bestellnummer", "notiz": "Notiz"}
+FILTER_OPS = {"enthaelt": "enthält", "nicht_enthaelt": "enthält nicht", "ist": "ist genau", "ist_nicht": "ist nicht",
+              "beginnt": "beginnt mit", "nicht_beginnt": "beginnt nicht mit", "leer": "ist leer", "nicht_leer": "ist nicht leer"}
+
+
+def _bedingungen(request: Request) -> list[tuple[str, str, str]]:
+    qp = request.query_params
+    out = []
+    for f, o, v in zip(qp.getlist("bf"), qp.getlist("bo"), qp.getlist("bv")):
+        if f in FILTER_FELDER and o in FILTER_OPS and (v.strip() or o in ("leer", "nicht_leer")):
+            out.append((f, o, v.strip()))
+    return out[:10]
+
+
+def _bedingung_sql(spalte, op: str, wert: str):
+    """Ohne Groß-/Kleinschreibung. „ist nicht“/„enthält nicht“ schließen leere Felder ein (sie enthalten den Wert ja nicht)."""
+    leer = or_(spalte.is_(None), spalte == "")
+    w = wert.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    klein = func.lower(spalte)
+    return {
+        "enthaelt": klein.like(f"%{w}%", escape="\\"),
+        "nicht_enthaelt": or_(leer, ~klein.like(f"%{w}%", escape="\\")),
+        "ist": klein == wert.lower(),
+        "ist_nicht": or_(leer, klein != wert.lower()),
+        "beginnt": klein.like(f"{w}%", escape="\\"),
+        "nicht_beginnt": or_(leer, ~klein.like(f"{w}%", escape="\\")),
+        "leer": leer,
+        "nicht_leer": ~leer,
+    }[op]
+
+
+def _anlagen_auswahl(con, request: Request, q: str, ebene: str, klasse: str, filter: str, archiv: int):
+    """Bedingungen und Join für Liste und Excel-Export (beide zeigen genau dasselbe)."""
     p = ih_plaetze
-    bed = [p.c.art == "platz", p.c.aktiv]
+    eltern = p.alias("eltern")
+    bed = [p.c.art == "platz", p.c.aktiv.is_(not archiv)]
     if q.strip():
         like = f"%{q.strip()}%"
         kompakt = f"%{ai.schluessel(q)}%"
         bed.append(or_(p.c.code.ilike(like), p.c.schluessel.like(kompakt), p.c.bezeichnung.ilike(like), p.c.hersteller.ilike(like),
                        p.c.modell.ilike(like), p.c.seriennummer.ilike(like), p.c.kategorie.ilike(like), p.c.bauteilklasse.ilike(like)))
+    ebenen = _ebenen(con)
+    if ebene.isdigit():
+        ids = {int(ebene)} | {e["id"] for e in ebenen if e["eltern_id"] == int(ebene)}
+        bed.append(p.c.eltern_id.in_(ids))
+    elif ebene == "ohne":
+        bed.append(p.c.eltern_id.is_(None))
+    if klasse:
+        bed.append(p.c.bauteilklasse == klasse if klasse != "-" else or_(p.c.bauteilklasse.is_(None), p.c.bauteilklasse == ""))
+    if filter == "sicher":
+        bed.append(p.c.sicherheitsgerichtet.is_(True))
+    elif filter == "ohne_doku":
+        bed.append(or_(p.c.doku_url.is_(None), p.c.doku_url == ""))
+    bedingungen = _bedingungen(request)
+    for f, o, v in bedingungen:
+        bed.append(_bedingung_sql(eltern.c.code if f == "unit" else p.c[f], o, v))
+    return bed, eltern, ebenen, bedingungen
+
+
+def _filter_query(request: Request, ohne: tuple = ("seite",)) -> str:
+    from urllib.parse import urlencode
+    return urlencode([(k, v) for k, v in request.query_params.multi_items() if k not in ohne])
+
+
+@router.get("/anlagen")
+def anlagen(request: Request, q: str = "", ebene: str = "", klasse: str = "", filter: str = "", seite: int = 1, archiv: int = 0):
+    require_recht(request, "ih.ansehen")
+    p = ih_plaetze
     with db.engine().connect() as con:
-        ebenen = _ebenen(con)
-        if ebene.isdigit():
-            ids = {int(ebene)} | {e["id"] for e in ebenen if e["eltern_id"] == int(ebene)}
-            bed.append(p.c.eltern_id.in_(ids))
-        elif ebene == "ohne":
-            bed.append(p.c.eltern_id.is_(None))
-        if klasse:
-            bed.append(p.c.bauteilklasse == klasse if klasse != "-" else or_(p.c.bauteilklasse.is_(None), p.c.bauteilklasse == ""))
-        if filter == "sicher":
-            bed.append(p.c.sicherheitsgerichtet.is_(True))
-        elif filter == "ohne_doku":
-            bed.append(or_(p.c.doku_url.is_(None), p.c.doku_url == ""))
-        gesamt = con.execute(select(func.count()).select_from(p).where(and_(*bed))).scalar()
+        bed, eltern, ebenen, bedingungen = _anlagen_auswahl(con, request, q, ebene, klasse, filter, archiv)
+        quelle = p.outerjoin(eltern, eltern.c.id == p.c.eltern_id)
+        gesamt = con.execute(select(func.count()).select_from(quelle).where(and_(*bed))).scalar()
         seite = max(1, min(seite, (gesamt + PRO_SEITE - 1) // PRO_SEITE or 1))
-        eltern = p.alias("eltern")
-        rows = con.execute(select(p, eltern.c.code.label("ebene")).select_from(p.outerjoin(eltern, eltern.c.id == p.c.eltern_id))
+        rows = con.execute(select(p, eltern.c.code.label("ebene")).select_from(quelle)
                            .where(and_(*bed)).order_by(p.c.code).limit(PRO_SEITE).offset((seite - 1) * PRO_SEITE)).mappings().all()
         klassen = [r[0] for r in con.execute(select(p.c.bauteilklasse).where(p.c.bauteilklasse.isnot(None), p.c.bauteilklasse != "")
                                              .distinct().order_by(p.c.bauteilklasse))]
+        kuerzel = [r[0] for r in con.execute(select(p.c.kuerzel).where(p.c.kuerzel.isnot(None), p.c.kuerzel != "", p.c.art == "platz")
+                                             .distinct().order_by(p.c.kuerzel))]
+        archiviert = con.execute(select(func.count()).select_from(p).where(p.c.art == "platz", p.c.aktiv.is_(False))).scalar()
     return render(request, "ih/anlagen.html", rows=rows, gesamt=gesamt, seite=seite, seiten=(gesamt + PRO_SEITE - 1) // PRO_SEITE,
-                  q=q, ebene=ebene, klasse=klasse, filter=filter, ebenen=ebenen, klassen=klassen)
+                  q=q, ebene=ebene, klasse=klasse, filter=filter, archiv=archiv, ebenen=ebenen, klassen=klassen, kuerzel=kuerzel,
+                  bedingungen=bedingungen, FILTER_FELDER=FILTER_FELDER, FILTER_OPS=FILTER_OPS, archiviert=archiviert,
+                  query=_filter_query(request))
+
+
+@router.get("/anlagen/export.xlsx")
+def anlagen_export(request: Request, q: str = "", ebene: str = "", klasse: str = "", filter: str = "", archiv: int = 0):
+    require_recht(request, "ih.ansehen")
+    p = ih_plaetze
+    with db.engine().connect() as con:
+        bed, eltern, _, _ = _anlagen_auswahl(con, request, q, ebene, klasse, filter, archiv)
+        rows = con.execute(select(p, eltern.c.code.label("ebene")).select_from(p.outerjoin(eltern, eltern.c.id == p.c.eltern_id))
+                           .where(and_(*bed)).order_by(p.c.code)).mappings().all()
+    spalten = ["Tag-Nr.", "Bezeichnung", "Unit", "Bauteilklasse", "PLT-Sicherheitseinrichtung", "Kritikalität", "Kürzel", "Kategorie",
+               "Hersteller", "Modell", "Seriennummer", "Lieferant", "Status", "Bestellnummer", "Kosten Einkauf", "Doku-Link"]
+    zeilen = [[r["code"], r["bezeichnung"], r["ebene"], r["bauteilklasse"],
+               {True: "Ja", False: "Nein"}.get(r["sicherheitsgerichtet"], ""), r["kritikalitaet"], r["kuerzel"], r["kategorie"],
+               r["hersteller"], r["modell"], r["seriennummer"], r["lieferant"], r["status"], r["bestellnummer"], r["kosten"], r["doku_url"]]
+              for r in rows]
+    daten = tabelle_xlsx("Anlagen", spalten, zeilen, [20, 34, 8, 18, 12, 8, 8, 20, 22, 26, 18, 22, 12, 14, 12, 50])
+    return Response(daten, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="Anlagen_{date.today():%Y%m%d}.xlsx"'})
+
+
+def _anlage_werte(f) -> tuple[dict, list[str]]:
+    """Formularfelder einer Anlage prüfen und umwandeln (Neu und Bearbeiten)."""
+    werte, fehler = {}, []
+    for k in BEARBEITBAR:
+        werte[k] = (f.get(k) or "").strip() or None
+    if werte["doku_url"] and not werte["doku_url"].lower().startswith(("http://", "https://")):
+        fehler.append("Der Dokumentations-Link muss mit http:// oder https:// beginnen.")
+    try:
+        werte["kritikalitaet"] = ai.kritikalitaet(f.get("kritikalitaet") or "")
+    except ValueError:
+        fehler.append("Kritikalität: A, B oder C.")
+    werte["sicherheitsgerichtet"] = {"ja": True, "nein": False}.get(f.get("sicherheitsgerichtet") or "")
+    for k in ("inbetriebnahme", "anschaffung"):
+        try:
+            werte[k] = ai.datum(f.get(k) or "")
+        except ValueError:
+            fehler.append(f"{k.capitalize()}: kein gültiges Datum.")
+    for k in ("kosten", "nebenkosten"):
+        try:
+            werte[k] = ai.zahl(f.get(k) or "")
+        except ValueError:
+            fehler.append(f"{k.capitalize()}: keine gültige Zahl.")
+    eltern = f.get("eltern_id") or ""
+    werte["eltern_id"] = int(eltern) if eltern.isdigit() else None
+    return werte, fehler
+
+
+@router.get("/anlagen/neu")
+def anlage_neu_form(request: Request, eltern: str = "", art: str = "platz"):
+    require_recht(request, "ih.anlagen.pflegen")
+    with db.engine().connect() as con:
+        ebenen = _ebenen(con)
+    a = {"id": None, "code": "", "art": art if art in ART_TEXT else "platz", "eltern_id": int(eltern) if eltern.isdigit() else None}
+    return render(request, "ih/anlage_form.html", a=a, ebenen=ebenen, ART_TEXT=ART_TEXT, neu=True)
+
+
+@router.post("/anlagen/neu")
+async def anlage_neu(request: Request):
+    me = require_recht(request, "ih.anlagen.pflegen")
+    f = await request.form()
+    werte, fehler = _anlage_werte(f)
+    code = ai.code_norm(f.get("code") or "")
+    art = f.get("art") if f.get("art") in ART_TEXT else "platz"
+    if not code:
+        fehler.append("Bitte eine Tag-Nr. bzw. einen Code angeben.")
+    elif len(code) > ai.LAENGE["code"]:
+        fehler.append(f"Die Tag-Nr. ist länger als {ai.LAENGE['code']} Zeichen.")
+    with db.schreiben() as con:
+        vorhanden = con.execute(select(ih_plaetze.c.id, ih_plaetze.c.code).where(ih_plaetze.c.schluessel == ai.schluessel(code))).first() if code else None
+        if vorhanden:
+            fehler.append(f"Die Tag-Nr. gibt es schon: {vorhanden.code}.")
+        if fehler:
+            return render(request, "ih/anlage_form.html", a={"id": None, "code": code, "art": art, **werte}, ebenen=_ebenen(con),
+                          fehler=" ".join(fehler), ART_TEXT=ART_TEXT, neu=True)
+        jetzt = datetime.now()
+        aid = con.execute(insert(ih_plaetze).values(code=code, schluessel=ai.schluessel(code), art=art, aktiv=True, erstellt_am=jetzt,
+                                                    geaendert_am=jetzt, **werte)).inserted_primary_key[0]
+        audit(con, me["username"], "Anlage angelegt", code, {"art": art})
+    flash(request, f"{ART_TEXT[art]} {code} angelegt.")
+    return RedirectResponse(f"/ih/anlagen/{aid}", status_code=303)
 
 
 def _anlage(con, aid: int) -> dict | None:
@@ -136,7 +278,11 @@ def anlage(request: Request, aid: int):
                 artikel.c.aktiv, or_(artikel.c.verwendung.ilike(f"%{a['code']}%"),
                                      func.replace(artikel.c.verwendung, " ", "").ilike(f"%{a['code'].replace(' ', '')}%")))
                 .order_by(artikel.c.nummer).limit(50)).mappings().all()
-    return render(request, "ih/anlage.html", a=a, ebenen_pfad=pfad, kinder=kinder, zusatz=_zusatz(a), teile=teile, ART_TEXT=ART_TEXT)
+        plan = wartung.plan_fuer_bauteil(con, a) if a["art"] == "platz" else []
+        hist = wartung.historie(con, aid) if a["art"] == "platz" else []
+        mass = wartung.massnahmen(con)
+    return render(request, "ih/anlage.html", a=a, ebenen_pfad=pfad, kinder=kinder, zusatz=_zusatz(a), teile=teile, ART_TEXT=ART_TEXT,
+                  plan=plan, hist=hist, mass=mass, ERGEBNIS=wartung.ERGEBNIS, kw=wartung.kw)
 
 
 BEARBEITBAR = ["bezeichnung", "bauteilklasse", "kategorie", "kuerzel", "hersteller", "modell", "seriennummer", "lieferant", "status",
@@ -158,29 +304,7 @@ def anlage_bearbeiten_form(request: Request, aid: int):
 async def anlage_bearbeiten(request: Request, aid: int):
     me = require_recht(request, "ih.anlagen.pflegen")
     f = await request.form()
-    werte, fehler = {}, []
-    for k in BEARBEITBAR:
-        v = (f.get(k) or "").strip()
-        werte[k] = v or None
-    if werte["doku_url"] and not werte["doku_url"].lower().startswith(("http://", "https://")):
-        fehler.append("Der Dokumentations-Link muss mit http:// oder https:// beginnen.")
-    try:
-        werte["kritikalitaet"] = ai.kritikalitaet(f.get("kritikalitaet") or "")
-    except ValueError:
-        fehler.append("Kritikalität: A, B oder C.")
-    werte["sicherheitsgerichtet"] = {"ja": True, "nein": False}.get(f.get("sicherheitsgerichtet") or "")
-    for k in ("inbetriebnahme", "anschaffung"):
-        try:
-            werte[k] = ai.datum(f.get(k) or "")
-        except ValueError:
-            fehler.append(f"{k.capitalize()}: kein gültiges Datum.")
-    for k in ("kosten", "nebenkosten"):
-        try:
-            werte[k] = ai.zahl(f.get(k) or "")
-        except ValueError:
-            fehler.append(f"{k.capitalize()}: keine gültige Zahl.")
-    eltern = f.get("eltern_id") or ""
-    werte["eltern_id"] = int(eltern) if eltern.isdigit() else None
+    werte, fehler = _anlage_werte(f)
     with db.schreiben() as con:
         a = _anlage(con, aid)
         if not a:
@@ -195,6 +319,23 @@ async def anlage_bearbeiten(request: Request, aid: int):
             con.execute(update(ih_plaetze).where(ih_plaetze.c.id == aid).values(geaendert_am=datetime.now(), **werte))
             audit(con, me["username"], "Anlage geändert", a["code"], geaendert)
     flash(request, "Gespeichert." if geaendert else "Keine Änderungen.")
+    return RedirectResponse(f"/ih/anlagen/{aid}", status_code=303)
+
+
+@router.post("/anlagen/{aid}/archivieren")
+def anlage_archivieren(request: Request, aid: int):
+    """Archivieren statt Löschen: verschwindet aus Listen und Wartungsplänen, Historie bleibt. Zurückholen jederzeit."""
+    me = require_recht(request, "ih.anlagen.pflegen")
+    with db.schreiben() as con:
+        a = _anlage(con, aid)
+        if not a:
+            return RedirectResponse("/ih/anlagen", status_code=303)
+        if a["aktiv"] and con.execute(select(func.count()).select_from(ih_plaetze).where(ih_plaetze.c.eltern_id == aid, ih_plaetze.c.aktiv)).scalar():
+            flash(request, "Darunter hängen noch aktive Anlagen. Diese zuerst archivieren oder verschieben.", "fehler")
+            return RedirectResponse(f"/ih/anlagen/{aid}", status_code=303)
+        con.execute(update(ih_plaetze).where(ih_plaetze.c.id == aid).values(aktiv=not a["aktiv"], geaendert_am=datetime.now()))
+        audit(con, me["username"], "Anlage archiviert" if a["aktiv"] else "Anlage reaktiviert", a["code"])
+    flash(request, f"{a['code']} {'archiviert – erscheint nicht mehr in Listen und Wartungsplänen' if a['aktiv'] else 'wieder aktiv'}.")
     return RedirectResponse(f"/ih/anlagen/{aid}", status_code=303)
 
 

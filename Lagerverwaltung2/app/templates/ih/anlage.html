@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon %}
+{% from "ih/_ih.html" import mass_symbol %}
 {% block title %}{{ a.code }}{% endblock %}
 {% block content %}
 <div class="text-sm text-muted mb-1"><a href="/ih/anlagen" class="hover:text-ink">Anlagen</a>{% for p in ebenen_pfad %} › <a class="hover:text-ink" href="/ih/anlagen/{{ p.id }}">{{ p.code }}{% if p.bezeichnung and not p.bezeichnung.endswith(p.code) %} {{ p.bezeichnung }}{% endif %}</a>{% endfor %}</div>
@@ -11,7 +12,11 @@
   </div>
   <div class="flex flex-wrap gap-2">
     {% if a.doku_url %}<a href="{{ a.doku_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">{{ icon("link", "w-4 h-4") }}Dokumentation öffnen</a>{% endif %}
-    {% if darf("ih.anlagen.pflegen") %}<a href="/ih/anlagen/{{ a.id }}/bearbeiten" class="btn">{{ icon("edit", "w-4 h-4") }}Bearbeiten</a>{% endif %}
+    {% if darf("ih.anlagen.pflegen") %}
+    {% if a.art != "platz" and a.aktiv %}<a href="/ih/anlagen/neu?eltern={{ a.id }}" class="btn">{{ icon("plus", "w-4 h-4") }}Bauteil hier anlegen</a>{% endif %}
+    <a href="/ih/anlagen/{{ a.id }}/bearbeiten" class="btn">{{ icon("edit", "w-4 h-4") }}Bearbeiten</a>
+    <form method="post" action="/ih/anlagen/{{ a.id }}/archivieren" onsubmit="return confirm('{{ 'Diese Anlage archivieren? Sie verschwindet aus Listen und Wartungsplänen, die Historie bleibt. Zurückholen geht jederzeit.' if a.aktiv else 'Anlage wieder aktiv setzen?' }}')"><button class="btn">{{ "Archivieren" if a.aktiv else "Wieder aktiv setzen" }}</button></form>
+    {% endif %}
   </div>
 </div>
 <div class="grid xl:grid-cols-[1fr_380px] gap-6">
@@ -25,6 +30,29 @@
       </dl>
       {% if a.notiz %}<div class="mt-4"><h3 class="text-sm text-muted mb-1">Notiz</h3><p class="whitespace-pre-line text-sm">{{ a.notiz }}</p></div>{% endif %}
     </section>
+    {% if a.art == "platz" %}
+    <section class="panel overflow-hidden">
+      <div class="px-4 py-3 border-b border-line flex justify-between"><h2>Wartung und Prüfungen</h2><span class="text-sm text-muted">{{ a.bauteilklasse or "keine Bauteilklasse" }}</span></div>
+      {% if plan %}
+      <table class="tbl"><thead><tr><th></th><th>Maßnahme</th><th class="num">Intervall</th><th>Zuletzt</th><th>Nächster Termin</th></tr></thead><tbody>
+      {% for r in plan %}<tr>
+        <td class="w-10">{{ mass_symbol(r.mass, r.massnahme) }}</td>
+        <td>{{ r.mass.name }}{% if r.grundlage %}<span class="block text-xs text-muted">{{ r.grundlage }}</span>{% endif %}{% if r.achtung %}<span class="block text-xs text-crit">Achtung: {{ r.achtung }}</span>{% endif %}</td>
+        <td class="num whitespace-nowrap">{{ (r.intervall_monate ~ " Mon.") if r.intervall_monate else "laufend" }}</td>
+        <td class="text-sm whitespace-nowrap">{{ r.letzte|datum(False) if r.letzte else "–" }}</td>
+        <td class="text-sm whitespace-nowrap">{% if r.kampagne and r.kampagne.naechster %}<a class="text-primary hover:underline" href="/ih/wartung/kampagne/{{ r.kampagne.id }}">{{ kw(r.kampagne.naechster) }}</a>{% elif not r.intervall_monate %}Schichtbuch{% else %}–{% endif %}</td></tr>
+      {% endfor %}</tbody></table>
+      {% else %}<p class="p-4 text-sm text-muted">{% if a.bauteilklasse %}Für die Klasse „{{ a.bauteilklasse }}“ gibt es noch keine Intervalle (Instandhaltungsplan übernehmen).{% else %}Ohne Bauteilklasse gibt es keinen Wartungsplan. Die Klasse kommt über den Import der Matrix oder per „Bearbeiten“.{% endif %}</p>{% endif %}
+    </section>
+    {% if hist %}
+    <section class="panel overflow-hidden">
+      <div class="px-4 py-3 border-b border-line"><h2>Historie</h2></div>
+      <table class="tbl"><tbody>
+      {% for h in hist %}<tr><td class="text-sm whitespace-nowrap">{{ h.durchgefuehrt_am|datum(False) }}</td><td>{{ mass_symbol(mass.get(h.massnahme), h.massnahme) }}</td><td><a class="hover:underline" href="/ih/auftraege/{{ h.auftrag_id }}">A-{{ "%05d"|format(h.auftrag_id) }}</a> <span class="text-sm">{{ ERGEBNIS.get(h.ergebnis) }}</span>{% if h.befund_text %}<span class="block text-xs text-muted">{{ h.befund_text }}</span>{% endif %}</td><td class="text-sm text-muted">{{ h.durchgefuehrt_von }}</td></tr>{% endfor %}
+      </tbody></table>
+    </section>
+    {% endif %}
+    {% endif %}
     {% if kinder %}
     <section class="panel overflow-hidden">
       <div class="px-4 py-3 border-b border-line flex justify-between"><h2>Darunter</h2><span class="text-sm text-muted">{{ kinder|length }}</span></div>
