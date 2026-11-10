@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Neue Kampagne{% endblock %}
+{% block content %}
+{%- macro v(feld, standard="") -%}{{ f.get(feld, standard) }}{%- endmacro -%}
+<div class="text-sm text-muted mb-1"><a href="/ih/wartung" class="hover:text-ink">Wartungsplan</a></div>
+<div class="mb-5">
+  <h1>Eigene Wartung anlegen</h1>
+  <p class="text-muted max-w-3xl">Für Bauteile, die in keine Kampagne des Instandhaltungsplans passen – oder für eine zusätzliche Maßnahme. Sie beschreiben, <b>was</b> zu tun ist, und legen fest, <b>ab wann</b> und <b>wie oft</b>. Ein späterer Import des Instandhaltungsplans lässt eigene Kampagnen unverändert.</p>
+</div>
+{% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-fehler max-w-4xl">{{ fehler }}</div>{% endif %}
+<form method="post" class="max-w-4xl space-y-6"
+      x-data='{ziel: {{ (f.get("ziel") or "bauteile")|tojson }}, tags: {{ vorbelegt|tojson }}, neu: "", hinzu() { const c = this.neu.split(" – ")[0].trim().replace(/\s+/g, " "); if (c && !this.tags.includes(c)) this.tags.push(c); this.neu = ""; }}'>
+  <section class="panel p-5 space-y-4">
+    <h2>Was wird gemacht?</h2>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div><label class="label">Art der Maßnahme</label>
+        <select name="massnahme" class="field" required>
+          {% for code, m in mass.items() %}<option value="{{ code }}" {% if v("massnahme", "W") == code %}selected{% endif %}>{{ m.symbol }} {{ m.name }} ({{ code }})</option>{% endfor %}
+        </select></div>
+      <div><label class="label">Wer macht es</label><input name="durchfuehrung" value="{{ v('durchfuehrung') }}" class="field" placeholder="z. B. Instandhaltung, Fachfirma XY"></div>
+    </div>
+    <div><label class="label">Was ist zu tun?</label><textarea name="taetigkeit" rows="4" class="field" required placeholder="z. B. Keilriemen auf Spannung und Verschleiß prüfen, bei Bedarf tauschen. Lager abschmieren (Fett laut Typenschild).">{{ v('taetigkeit') }}</textarea>
+      <p class="text-xs text-muted mt-1">Steht so im Auftrag und im Protokoll. Gibt es eine Wartungsanweisung des Herstellers, hier darauf verweisen.</p></div>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div><label class="label">Grundlage (optional)</label><input name="grundlage" value="{{ v('grundlage') }}" class="field" placeholder="z. B. Betriebsanleitung Kap. 7, Herstellerempfehlung"></div>
+      <div><label class="label">Achtung / Sicherheitshinweis (optional)</label><input name="hinweis" value="{{ v('hinweis') }}" class="field" placeholder="z. B. nur bei Stillstand, freischalten"></div>
+    </div>
+  </section>
+
+  <section class="panel p-5 space-y-4">
+    <h2>Für welche Bauteile?</h2>
+    <div class="flex flex-wrap gap-4 text-sm">
+      <label class="flex items-center gap-2"><input type="radio" name="ziel" value="bauteile" x-model="ziel"> Einzelne Bauteile (Tag-Nr.)</label>
+      {% if klassen %}<label class="flex items-center gap-2"><input type="radio" name="ziel" value="klasse" x-model="ziel"> Alle Bauteile einer Klasse</label>{% endif %}
+      <label class="flex items-center gap-2"><input type="radio" name="ziel" value="anlage" x-model="ziel"> Anlage als Ganzes / ohne Bauteilliste</label>
+    </div>
+    <div x-show="ziel === 'bauteile'">
+      <div class="flex flex-wrap gap-2 mb-2" x-show="tags.length">
+        <template x-for="(t, i) in tags" :key="t"><span class="inline-flex items-center gap-1 rounded-full border border-line bg-soft px-3 py-1 text-sm font-semibold">
+          <span x-text="t"></span><input type="hidden" name="tag" :value="t" :disabled="ziel !== 'bauteile'"><button type="button" class="text-muted hover:text-crit" @click="tags.splice(i, 1)" :aria-label="'Tag-Nr. ' + t + ' entfernen'">×</button></span></template>
+      </div>
+      <div class="flex gap-2"><input x-model="neu" list="ih_tags" class="field" placeholder="Tag-Nr. suchen und wählen" @keydown.enter.prevent="hinzu()" @change="hinzu()" autocomplete="off">
+        <button type="button" class="btn" @click="hinzu()">Hinzufügen</button></div>
+      <p class="text-xs text-muted mt-1">Weitere Bauteile lassen sich später auf der Kampagnenseite hinzufügen oder entfernen.</p>
+      <datalist id="ih_tags">{% for c, b in tags %}<option value="{{ c }}{% if b %} – {{ b }}{% endif %}">{% endfor %}</datalist>
+    </div>
+    <div x-show="ziel === 'klasse'" x-cloak>
+      <label class="label">Bauteilklasse</label>
+      <select name="bauteilklasse" class="field max-w-md">{% for kl in klassen %}<option {% if v("bauteilklasse") == kl %}selected{% endif %}>{{ kl }}</option>{% endfor %}</select>
+      <p class="text-xs text-muted mt-1">Gilt automatisch auch für Bauteile, die später mit dieser Klasse dazukommen.</p>
+    </div>
+    <div><label class="label" x-text="ziel === 'anlage' ? 'Gegenstand (was wird geprüft?)' : 'Bezeichnung der Kampagne (optional)'">Gegenstand</label>
+      <input name="gegenstand" value="{{ v('gegenstand') }}" class="field" placeholder="z. B. Druckluftstation Halle 2"></div>
+  </section>
+
+  <section class="panel p-5 space-y-4">
+    <h2>Ab wann und wie oft?</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div><label class="label">Erster Termin</label><input name="erster_termin" type="date" value="{{ v('erster_termin', heute) }}" class="field" required></div>
+      <div><label class="label">Intervall (Monate)</label><input name="intervall_monate" value="{{ v('intervall_monate', 12) }}" class="field" inputmode="numeric" required></div>
+      <div><label class="label">Dauer (Wochen)</label><input name="dauer_wochen" value="{{ v('dauer_wochen', 1) }}" class="field" inputmode="numeric"></div>
+      <div><label class="label">Aufwand (Tage)</label><input name="aufwand_tage" value="{{ v('aufwand_tage') }}" class="field" inputmode="decimal"></div>
+      <div><label class="label">Vorlauf (Wochen)</label><input name="vorlauf_wochen" value="{{ v('vorlauf_wochen') }}" class="field" inputmode="numeric" placeholder="Standard 2"></div>
+      <div class="col-span-1 sm:col-span-3"><label class="label">Verantwortlich</label><input name="verantwortlich" value="{{ v('verantwortlich') }}" class="field"></div>
+    </div>
+    <fieldset><legend class="label">Nächste Termine zählen …</legend>
+      {% for code, text in RHYTHMUS.items() %}<label class="flex items-start gap-2 text-sm py-0.5"><input type="radio" name="rhythmus" value="{{ code }}" class="mt-1" {% if v("rhythmus", "fest") == code %}checked{% endif %}> {{ text }}</label>{% endfor %}
+    </fieldset>
+  </section>
+  <div class="flex gap-2"><button class="btn btn-primary btn-lg">Kampagne anlegen</button><a href="/ih/wartung" class="btn btn-lg">Abbrechen</a></div>
+</form>
+{% endblock %}

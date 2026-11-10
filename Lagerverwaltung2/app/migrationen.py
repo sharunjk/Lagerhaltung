@@ -48,10 +48,17 @@ def _m2_importart(con: Connection) -> None:
     _spalte_ergaenzen(con, "ih_import_laeufe", "art", "VARCHAR(20)")
 
 
+def _m3_kampagnen(con: Connection) -> None:
+    _spalte_ergaenzen(con, "ih_kampagnen", "rhythmus", "VARCHAR(20)")
+    _spalte_ergaenzen(con, "ih_kampagnen", "taetigkeit", "TEXT")
+    _spalte_ergaenzen(con, "ih_kampagnen", "eigen", "BOOLEAN")
+
+
 # (Nummer, Beschreibung, Funktion) – nur anhängen, nie ändern oder entfernen
 MIGRATIONEN = [
     (1, "Buchungen: Preis zum Buchungszeitpunkt und Auftragsbezug; Reservierungen: Auftragsbezug", _m1_buchungen_preis_auftrag),
     (2, "Importläufe: Art (Asset-Liste oder Instandhaltungsplan)", _m2_importart),
+    (3, "Kampagnen: Rhythmus (fest oder ab letzter Durchführung), Tätigkeit, eigene Kampagnen", _m3_kampagnen),
 ]
 
 

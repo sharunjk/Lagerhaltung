@@ -15,7 +15,8 @@ from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import func, insert, select, update
 
 from .. import db
-from ..db import ih_auftraege, ih_auftrag_positionen, ih_dokumente, ih_import_laeufe, ih_import_zeilen, ih_kampagnen, ih_statuslog
+from ..db import (ih_auftraege, ih_auftrag_positionen, ih_dokumente, ih_import_laeufe, ih_import_zeilen, ih_kampagne_bauteile,
+                  ih_kampagnen, ih_plaetze, ih_statuslog)
 from ..rechte import hat_recht
 from ..services import wartung as w
 from ..services.lager import audit
@@ -129,6 +130,111 @@ def _kampagne(con, kid: int) -> dict | None:
     return dict(r) if r else None
 
 
+def _kampagne_werte(f, neu: bool = False) -> tuple[dict, list[str]]:
+    """Formularfelder einer Kampagne (Bearbeiten und eigene Kampagne anlegen)."""
+    fehler = []
+    werte = {"verantwortlich": (f.get("verantwortlich") or "").strip() or None, "aktiv": f.get("aktiv") == "on" or (neu and "aktiv" not in f),
+             "rhythmus": f.get("rhythmus") if f.get("rhythmus") in w.RHYTHMUS else "fest",
+             "taetigkeit": (f.get("taetigkeit") or "").strip() or None, "hinweis": (f.get("hinweis") or "").strip() or None}
+    for feld, lab in (("intervall_monate", "Intervall"), ("dauer_wochen", "Dauer"), ("vorlauf_wochen", "Vorlauf")):
+        v = (f.get(feld) or "").strip()
+        if v == "" and feld in ("vorlauf_wochen", "dauer_wochen"):
+            werte[feld] = None if feld == "vorlauf_wochen" else 1
+            continue
+        if not v.isdigit() or (feld != "vorlauf_wochen" and int(v) < 1) or int(v) > 600:
+            fehler.append(f"{lab}: ganze Zahl angeben.")
+        else:
+            werte[feld] = int(v)
+    try:
+        werte["erster_termin"] = date.fromisoformat(f.get("erster_termin") or "")
+    except ValueError:
+        fehler.append("Erster Termin bzw. Beginn: gültiges Datum angeben.")
+    try:
+        werte["aufwand_tage"] = float(str(f.get("aufwand_tage") or "0").replace(",", ".")) or None
+    except ValueError:
+        fehler.append("Aufwand: Zahl angeben.")
+    return werte, fehler
+
+
+@router.get("/wartung/kampagne/neu")
+def kampagne_neu_form(request: Request, platz: str = ""):
+    require_recht(request, "ih.wartung.planen")
+    with db.schreiben() as con:
+        w.massnahmen_sicherstellen(con)
+    with db.engine().connect() as con:
+        mass = w.massnahmen(con)
+        klassen = [r[0] for r in con.execute(select(ih_plaetze.c.bauteilklasse).where(ih_plaetze.c.bauteilklasse.isnot(None),
+                                                                                    ih_plaetze.c.bauteilklasse != "").distinct().order_by(ih_plaetze.c.bauteilklasse))]
+        tags = _tags(con)
+        vorbelegt = con.execute(select(ih_plaetze.c.code).where(ih_plaetze.c.id == int(platz))).scalar() if platz.isdigit() else None
+    return render(request, "ih/kampagne_neu.html", mass=mass, klassen=klassen, tags=tags, vorbelegt=[vorbelegt] if vorbelegt else [],
+                  RHYTHMUS=w.RHYTHMUS, f={}, heute=w.montag(date.today()))
+
+
+def _tags(con) -> list[tuple[str, str]]:
+    return [(r.code, r.bezeichnung or "") for r in con.execute(select(ih_plaetze.c.code, ih_plaetze.c.bezeichnung)
+                                                               .where(ih_plaetze.c.art == "platz", ih_plaetze.c.aktiv).order_by(ih_plaetze.c.code))]
+
+
+def _platz_ids(con, codes: list[str]) -> tuple[list[int], list[str]]:
+    from ..services.asset_import import schluessel
+    ids, unbekannt = [], []
+    for c in codes:
+        c = " ".join((c or "").split(" – ")[0].split())
+        if not c:
+            continue
+        pid = con.execute(select(ih_plaetze.c.id).where(ih_plaetze.c.schluessel == schluessel(c), ih_plaetze.c.art == "platz")).scalar()
+        if pid:
+            if pid not in ids:
+                ids.append(pid)
+        else:
+            unbekannt.append(c)
+    return ids, unbekannt
+
+
+@router.post("/wartung/kampagne/neu")
+async def kampagne_neu(request: Request):
+    me = require_recht(request, "ih.wartung.planen")
+    f = await request.form()
+    werte, fehler = _kampagne_werte(f, neu=True)
+    massnahme = f.get("massnahme") or ""
+    ziel = f.get("ziel") or "bauteile"
+    klasse = (f.get("bauteilklasse") or "").strip() if ziel == "klasse" else None
+    gegenstand = (f.get("gegenstand") or "").strip() or None
+    with db.schreiben() as con:
+        mass = w.massnahmen(con)
+        if massnahme not in mass:
+            fehler.append("Bitte eine Maßnahme wählen.")
+        ids, unbekannt = _platz_ids(con, f.getlist("tag")) if ziel == "bauteile" else ([], [])
+        if unbekannt:
+            fehler.append(f"Diese Tag-Nr. gibt es nicht unter Anlagen: {', '.join(unbekannt)}.")
+        if ziel == "bauteile" and not ids:
+            fehler.append("Bitte mindestens ein Bauteil auswählen.")
+        if ziel == "klasse" and not klasse:
+            fehler.append("Bitte eine Bauteilklasse wählen.")
+        if ziel == "anlage" and not gegenstand:
+            fehler.append("Bitte angeben, was geprüft bzw. gewartet wird (Gegenstand).")
+        if not werte.get("taetigkeit"):
+            fehler.append("Bitte beschreiben, was zu tun ist.")
+        if fehler:
+            klassen = [r[0] for r in con.execute(select(ih_plaetze.c.bauteilklasse).where(ih_plaetze.c.bauteilklasse.isnot(None),
+                                                                                        ih_plaetze.c.bauteilklasse != "").distinct().order_by(ih_plaetze.c.bauteilklasse))]
+            return render(request, "ih/kampagne_neu.html", mass=mass, klassen=klassen, tags=_tags(con), vorbelegt=list(f.getlist("tag")),
+                          RHYTHMUS=w.RHYTHMUS, f=dict(f), fehler=" ".join(fehler), heute=w.montag(date.today()))
+        text = gegenstand or klasse or con.execute(select(ih_plaetze.c.code).where(ih_plaetze.c.id == ids[0])).scalar()
+        sid = w.schluessel_vorschlag(con, massnahme, text)
+        kid = con.execute(insert(ih_kampagnen).values(
+            schluessel=sid, massnahme=massnahme, bauteilklasse=klasse if ziel == "klasse" else ("Anlage" if ziel == "anlage" else None),
+            gegenstand=gegenstand or (None if ziel != "bauteile" else (text if len(ids) == 1 else f"{text} + {len(ids) - 1} weitere")),
+            grundlage=(f.get("grundlage") or "").strip() or None, eigen=True, geaendert_am=datetime.now(),
+            durchfuehrung=(f.get("durchfuehrung") or "").strip() or None, **werte)).inserted_primary_key[0]
+        for pid in ids:
+            con.execute(insert(ih_kampagne_bauteile).values(kampagne_id=kid, platz_id=pid))
+        audit(con, me["username"], "Eigene Kampagne angelegt", sid, {"bauteile": len(ids), "klasse": klasse, "intervall": werte.get("intervall_monate")})
+    flash(request, f"Kampagne {sid} angelegt.")
+    return RedirectResponse(f"/ih/wartung/kampagne/{kid}", status_code=303)
+
+
 @router.get("/wartung/kampagne/{kid}")
 def kampagne(request: Request, kid: int):
     require_recht(request, "ih.ansehen")
@@ -140,14 +246,15 @@ def kampagne(request: Request, kid: int):
         m = w.massnahmen(con).get(k["massnahme"], {"name": k["massnahme"], "symbol": ""})
         auftr = {r["termin"]: dict(r) for r in con.execute(select(ih_auftraege).where(ih_auftraege.c.kampagne_id == kid)).mappings()}
         kommende = [t for t in w.termine(k, heute + timedelta(days=366 * 3)) if t + timedelta(weeks=k["dauer_wochen"] or 1) > heute][:6]
-        teile = w.bauteile(con, k["bauteilklasse"])
+        teile = w.bauteile_kampagne(con, k)
         letzte = dict(con.execute(select(ih_auftrag_positionen.c.platz_id, func.max(ih_auftrag_positionen.c.durchgefuehrt_am))
                                   .select_from(ih_auftrag_positionen.join(ih_auftraege, ih_auftraege.c.id == ih_auftrag_positionen.c.auftrag_id))
                                   .where(ih_auftraege.c.kampagne_id == kid, ih_auftrag_positionen.c.ergebnis.isnot(None))
                                   .group_by(ih_auftrag_positionen.c.platz_id)).all())
-        achtung = w.achtung(con, k["massnahme"], k["bauteilklasse"])
+        achtung = w.achtung(con, k["massnahme"], k["bauteilklasse"]) if not k["einzeln"] else None
+        tags = _tags(con) if k["einzeln"] else []
     return render(request, "ih/kampagne.html", k=k, m=m, auftr=auftr, kommende=kommende, teile=teile, letzte=letzte, achtung=achtung,
-                  heute=heute, kw=w.kw, STATUS=w.STATUS, LAGE_TEXT=w.LAGE_TEXT, timedelta=timedelta,
+                  heute=heute, kw=w.kw, STATUS=w.STATUS, LAGE_TEXT=w.LAGE_TEXT, timedelta=timedelta, RHYTHMUS=w.RHYTHMUS, tags=tags,
                   historie=sorted(auftr.values(), key=lambda a: a["termin"], reverse=True))
 
 
@@ -155,25 +262,7 @@ def kampagne(request: Request, kid: int):
 async def kampagne_bearbeiten(request: Request, kid: int):
     me = require_recht(request, "ih.wartung.planen")
     f = await request.form()
-    fehler = []
-    werte = {"verantwortlich": (f.get("verantwortlich") or "").strip() or None, "aktiv": f.get("aktiv") == "on"}
-    for feld, lab in (("intervall_monate", "Intervall"), ("dauer_wochen", "Dauer"), ("vorlauf_wochen", "Vorlauf")):
-        v = (f.get(feld) or "").strip()
-        if v == "" and feld == "vorlauf_wochen":
-            werte[feld] = None
-            continue
-        if not v.isdigit() or (feld != "vorlauf_wochen" and int(v) < 1):
-            fehler.append(f"{lab}: ganze Zahl angeben.")
-        else:
-            werte[feld] = int(v)
-    try:
-        werte["erster_termin"] = date.fromisoformat(f.get("erster_termin") or "")
-    except ValueError:
-        fehler.append("Erster Termin: gültiges Datum angeben.")
-    try:
-        werte["aufwand_tage"] = float(str(f.get("aufwand_tage") or "0").replace(",", ".")) or None
-    except ValueError:
-        fehler.append("Aufwand: Zahl angeben.")
+    werte, fehler = _kampagne_werte(f)
     if fehler:
         flash(request, " ".join(fehler), "fehler")
         return RedirectResponse(f"/ih/wartung/kampagne/{kid}", status_code=303)
@@ -181,13 +270,45 @@ async def kampagne_bearbeiten(request: Request, kid: int):
         k = _kampagne(con, kid)
         if not k:
             return RedirectResponse("/ih/wartung", status_code=303)
-        geaendert = {x: [str(k[x]), str(v)] for x, v in werte.items() if k[x] != v}
+        geaendert = {x: [str(k[x]), str(v)] for x, v in werte.items() if k[x] != v and not (k[x] is None and x == "rhythmus" and v == "fest")}
         if geaendert:
             con.execute(update(ih_kampagnen).where(ih_kampagnen.c.id == kid).values(geaendert_am=datetime.now(), **werte))
             audit(con, me["username"], "Kampagne geändert", k["schluessel"], geaendert)
-    flash(request, "Kampagne gespeichert. Hinweis: Ein erneuter Import des Instandhaltungsplans überschreibt diese Werte." if geaendert
-          else "Keine Änderungen.")
+    flash(request, ("Kampagne gespeichert." + ("" if k.get("eigen") else " Hinweis: Ein erneuter Import des Instandhaltungsplans überschreibt "
+                    "die Werte aus dem Plan; Rhythmus und Tätigkeit bleiben.")) if geaendert else "Keine Änderungen.")
     return RedirectResponse(f"/ih/wartung/kampagne/{kid}", status_code=303)
+
+
+@router.post("/wartung/kampagne/{kid}/bauteile")
+async def kampagne_bauteile(request: Request, kid: int):
+    """Einzelne Bauteile einer eigenen Kampagne hinzufügen oder entfernen."""
+    me = require_recht(request, "ih.wartung.planen")
+    f = await request.form()
+    with db.schreiben() as con:
+        k = _kampagne(con, kid)
+        if not k:
+            return RedirectResponse("/ih/wartung", status_code=303)
+        if f.get("entfernen", "").isdigit():
+            n = con.execute(select(func.count()).select_from(ih_kampagne_bauteile).where(ih_kampagne_bauteile.c.kampagne_id == kid)).scalar()
+            if n <= 1:
+                flash(request, "Das letzte Bauteil bleibt – die Kampagne stattdessen deaktivieren.", "fehler")
+            else:
+                con.execute(ih_kampagne_bauteile.delete().where(ih_kampagne_bauteile.c.kampagne_id == kid,
+                                                                ih_kampagne_bauteile.c.platz_id == int(f["entfernen"])))
+                audit(con, me["username"], "Kampagne: Bauteil entfernt", k["schluessel"], {"platz_id": int(f["entfernen"])})
+        else:
+            ids, unbekannt = _platz_ids(con, f.getlist("tag"))
+            vorhanden = {r[0] for r in con.execute(select(ih_kampagne_bauteile.c.platz_id).where(ih_kampagne_bauteile.c.kampagne_id == kid))}
+            neu = [i for i in ids if i not in vorhanden]
+            for pid in neu:
+                con.execute(insert(ih_kampagne_bauteile).values(kampagne_id=kid, platz_id=pid))
+            if neu:
+                audit(con, me["username"], "Kampagne: Bauteile hinzugefügt", k["schluessel"], {"anzahl": len(neu)})
+            if unbekannt:
+                flash(request, f"Nicht gefunden: {', '.join(unbekannt)}.", "fehler")
+            elif neu:
+                flash(request, f"{len(neu)} Bauteil(e) hinzugefügt. Neue Aufträge enthalten sie, bestehende bleiben unverändert.")
+    return RedirectResponse(f"/ih/wartung/kampagne/{kid}#bauteile", status_code=303)
 
 
 @router.post("/wartung/kampagne/{kid}/auftrag")
@@ -313,7 +434,11 @@ def _auftrag_ctx(con, aid: int) -> dict | None:
     docs = [dict(r) for r in con.execute(select(ih_dokumente).where(ih_dokumente.c.auftrag_id == aid).order_by(ih_dokumente.c.id)).mappings()]
     log = [dict(r) for r in con.execute(select(ih_statuslog).where(ih_statuslog.c.auftrag_id == aid).order_by(ih_statuslog.c.id)).mappings()]
     m = w.massnahmen(con).get(a["massnahme"], {"name": a["massnahme"], "symbol": "", "beschreibung": None, "wer": None, "nachweis": None})
-    return {"a": a, "pos": pos, "docs": docs, "log": log, "m": m, "achtung": w.achtung(con, a["massnahme"], a["bauteilklasse"])}
+    teile = w.ersatzteile_auftrag(con, aid)
+    entn = w.entnahmen(con, aid)
+    kosten = sum(-(e["menge"] or 0) * (e["preis"] or 0) for e in entn)
+    achtung = " ".join(x for x in (w.achtung(con, a["massnahme"], a["bauteilklasse"]), a.get("kampagne_hinweis") if a.get("eigen") else None) if x) or None
+    return {"a": a, "pos": pos, "docs": docs, "log": log, "m": m, "achtung": achtung, "teile": teile, "entn": entn, "kosten": kosten}
 
 
 @router.get("/auftraege/{aid}")
@@ -430,6 +555,28 @@ async def position_speichern(request: Request, aid: int, pid: int):
     if f.get("weiter") == "naechste" and i + 1 < len(reihe):
         return RedirectResponse(f"/ih/auftraege/{aid}/position/{reihe[i + 1]}", status_code=303)
     return RedirectResponse(f"/ih/auftraege/{aid}#bauteile", status_code=303)
+
+
+@router.post("/auftraege/{aid}/entnahme")
+def auftrag_entnahme(request: Request, aid: int, artikel_nr: str = Form(""), platz: str = Form(""), menge: str = Form("")):
+    """Ersatzteil für den Auftrag entnehmen: bucht den Lagerbestand ab und verknüpft die Buchung mit dem Auftrag
+    (Materialverbrauch je Anlage, Kosten zum Preis des Buchungszeitpunkts)."""
+    me = require_recht(request, "ih.auftrag.ausfuehren")
+    from ..services.lager import BuchungsFehler, Lager
+    cfg = request.app.state.cfg
+    try:
+        with db.schreiben() as con:
+            a = w.auftrag(con, aid)
+            if not a or a["status"] not in ("freigegeben", "in_arbeit"):
+                raise w.WartungsFehler("Entnahmen sind nur bei freigegebenen Aufträgen in Arbeit möglich.")
+            lg = Lager(con, me["username"], "ih", cfg.lager.negative_bestaende_erlauben, False)
+            e = lg.ausgang(artikel_nr.strip(), platz.strip(), menge, auftrag_id=aid, empfaenger=f"Auftrag A-{aid:05d}", zweck=a["titel"][:300])
+            audit(con, me["username"], "Entnahme für Auftrag", f"A-{aid:05d}", {"artikel": e.artikel_nr, "platz": e.platz, "menge": e.menge})
+    except (BuchungsFehler, w.WartungsFehler) as ex:
+        flash(request, str(ex), "fehler")
+        return RedirectResponse(f"/ih/auftraege/{aid}#ersatzteile", status_code=303)
+    flash(request, f"Entnommen: {abs(e.menge):g} × {e.artikel_nr} von {e.platz} (Bestand dort jetzt {e.bestand_nachher:g}).")
+    return RedirectResponse(f"/ih/auftraege/{aid}#ersatzteile", status_code=303)
 
 
 # ------------------------------------------------------------------ Nachweise / Dokumente

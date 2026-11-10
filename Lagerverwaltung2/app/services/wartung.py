@@ -19,8 +19,8 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.engine import Connection
 
-from ..db import (ih_auftraege, ih_auftrag_positionen, ih_dokumente, ih_kampagnen, ih_klassen_intervalle, ih_massnahmen, ih_plaetze,
-                  ih_statuslog)
+from ..db import (artikel, bestand, bewegungen, ih_auftraege, ih_auftrag_positionen, ih_dokumente, ih_kampagne_bauteile, ih_kampagnen,
+                  ih_klassen_intervalle, ih_massnahmen, ih_plaetze, ih_statuslog, ih_stueckliste, lagerplaetze)
 from .lager import audit
 
 
@@ -59,13 +59,27 @@ def kw(d: date) -> str:
     return f"KW {w:02d}/{j}"
 
 
+RHYTHMUS = {"fest": "fest ab dem ersten Termin (wie im Instandhaltungsplan)",
+            "ab_erledigung": "ab der letzten Durchführung (später erledigt = nächster Termin später)"}
+
+
+def startpunkt(k: dict) -> date | None:
+    """Ab wann die Intervalle gerechnet werden: fester Rhythmus ab erstem Termin oder ab letzter Durchführung."""
+    erster = k.get("erster_termin")
+    if k.get("rhythmus") == "ab_erledigung" and k.get("basis") and k.get("intervall_monate"):
+        ab = montag(plus_monate(k["basis"], int(k["intervall_monate"])))  # Wochenplanung: Montag der Woche
+        return max(ab, erster) if erster else ab
+    return erster
+
+
 def termine(k: dict, bis: date) -> list[date]:
-    """Alle Termine einer Kampagne vom ersten Termin bis einschließlich ``bis`` (fester Rhythmus wie im Plan)."""
-    if not k.get("intervall_monate") or not k.get("erster_termin"):
+    """Termine einer Kampagne bis einschließlich ``bis`` – ab ``startpunkt`` im Abstand des Intervalls."""
+    start = startpunkt(k)
+    if not k.get("intervall_monate") or not start:
         return []
     out, n = [], 0
     while True:
-        t = plus_monate(k["erster_termin"], n * int(k["intervall_monate"]))
+        t = plus_monate(start, n * int(k["intervall_monate"]))
         if t > bis:
             return out
         out.append(t)
@@ -83,20 +97,31 @@ def vorlauf(k: dict) -> int:
 def lage(con: Connection, heute: date | None = None) -> list[dict]:
     """Jede aktive Kampagne mit nächstem offenen Termin, Status und Anzahl Bauteile."""
     heute = heute or date.today()
-    auftr = {}
+    auftr, offene = {}, {}
     for r in con.execute(select(ih_auftraege.c.kampagne_id, ih_auftraege.c.termin, ih_auftraege.c.id, ih_auftraege.c.status)):
         auftr[(r.kampagne_id, r.termin)] = {"id": r.id, "status": r.status}
+        if r.status in OFFEN:
+            offene.setdefault(r.kampagne_id, []).append((r.termin, {"id": r.id, "status": r.status}))
     anzahl = bauteile_je_klasse(con)
+    einzeln = dict(con.execute(select(ih_kampagne_bauteile.c.kampagne_id, func.count()).select_from(
+        ih_kampagne_bauteile.join(ih_plaetze, ih_plaetze.c.id == ih_kampagne_bauteile.c.platz_id)).where(ih_plaetze.c.aktiv)
+        .group_by(ih_kampagne_bauteile.c.kampagne_id)).all())
+    basen = basis_je_kampagne(con)
     out = []
     for k in con.execute(select(ih_kampagnen).order_by(ih_kampagnen.c.schluessel)).mappings():
         k = dict(k)
-        k["bauteile"] = anzahl.get((k["bauteilklasse"] or "").casefold(), 0)
+        k["einzeln"] = k["id"] in einzeln
+        k["bauteile"] = einzeln[k["id"]] if k["einzeln"] else anzahl.get((k["bauteilklasse"] or "").casefold(), 0)
         k["vorlauf"] = vorlauf(k)
+        k["basis"] = basen.get(k["id"])
         offen = []
         for t in termine(k, heute + timedelta(days=366 + 7 * k["vorlauf"])):
             a = auftr.get((k["id"], t))
             if not a or a["status"] in OFFEN:
                 offen.append((t, a))
+        # offene Aufträge außerhalb des Rasters (z. B. nach Änderung des Intervalls) zählen trotzdem als nächster Termin
+        bekannt = {t for t, _ in offen}
+        offen = sorted(offen + [(t, a) for t, a in offene.get(k["id"], []) if t not in bekannt], key=lambda x: x[0])
         k["ueberfaellige"] = sum(1 for t, _ in offen if t + timedelta(weeks=k["dauer_wochen"] or 1) <= heute)
         if offen:
             k["naechster"], k["auftrag"] = offen[0]
@@ -132,6 +157,27 @@ def bauteile(con: Connection, klasse: str | None) -> list[dict]:
     return [dict(r) for r in con.execute(select(ih_plaetze).where(
         ih_plaetze.c.art == "platz", ih_plaetze.c.aktiv, func.lower(ih_plaetze.c.bauteilklasse) == klasse.casefold())
         .order_by(ih_plaetze.c.code)).mappings()]
+
+
+def bauteile_kampagne(con: Connection, k: dict) -> list[dict]:
+    """Einzeln zugeordnete Bauteile (eigene Kampagne) – sonst alle aktiven Bauteile der Bauteilklasse."""
+    einzeln = [dict(r) for r in con.execute(select(ih_plaetze).select_from(
+        ih_kampagne_bauteile.join(ih_plaetze, ih_plaetze.c.id == ih_kampagne_bauteile.c.platz_id))
+        .where(ih_kampagne_bauteile.c.kampagne_id == k["id"], ih_plaetze.c.aktiv).order_by(ih_plaetze.c.code)).mappings()]
+    if einzeln or con.execute(select(func.count()).select_from(ih_kampagne_bauteile).where(ih_kampagne_bauteile.c.kampagne_id == k["id"])).scalar():
+        return einzeln
+    return bauteile(con, k.get("bauteilklasse"))
+
+
+def basis_je_kampagne(con: Connection) -> dict[int, date]:
+    """Letzte Durchführung je Kampagne: Datum „technisch erledigt“ des neuesten abgeschlossenen Auftrags."""
+    out = {}
+    for kid, erl, abg in con.execute(select(ih_auftraege.c.kampagne_id, ih_auftraege.c.erledigt_am, ih_auftraege.c.abgeschlossen_am)
+                                     .where(ih_auftraege.c.status == "abgeschlossen")):
+        d = (erl or abg)
+        if d and (kid not in out or d.date() > out[kid]):
+            out[kid] = d.date()
+    return out
 
 
 def wochenlast(kampagnen: list[dict], wochen: list[date]) -> dict[date, float]:
@@ -367,7 +413,8 @@ def auftrag_anlegen(con: Connection, kampagne_id: int, termin: date, benutzer: s
     k = con.execute(select(ih_kampagnen).where(ih_kampagnen.c.id == kampagne_id)).mappings().first()
     if not k:
         raise WartungsFehler("Kampagne nicht gefunden.")
-    if termin not in termine(dict(k), termin):
+    k = {**k, "basis": basis_je_kampagne(con).get(kampagne_id)}
+    if termin not in termine(k, termin):
         raise WartungsFehler(f"{termin:%d.%m.%Y} ist kein Termin dieser Kampagne.")
     if con.execute(select(ih_auftraege.c.id).where(ih_auftraege.c.kampagne_id == kampagne_id, ih_auftraege.c.termin == termin)).scalar():
         raise WartungsFehler(f"Für {kw(termin)} gibt es schon einen Auftrag.")
@@ -377,7 +424,7 @@ def auftrag_anlegen(con: Connection, kampagne_id: int, termin: date, benutzer: s
     aid = con.execute(insert(ih_auftraege).values(kampagne_id=kampagne_id, termin=termin, massnahme=k["massnahme"], titel=titel[:300],
                                                   status="angelegt", verantwortlich=k["verantwortlich"], erstellt_von=benutzer,
                                                   erstellt_am=jetzt)).inserted_primary_key[0]
-    teile = bauteile(con, k["bauteilklasse"])
+    teile = bauteile_kampagne(con, k)
     if teile:
         con.execute(insert(ih_auftrag_positionen), [{"auftrag_id": aid, "platz_id": t["id"],
                                                      "formular": formular(k["massnahme"], t["sicherheitsgerichtet"])} for t in teile])
@@ -403,7 +450,8 @@ def _log(con, aid, benutzer, von, nach, text=""):
 def auftrag(con: Connection, aid: int) -> dict | None:
     r = con.execute(select(ih_auftraege, ih_kampagnen.c.schluessel.label("kampagne"), ih_kampagnen.c.bauteilklasse,
                            ih_kampagnen.c.gegenstand, ih_kampagnen.c.grundlage, ih_kampagnen.c.rechtsgrundlage,
-                           ih_kampagnen.c.durchfuehrung, ih_kampagnen.c.hinweis, ih_kampagnen.c.dauer_wochen)
+                           ih_kampagnen.c.durchfuehrung, ih_kampagnen.c.hinweis, ih_kampagnen.c.dauer_wochen,
+                           ih_kampagnen.c.taetigkeit, ih_kampagnen.c.eigen, ih_kampagnen.c.hinweis.label("kampagne_hinweis"))
                     .select_from(ih_auftraege.outerjoin(ih_kampagnen, ih_kampagnen.c.id == ih_auftraege.c.kampagne_id))
                     .where(ih_auftraege.c.id == aid)).mappings().first()
     return dict(r) if r else None
@@ -527,29 +575,160 @@ def historie(con: Connection, platz_id: int) -> list[dict]:
 
 
 def plan_fuer_bauteil(con: Connection, a: dict) -> list[dict]:
-    """Maßnahmen, die für die Bauteilklasse gelten, mit letzter Durchführung und nächstem Termin."""
-    if not a.get("bauteilklasse"):
-        return []
+    """Maßnahmen, die für das Bauteil gelten (über die Bauteilklasse oder eigene Kampagnen), mit letzter
+    Durchführung und nächstem Termin."""
     letzte = {r.massnahme: r.am for r in con.execute(
         select(ih_auftraege.c.massnahme, func.max(ih_auftrag_positionen.c.durchgefuehrt_am).label("am"))
         .select_from(ih_auftrag_positionen.join(ih_auftraege, ih_auftraege.c.id == ih_auftrag_positionen.c.auftrag_id))
         .where(ih_auftrag_positionen.c.platz_id == a["id"], ih_auftrag_positionen.c.ergebnis.isnot(None))
         .group_by(ih_auftraege.c.massnahme))}
+    klasse = (a.get("bauteilklasse") or "").casefold()
+    eigene_ids = {r[0] for r in con.execute(select(ih_kampagne_bauteile.c.kampagne_id).where(ih_kampagne_bauteile.c.platz_id == a["id"]))}
+    alle = lage(con)
     naechster = {}
-    for k in lage(con):
-        if (k["bauteilklasse"] or "").casefold() == a["bauteilklasse"].casefold() and k["aktiv"]:
+    for k in alle:
+        if klasse and not k["einzeln"] and (k["bauteilklasse"] or "").casefold() == klasse and k["aktiv"]:
             naechster[k["massnahme"]] = k
     m = massnahmen(con)
     out = []
-    for r in con.execute(select(ih_klassen_intervalle).where(func.lower(ih_klassen_intervalle.c.bauteilklasse) == a["bauteilklasse"].casefold())).mappings():
-        r = dict(r)
-        r["mass"] = m.get(r["massnahme"], {"name": r["massnahme"], "symbol": ""})
-        r["letzte"] = letzte.get(r["massnahme"])
-        r["kampagne"] = naechster.get(r["massnahme"])
-        out.append(r)
-    return sorted(out, key=lambda r: r["mass"].get("reihenfolge") or 0)
+    if klasse:
+        for r in con.execute(select(ih_klassen_intervalle).where(func.lower(ih_klassen_intervalle.c.bauteilklasse) == klasse)).mappings():
+            r = dict(r)
+            r["mass"] = m.get(r["massnahme"], {"name": r["massnahme"], "symbol": ""})
+            r["letzte"] = letzte.get(r["massnahme"])
+            r["kampagne"] = naechster.get(r["massnahme"])
+            out.append(r)
+    for k in alle:  # eigene Kampagnen, die genau dieses Bauteil enthalten
+        if k["id"] in eigene_ids:
+            out.append({"massnahme": k["massnahme"], "mass": m.get(k["massnahme"], {"name": k["massnahme"], "symbol": ""}),
+                        "intervall_monate": k["intervall_monate"], "grundlage": k["taetigkeit"] or k["grundlage"], "achtung": k["hinweis"],
+                        "letzte": letzte.get(k["massnahme"]), "kampagne": k, "eigen": True})
+    return sorted(out, key=lambda r: (r["mass"].get("reihenfolge") or 0, r.get("eigen", False)))
 
 
 def offene_auftraege_zahl(con: Connection) -> int:
     return con.execute(select(func.count()).select_from(ih_auftraege).where(ih_auftraege.c.status.in_(OFFEN))).scalar()
 
+
+
+# ------------------------------------------------------------------ Eigene Kampagnen
+STANDARD_MASSNAHMEN = [
+    {"code": "S", "symbol": "●", "name": "Sichtprüfung", "beschreibung": "Äußerlich erkennbare Mängel oder Schäden an Gerät, Installation und "
+     "Kennzeichnung feststellen. Keine Demontage, kein Eingriff in den Prozess.", "wer": "Instandhaltung", "nachweis": "Wartungsprotokoll",
+     "pflicht": False, "reihenfolge": 0},
+    {"code": "W", "symbol": "▲", "name": "Wartung", "beschreibung": "Maßnahmen zum Erhalt des Sollzustands nach der bauteilspezifischen "
+     "Wartungsanweisung.", "wer": "Instandhaltung", "nachweis": "Wartungsprotokoll", "pflicht": False, "reihenfolge": 1},
+    {"code": "F", "symbol": "■", "name": "Funktionsprüfung", "beschreibung": "Nachweis, dass die Funktion im Anforderungsfall erfüllt wird.",
+     "wer": "Instandhaltung / Fachfirma", "nachweis": "Prüfprotokoll", "pflicht": False, "reihenfolge": 2},
+]
+
+
+def massnahmen_sicherstellen(con: Connection) -> None:
+    """Ohne übernommenen Instandhaltungsplan gibt es trotzdem S, W und F für eigene Kampagnen."""
+    vorhanden = {r[0] for r in con.execute(select(ih_massnahmen.c.code))}
+    for m in STANDARD_MASSNAHMEN:
+        if m["code"] not in vorhanden:
+            con.execute(insert(ih_massnahmen).values(**m))
+
+
+def schluessel_vorschlag(con: Connection, massnahme: str, text: str) -> str:
+    basis = re.sub(r"\s+", " ", f"E-{massnahme}-{text}".strip())[:100]
+    vorhanden = {r[0] for r in con.execute(select(ih_kampagnen.c.schluessel))}
+    if basis not in vorhanden:
+        return basis
+    n = 2
+    while f"{basis}-{n}" in vorhanden:
+        n += 1
+    return f"{basis}-{n}"
+
+
+# ------------------------------------------------------------------ Ersatzteile (Stückliste) und Entnahme für Aufträge
+def orte(con: Connection, artikel_ids: list[int]) -> dict[int, list[tuple[str, float]]]:
+    out: dict[int, list] = {}
+    if not artikel_ids:
+        return out
+    for aid, code, menge in con.execute(select(bestand.c.artikel_id, lagerplaetze.c.code, bestand.c.menge)
+                                        .select_from(bestand.join(lagerplaetze, lagerplaetze.c.id == bestand.c.lagerplatz_id))
+                                        .where(bestand.c.artikel_id.in_(artikel_ids), bestand.c.menge != 0).order_by(lagerplaetze.c.code)):
+        out.setdefault(aid, []).append((code, float(menge)))
+    return out
+
+
+def ersatzteile_platz(con: Connection, platz_id: int) -> list[dict]:
+    rows = [dict(r) for r in con.execute(
+        select(ih_stueckliste.c.id.label("sid"), ih_stueckliste.c.menge.label("je_bauteil"), ih_stueckliste.c.bemerkung, artikel.c.id,
+               artikel.c.nummer, artikel.c.bezeichnung, artikel.c.einheit, artikel.c.meldebestand, artikel.c.aktiv)
+        .select_from(ih_stueckliste.join(artikel, artikel.c.id == ih_stueckliste.c.artikel_id))
+        .where(ih_stueckliste.c.platz_id == platz_id).order_by(artikel.c.nummer)).mappings()]
+    o = orte(con, [r["id"] for r in rows])
+    for r in rows:
+        r["orte"] = o.get(r["id"], [])
+        r["bestand"] = sum(m for _, m in r["orte"])
+    return rows
+
+
+def ersatzteile_auftrag(con: Connection, aid: int) -> list[dict]:
+    """Ersatzteile aller Bauteile im Auftrag, zusammengefasst je Artikel, mit Lagerbestand und bereits Entnommenem."""
+    rows = con.execute(select(artikel.c.id, artikel.c.nummer, artikel.c.bezeichnung, artikel.c.einheit, ih_plaetze.c.code, ih_stueckliste.c.menge)
+                       .select_from(ih_auftrag_positionen.join(ih_stueckliste, ih_stueckliste.c.platz_id == ih_auftrag_positionen.c.platz_id)
+                                    .join(artikel, artikel.c.id == ih_stueckliste.c.artikel_id)
+                                    .join(ih_plaetze, ih_plaetze.c.id == ih_auftrag_positionen.c.platz_id))
+                       .where(ih_auftrag_positionen.c.auftrag_id == aid).order_by(artikel.c.nummer, ih_plaetze.c.code)).all()
+    teile: dict[int, dict] = {}
+    for r in rows:
+        t = teile.setdefault(r.id, {"id": r.id, "nummer": r.nummer, "bezeichnung": r.bezeichnung, "einheit": r.einheit, "bauteile": [], "bedarf": 0.0})
+        t["bauteile"].append(r.code)
+        t["bedarf"] += r.menge or 0
+    for t in entnahmen(con, aid):
+        if t["artikel_id"] not in teile and t["artikel_id"]:
+            teile[t["artikel_id"]] = {"id": t["artikel_id"], "nummer": t["artikel_nr"], "bezeichnung": t["bezeichnung"], "einheit": t["einheit"],
+                                      "bauteile": [], "bedarf": 0.0}
+    o = orte(con, list(teile))
+    ent: dict[int, float] = {}
+    for e in entnahmen(con, aid):
+        ent[e["artikel_id"]] = ent.get(e["artikel_id"], 0) - e["menge"]
+    for t in teile.values():
+        t["orte"] = o.get(t["id"], [])
+        t["bestand"] = sum(m for _, m in t["orte"])
+        t["entnommen"] = ent.get(t["id"], 0)
+    return list(teile.values())
+
+
+def entnahmen(con: Connection, aid: int) -> list[dict]:
+    return [dict(r) for r in con.execute(
+        select(bewegungen.c.id, bewegungen.c.zeit, bewegungen.c.artikel_id, bewegungen.c.artikel_nr, bewegungen.c.lagerplatz, bewegungen.c.menge,
+               bewegungen.c.preis, bewegungen.c.benutzer, bewegungen.c.typ, artikel.c.bezeichnung, artikel.c.einheit)
+        .select_from(bewegungen.outerjoin(artikel, artikel.c.id == bewegungen.c.artikel_id))
+        .where(bewegungen.c.auftrag_id == aid, bewegungen.c.typ == "ausgang").order_by(bewegungen.c.id)).mappings()]
+
+
+def tag_muster(code: str) -> re.Pattern:
+    """Tag-Nr. in Freitext finden: Leerzeichen zwischen den Teilen beliebig, nicht als Teil einer längeren Nummer."""
+    teile = [re.escape(t) for t in code.split()]
+    return re.compile(r"(?<![0-9A-Za-z])" + r"\s*".join(teile) + r"(?![0-9A-Za-z])", re.IGNORECASE)
+
+
+def vorschlaege_aus_verwendung(con: Connection, nur_platz: int | None = None) -> list[dict]:
+    """Artikel, deren Feld „Verwendung“ eine Tag-Nr. nennt, die noch nicht zugeordnet ist."""
+    q = select(ih_plaetze.c.id, ih_plaetze.c.code, ih_plaetze.c.bezeichnung).where(ih_plaetze.c.art == "platz", ih_plaetze.c.aktiv,
+                                                                                   func.length(ih_plaetze.c.schluessel) >= 5)
+    if nur_platz:
+        q = q.where(ih_plaetze.c.id == nur_platz)
+    plaetze = [(r.id, r.code, r.bezeichnung, tag_muster(r.code)) for r in con.execute(q)]
+    schon = {(r.artikel_id, r.platz_id) for r in con.execute(select(ih_stueckliste.c.artikel_id, ih_stueckliste.c.platz_id))}
+    out = []
+    for a in con.execute(select(artikel.c.id, artikel.c.nummer, artikel.c.bezeichnung, artikel.c.verwendung)
+                         .where(artikel.c.aktiv, artikel.c.verwendung.isnot(None), artikel.c.verwendung != "").order_by(artikel.c.nummer)):
+        treffer = [{"id": pid, "code": code, "bezeichnung": bez} for pid, code, bez, m in plaetze
+                   if (a.id, pid) not in schon and m.search(a.verwendung)]
+        if treffer:
+            out.append({"id": a.id, "nummer": a.nummer, "bezeichnung": a.bezeichnung, "verwendung": a.verwendung, "tags": treffer})
+    return out
+
+
+def zuordnen(con: Connection, artikel_id: int, platz_id: int, benutzer: str, menge: float | None = None, bemerkung: str | None = None) -> bool:
+    if con.execute(select(ih_stueckliste.c.id).where(ih_stueckliste.c.artikel_id == artikel_id, ih_stueckliste.c.platz_id == platz_id)).scalar():
+        return False
+    con.execute(insert(ih_stueckliste).values(artikel_id=artikel_id, platz_id=platz_id, menge=menge, bemerkung=bemerkung, erstellt_von=benutzer,
+                                              erstellt_am=datetime.now()))
+    return True

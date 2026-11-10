@@ -271,17 +271,15 @@ def anlage(request: Request, aid: int):
         pfad = _pfad(con, a)
         kinder = con.execute(select(ih_plaetze).where(ih_plaetze.c.eltern_id == aid, ih_plaetze.c.aktiv).order_by(ih_plaetze.c.code)
                              .limit(500)).mappings().all()
-        # Ersatzteile aus dem Lager: Artikel, deren Verwendung diese Tag-Nr. nennt (bis zur Stückliste in Phase 1)
-        teile = []
-        if a["art"] == "platz":
-            teile = con.execute(select(artikel.c.nummer, artikel.c.bezeichnung, artikel.c.verwendung).where(
-                artikel.c.aktiv, or_(artikel.c.verwendung.ilike(f"%{a['code']}%"),
-                                     func.replace(artikel.c.verwendung, " ", "").ilike(f"%{a['code'].replace(' ', '')}%")))
-                .order_by(artikel.c.nummer).limit(50)).mappings().all()
+        teile = wartung.ersatzteile_platz(con, aid) if a["art"] == "platz" else []
+        vorschlaege = (wartung.vorschlaege_aus_verwendung(con, nur_platz=aid) if a["art"] == "platz" else [])
+        artikelliste = [(r.nummer, r.bezeichnung) for r in con.execute(select(artikel.c.nummer, artikel.c.bezeichnung)
+                                                                        .where(artikel.c.aktiv).order_by(artikel.c.nummer))] if a["art"] == "platz" else []
         plan = wartung.plan_fuer_bauteil(con, a) if a["art"] == "platz" else []
         hist = wartung.historie(con, aid) if a["art"] == "platz" else []
         mass = wartung.massnahmen(con)
     return render(request, "ih/anlage.html", a=a, ebenen_pfad=pfad, kinder=kinder, zusatz=_zusatz(a), teile=teile, ART_TEXT=ART_TEXT,
+                  vorschlaege=vorschlaege, artikelliste=artikelliste,
                   plan=plan, hist=hist, mass=mass, ERGEBNIS=wartung.ERGEBNIS, kw=wartung.kw)
 
 
@@ -320,6 +318,70 @@ async def anlage_bearbeiten(request: Request, aid: int):
             audit(con, me["username"], "Anlage geändert", a["code"], geaendert)
     flash(request, "Gespeichert." if geaendert else "Keine Änderungen.")
     return RedirectResponse(f"/ih/anlagen/{aid}", status_code=303)
+
+
+@router.post("/anlagen/{aid}/ersatzteile")
+async def anlage_ersatzteile(request: Request, aid: int):
+    """Ersatzteile (Lagerartikel) einem Bauteil zuordnen oder die Zuordnung lösen."""
+    me = require_recht(request, "ih.anlagen.pflegen")
+    f = await request.form()
+    from ..db import ih_stueckliste
+    with db.schreiben() as con:
+        a = _anlage(con, aid)
+        if not a or a["art"] != "platz":
+            return RedirectResponse("/ih/anlagen", status_code=303)
+        if (f.get("loesen") or "").isdigit():
+            nr = con.execute(select(artikel.c.nummer).select_from(ih_stueckliste.join(artikel, artikel.c.id == ih_stueckliste.c.artikel_id))
+                             .where(ih_stueckliste.c.id == int(f["loesen"]), ih_stueckliste.c.platz_id == aid)).scalar()
+            if nr:
+                con.execute(ih_stueckliste.delete().where(ih_stueckliste.c.id == int(f["loesen"])))
+                audit(con, me["username"], "Ersatzteil-Zuordnung gelöst", a["code"], {"artikel": nr})
+                flash(request, f"Artikel {nr} ist nicht mehr {a['code']} zugeordnet.")
+        else:
+            nummern = [n.strip() for n in f.getlist("artikel_nr") if n.strip()]
+            menge = None
+            try:
+                menge = ai.zahl(f.get("menge") or "")
+            except ValueError:
+                flash(request, "Menge: bitte eine Zahl.", "fehler")
+            neu, unbekannt = [], []
+            for nr in nummern:
+                art_id = con.execute(select(artikel.c.id).where(artikel.c.nummer == nr.split(" – ")[0].strip())).scalar()
+                if not art_id:
+                    unbekannt.append(nr)
+                elif wartung.zuordnen(con, art_id, aid, me["username"], menge, (f.get("bemerkung") or "").strip() or None):
+                    neu.append(nr.split(" – ")[0].strip())
+            if neu:
+                audit(con, me["username"], "Ersatzteil zugeordnet", a["code"], {"artikel": neu})
+                flash(request, f"Zugeordnet: {', '.join(neu)}.")
+            if unbekannt:
+                flash(request, f"Artikel nicht gefunden: {', '.join(unbekannt)}.", "fehler")
+    return RedirectResponse(f"/ih/anlagen/{aid}#ersatzteile", status_code=303)
+
+
+@router.get("/ersatzteile/vorschlaege")
+def ersatzteile_vorschlaege(request: Request):
+    """Assistent: Tag-Nummern aus dem Freitextfeld „Verwendung“ der Lagerartikel als feste Zuordnung übernehmen."""
+    require_recht(request, "ih.anlagen.pflegen")
+    with db.engine().connect() as con:
+        liste = wartung.vorschlaege_aus_verwendung(con)
+    return render(request, "ih/ersatzteile_vorschlaege.html", liste=liste)
+
+
+@router.post("/ersatzteile/vorschlaege")
+async def ersatzteile_vorschlaege_uebernehmen(request: Request):
+    me = require_recht(request, "ih.anlagen.pflegen")
+    f = await request.form()
+    n = 0
+    with db.schreiben() as con:
+        for wert in f.getlist("paar"):
+            art_id, _, pid = wert.partition(":")
+            if art_id.isdigit() and pid.isdigit() and wartung.zuordnen(con, int(art_id), int(pid), me["username"]):
+                n += 1
+        if n:
+            audit(con, me["username"], "Ersatzteil-Zuordnungen übernommen", "Verwendung", {"anzahl": n})
+    flash(request, f"{n} Zuordnungen übernommen." if n else "Nichts ausgewählt.")
+    return RedirectResponse("/ih/ersatzteile/vorschlaege", status_code=303)
 
 
 @router.post("/anlagen/{aid}/archivieren")

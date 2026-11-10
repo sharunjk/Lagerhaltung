@@ -51,7 +51,21 @@
   <section class="panel p-5">
     <h2 class="mb-4">Zusatzinformationen</h2>
     <label class="flex items-center gap-2"><input type="checkbox" name="kritisch" {% if a.kritisch in (True, 'on', 1) %}checked{% endif %}> Kritisches Ersatzteil (Anlagenstillstand, wenn nicht vorrätig)</label>
-    <div class="mt-4"><label class="label">Verwendung / Anlage / Tag-Nummer</label><textarea name="verwendung" rows="2" class="field" placeholder="z. B. VV 1040 80, Reformer-Strang">{{ a.verwendung or '' }}</textarea></div>
+    {% if cfg.cmms.aktiv and ih_tags %}
+    <div class="mt-4" x-data='{tags: {{ (a._tags or [])|tojson }}, neu: "", hinzu() { const c = this.neu.split(" – ")[0].trim().replace(/\s+/g, " "); if (c && !this.tags.includes(c)) this.tags.push(c); this.neu = ""; }}'>
+      <input type="hidden" name="tags_bearbeitet" value="1">
+      <label class="label">Ersatzteil für Tag-Nr. (Instandhaltung → Anlagen)</label>
+      <div class="flex flex-wrap gap-2 mb-2" x-show="tags.length">
+        <template x-for="(t, i) in tags" :key="t"><span class="inline-flex items-center gap-1 rounded-full border border-line bg-soft px-3 py-1 text-sm font-semibold">
+          <span x-text="t"></span><input type="hidden" name="tag" :value="t"><button type="button" class="text-muted hover:text-crit" @click="tags.splice(i, 1)" :aria-label="'Tag-Nr. ' + t + ' entfernen'">×</button></span></template>
+      </div>
+      <div class="flex gap-2"><input x-model="neu" list="ih_tags" class="field" placeholder="Tag-Nr. suchen und wählen, z. B. VV 1040 80" @keydown.enter.prevent="hinzu()" @change="hinzu()" autocomplete="off">
+        <button type="button" class="btn" @click="hinzu()">Hinzufügen</button></div>
+      <p class="text-xs text-muted mt-1">Feste Zuordnung: Das Teil erscheint an der Anlage und in deren Wartungsaufträgen (mit Bestand und Lagerort). Ein Teil kann zu mehreren Tag-Nummern gehören.</p>
+      <datalist id="ih_tags">{% for c, b in ih_tags %}<option value="{{ c }}{% if b %} – {{ b }}{% endif %}">{% endfor %}</datalist>
+    </div>
+    {% endif %}
+    <div class="mt-4"><label class="label">Verwendung / Anlage (Freitext)</label><textarea name="verwendung" rows="2" class="field" placeholder="z. B. Reformer-Strang">{{ a.verwendung or '' }}</textarea></div>
     <div class="mt-4"><label class="label">Notiz</label><textarea name="notiz" rows="3" class="field">{{ a.notiz or '' }}</textarea></div>
   </section>
   <div class="flex gap-2"><button class="btn btn-primary btn-lg">{{ "Artikel anlegen" if neu else "Änderungen speichern" }}</button><a href="{{ zurueck }}" class="btn btn-lg">Abbrechen</a></div>

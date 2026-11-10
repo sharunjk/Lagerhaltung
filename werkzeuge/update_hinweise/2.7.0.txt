@@ -1,0 +1,19 @@
+Neu in 2.7.0 - Rhythmus der Kampagnen, eigene Wartungen, Ersatzteile je Tag-Nr.:
+- Ab wann zaehlen die Intervalle? An jeder Kampagne (Wartungsplan -> Kampagne -> Planung anpassen):
+  "Erster Termin" = Beginn der Kampagne. "Naechste Termine zaehlen" = fest ab dem ersten Termin (wie im
+  Instandhaltungsplan, Standard) oder ab der letzten Durchfuehrung (spaeter erledigt = naechster Termin spaeter).
+- Eigene Wartung: Wartungsplan -> "Eigene Kampagne" oder an einem Bauteil "Eigene Wartung anlegen". Art waehlen,
+  beschreiben was zu tun ist, Bauteile per Tag-Nr. waehlen (oder ganze Klasse / Anlage), erster Termin, Intervall.
+  Eigene Kampagnen (Schluessel E-...) bleiben beim Import des Instandhaltungsplans unveraendert.
+- Ersatzteile fest einer Tag-Nr. zuordnen: Artikel -> Bearbeiten -> "Ersatzteil fuer Tag-Nr." (Auswahlliste aller
+  Tag-Nummern aus Instandhaltung -> Anlagen), oder an der Anlage unter "Ersatzteile im Lager". Altdaten aus dem
+  Freitext "Verwendung" auf einmal: Anlage -> "Zuordnungen aus Verwendung uebernehmen" -> abhaken -> uebernehmen.
+- Im Auftrag: Abschnitt "Ersatzteile" mit Bestand und Lagerort, "Entnehmen" bucht direkt vom Lager ab
+  (Empfaenger "Auftrag A-..."), der Auftrag zeigt die Materialkosten.
+
+Datenbank-Erweiterung: Beim ersten Start ergaenzt die Lagerverwaltung drei Spalten und zwei Tabellen - wie bei 2.5.0
+und 2.6.0 erst als Probelauf an einer Kopie, mit Sicherung vor_update_... vorher. Der Lagerbestand bleibt unveraendert.
+
+Kommen Sie von einer aelteren Version, ist auch alles aus 2.6.0 (Wartungsplanung, Auftraege, Protokolle, Filter),
+2.5.0 (Instandhaltung, Asset-Import, Testsystem), 2.4.0, 2.3.1 und 2.3.0 enthalten. Nach einem Update von vor 2.5.0
+ist die Instandhaltung zunaechst ausgeschaltet (Einstellungen -> Allgemein -> Instandhaltung (CMMS) aktivieren).

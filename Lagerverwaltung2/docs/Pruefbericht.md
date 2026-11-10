@@ -405,6 +405,19 @@ Prüfung: 160 Tests grün (2 übersprungen, wie in 2.5.0). Browserprüfung `werk
 
 `cmms.cjs` (17/17) und die Lager-Browserprüfungen laufen unverändert.
 
+## Nachtrag: Rhythmus, eigene Kampagnen, Ersatzteile je Tag-Nr. 2.7.0
+
+| Änderung | Umsetzung | Beleg |
+|---|---|---|
+| Ab wann die Intervalle zählen | je Kampagne „fest ab erstem Termin“ oder „ab letzter Durchführung“ (Montag der Woche, nie vor dem ersten Termin); Planimport behält den Rhythmus; Aufträge nur für Termine des gültigen Rhythmus | `test_startpunkt_und_termine`, `test_rhythmus_ab_erledigung_verschiebt_naechsten_termin` |
+| Eigene Kampagnen | Maßnahme, Tätigkeit (Pflicht), Hinweis, einzelne Tag-Nummern / Klasse / Anlage, Rhythmus; S, W, F auch ohne Instandhaltungsplan; Bauteile ergänzen/entfernen (das letzte bleibt); Aufträge mit genau diesen Bauteilen; Planimport lässt sie stehen | `test_eigene_kampagne_fuer_einzelne_bauteile` |
+| Ersatzteil ↔ Tag-Nr. | Auswahlliste aller Tag-Nummern im Artikelformular, mehrere je Artikel, unbekannte abgelehnt, ohne Abschnitt (CMMS aus) unverändert, Protokoll | `test_artikel_formular_tag_nr_zuordnen` |
+| Ersatzteile an der Anlage, Assistent | Zuordnen/Lösen mit Recht `ih.anlagen.pflegen`, Bestand und Orte, Vorschläge aus „Verwendung“ ohne Fehltreffer bei längeren Nummern, Freitext bleibt | `test_anlage_ersatzteile_und_vorschlaege` |
+| Entnahme für Auftrag | nur bei freigegebenen Aufträgen und mit Recht `ih.auftrag.ausfuehren`, Bestandsprüfung wie im Lager, Buchung mit Auftrag, Preis und Empfänger, Materialkosten, Protokoll | `test_entnahme_fuer_auftrag` |
+| Rechte, Migration 3 | sieben neue Routen × alle Rollen; Datenbank aus 2.6.0 bekommt Spalten und Tabellen, Probelauf, Sicherung, Bestand unverändert | `test_rechte_neue_routen`, `test_migration_3_von_2_6` |
+
+Prüfung: 168 Tests grün (2 übersprungen). Neue Browserprüfung `werkzeuge/pruefung/ersatzteile.cjs` mit Demodaten 19/19 (Auswahlliste, Chips, Anlage mit Bestand, eigene Kampagne von der Anlage aus, Bauteil ergänzen, Pflichtfeld, Auftrag, Entnahme mit Kosten, Buchung im Lager, Handy-Breite 390 px ohne seitliches Scrollen, keine JS-Fehler). `wartung.cjs` (19/19, echte Dateien, nur lokal), `cmms.cjs` und `pc.cjs` laufen unverändert.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

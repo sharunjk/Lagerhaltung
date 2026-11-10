@@ -7,7 +7,7 @@
 <div class="flex flex-wrap items-start justify-between gap-4 mb-5">
   <div class="flex gap-3 items-start">{{ mass_symbol(m, k.massnahme) }}
     <div><h1>{{ m.name }} – {{ k.gegenstand or k.bauteilklasse }}</h1>
-      <p class="text-muted">{{ k.schluessel }} · alle {{ k.intervall_monate }} Monate · {{ lage_chip(k.lage, LAGE_TEXT[k.lage]) }}{% if not k.aktiv %} (inaktiv){% endif %}</p></div>
+      <p class="text-muted">{{ k.schluessel }}{% if k.eigen %} · eigene Kampagne{% endif %} · alle {{ k.intervall_monate }} Monate · {{ lage_chip(k.lage, LAGE_TEXT[k.lage]) }}{% if not k.aktiv %} (inaktiv){% endif %}</p></div>
   </div>
 </div>
 {% if achtung %}<div class="panel p-4 mb-5 border-l-4 border-l-crit"><h2 class="text-base text-crit">Achtung</h2><p class="mt-1">{{ achtung }}</p></div>{% endif %}
@@ -16,14 +16,14 @@
     <section class="panel p-5">
       <h2 class="mb-3">Was ist zu tun</h2>
       <dl class="text-sm space-y-2">
-        {% for lab, wert in [("Maßnahme", m.beschreibung), ("Wer macht es", k.durchfuehrung or m.wer), ("Nachweis", k.nachweis or m.nachweis), ("Grundlage", k.grundlage), ("Rechtsgrundlage", k.rechtsgrundlage), ("Hinweis", k.hinweis), ("Verantwortlich", k.verantwortlich)] if wert %}
+        {% for lab, wert in [("Tätigkeit", k.taetigkeit), ("Maßnahme", m.beschreibung if not k.taetigkeit else None), ("Wer macht es", k.durchfuehrung or m.wer), ("Nachweis", k.nachweis or m.nachweis), ("Grundlage", k.grundlage), ("Rechtsgrundlage", k.rechtsgrundlage), ("Hinweis", k.hinweis), ("Verantwortlich", k.verantwortlich)] if wert %}
         <div class="flex gap-3"><dt class="w-36 shrink-0 text-muted">{{ lab }}</dt><dd>{{ wert }}</dd></div>
         {% endfor %}
       </dl>
       {% if k.massnahme.startswith("Z") %}<p class="text-sm mt-3 rounded-md bg-soft p-3">Gesetzliche Pflichtprüfung: Sie wird von außen durchgeführt (siehe „Wer macht es“). Das Programm plant, erinnert und verwahrt die Prüfbescheinigung – es ersetzt die Prüfung nicht.</p>{% endif %}
     </section>
     <section class="panel overflow-hidden">
-      <div class="px-4 py-3 border-b border-line"><h2>Termine</h2></div>
+      <div class="px-4 py-3 border-b border-line flex flex-wrap justify-between gap-2"><h2>Termine</h2><span class="text-sm text-muted">{% if k.rhythmus == "ab_erledigung" %}ab der letzten Durchführung{% if k.basis %} ({{ k.basis|datum(False) }}){% else %} – noch keine, daher ab dem ersten Termin{% endif %}{% else %}fester Rhythmus ab {{ k.erster_termin|datum(False) }}{% endif %}</span></div>
       <table class="tbl"><thead><tr><th>Termin</th><th>Woche</th><th>Auftrag</th><th></th></tr></thead><tbody>
       {% for t in kommende %}{% set a = auftr.get(t) %}
         <tr><td class="whitespace-nowrap">{{ t|datum(False) }}</td><td class="text-sm">{{ kw(t) }}{% if k.dauer_wochen and k.dauer_wochen > 1 %} · {{ k.dauer_wochen }} Wochen{% endif %}</td>
@@ -32,14 +32,22 @@
       {% endfor %}
       </tbody></table>
     </section>
-    {% if k.bauteilklasse and k.bauteilklasse != "Anlage" %}
-    <section class="panel overflow-hidden">
-      <div class="px-4 py-3 border-b border-line flex justify-between"><h2>Bauteile ({{ teile|length }})</h2><span class="text-sm text-muted">alle aktiven Anlagen der Klasse „{{ k.bauteilklasse }}“</span></div>
+    {% if k.einzeln or (k.bauteilklasse and k.bauteilklasse != "Anlage") %}
+    <section id="bauteile" class="panel overflow-hidden">
+      <div class="px-4 py-3 border-b border-line flex justify-between"><h2>Bauteile ({{ teile|length }})</h2><span class="text-sm text-muted">{% if k.einzeln %}einzeln zugeordnet{% else %}alle aktiven Anlagen der Klasse „{{ k.bauteilklasse }}“{% endif %}</span></div>
       <div class="max-h-[32rem] overflow-y-auto">
-      <table class="tbl"><thead><tr><th>Tag-Nr.</th><th>Bezeichnung</th><th>Zuletzt</th></tr></thead><tbody>
-      {% for t in teile %}<tr><td class="whitespace-nowrap"><a class="font-semibold hover:underline" href="/ih/anlagen/{{ t.id }}">{{ t.code }}</a>{% if t.sicherheitsgerichtet %} <span class="status st-kritisch" title="PLT-Sicherheitseinrichtung">PLT-S</span>{% endif %}</td><td class="text-sm">{{ t.bezeichnung or "" }}</td><td class="text-sm text-muted">{{ letzte[t.id]|datum(False) if letzte.get(t.id) else "–" }}</td></tr>
+      <table class="tbl"><thead><tr><th>Tag-Nr.</th><th>Bezeichnung</th><th>Zuletzt</th>{% if k.einzeln and darf("ih.wartung.planen") %}<th></th>{% endif %}</tr></thead><tbody>
+      {% for t in teile %}<tr><td class="whitespace-nowrap"><a class="font-semibold hover:underline" href="/ih/anlagen/{{ t.id }}">{{ t.code }}</a>{% if t.sicherheitsgerichtet %} <span class="status st-kritisch" title="PLT-Sicherheitseinrichtung">PLT-S</span>{% endif %}</td><td class="text-sm">{{ t.bezeichnung or "" }}</td><td class="text-sm text-muted">{{ letzte[t.id]|datum(False) if letzte.get(t.id) else "–" }}</td>
+        {% if k.einzeln and darf("ih.wartung.planen") %}<td class="text-right">{% if teile|length > 1 %}<form method="post" action="/ih/wartung/kampagne/{{ k.id }}/bauteile"><input type="hidden" name="entfernen" value="{{ t.id }}"><button class="btn btn-sm" aria-label="{{ t.code }} entfernen">Entfernen</button></form>{% endif %}</td>{% endif %}</tr>
       {% else %}<tr><td colspan="3" class="text-muted">Keine Anlagen mit dieser Bauteilklasse. Die Klasse kommt über den Import der Matrix oder an der Anlage.</td></tr>{% endfor %}
       </tbody></table></div>
+      {% if k.einzeln and darf("ih.wartung.planen") %}
+      <form method="post" action="/ih/wartung/kampagne/{{ k.id }}/bauteile" class="p-4 border-t border-line flex flex-wrap gap-2 items-end">
+        <div class="grow max-w-md"><label class="label">Bauteil hinzufügen</label><input name="tag" list="ih_tags" class="field" placeholder="Tag-Nr. suchen und wählen" autocomplete="off" required></div>
+        <button class="btn">Hinzufügen</button>
+        <datalist id="ih_tags">{% for c, b in tags %}<option value="{{ c }}">{{ b }}</option>{% endfor %}</datalist>
+      </form>
+      {% endif %}
     </section>
     {% endif %}
   </div>
@@ -55,9 +63,14 @@
         <div><label class="label">Vorlauf (Wochen)</label><input name="vorlauf_wochen" value="{{ k.vorlauf_wochen if k.vorlauf_wochen is not none else '' }}" class="field" inputmode="numeric" placeholder="Standard {{ k.vorlauf }}"></div>
         <div><label class="label">Verantwortlich</label><input name="verantwortlich" value="{{ k.verantwortlich or '' }}" class="field"></div>
       </div>
+      <fieldset><legend class="label">Nächste Termine zählen …</legend>
+        {% for code, text in RHYTHMUS.items() %}<label class="flex items-start gap-2 text-sm py-0.5"><input type="radio" name="rhythmus" value="{{ code }}" class="mt-1" {% if (k.rhythmus or "fest") == code %}checked{% endif %}> {{ text }}</label>{% endfor %}
+      </fieldset>
+      <div><label class="label">Was ist zu tun{% if not k.eigen %} (Ergänzung){% endif %}</label><textarea name="taetigkeit" rows="3" class="field" placeholder="{{ 'Beschreibung der Tätigkeit' if k.eigen else 'optional – ergänzt die Beschreibung der Maßnahme' }}">{{ k.taetigkeit or '' }}</textarea></div>
+      <div><label class="label">Hinweis</label><input name="hinweis" value="{{ k.hinweis or '' }}" class="field"></div>
       <label class="flex items-center gap-2"><input type="checkbox" name="aktiv" {% if k.aktiv %}checked{% endif %}> Kampagne aktiv</label>
       <button class="btn btn-primary">Speichern</button>
-      <p class="text-xs text-muted">Termine folgen dem festen Rhythmus ab dem ersten Termin. Ein erneuter Import des Instandhaltungsplans überschreibt diese Werte.</p>
+      <p class="text-xs text-muted">„Erster Termin“ legt fest, ab wann die Kampagne beginnt. Fester Rhythmus: Termine bleiben im Raster (wie im Instandhaltungsplan), auch wenn einmal später erledigt wurde. Ab letzter Durchführung: Der nächste Termin ist Intervall nach dem Datum „technisch erledigt“ des letzten abgeschlossenen Auftrags.{% if not k.eigen %} Ein erneuter Import des Instandhaltungsplans überschreibt die Werte aus dem Plan (Intervall, erster Termin, Dauer, Aufwand, Verantwortliche, Hinweis); Rhythmus und Tätigkeit bleiben.{% endif %}</p>
     </form>
     {% endif %}
     <section class="panel overflow-hidden">

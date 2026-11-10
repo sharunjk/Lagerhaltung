@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Ersatzteile zuordnen{% endblock %}
+{% block content %}
+<div class="text-sm text-muted mb-1"><a href="/ih/anlagen" class="hover:text-ink">Anlagen</a></div>
+<div class="mb-5">
+  <h1>Ersatzteile aus „Verwendung“ zuordnen</h1>
+  <p class="text-muted max-w-3xl">Bisher stand die Tag-Nr. als Freitext im Feld „Verwendung“ der Lagerartikel. Hier sind alle Artikel, deren Text eine Tag-Nr. aus <i>Anlagen</i> nennt, die noch nicht fest zugeordnet ist. Häkchen prüfen, dann übernehmen – der Freitext bleibt unverändert stehen.</p>
+</div>
+{% if liste %}
+<form method="post" x-data>
+  <div class="panel overflow-x-auto">
+    <table class="tbl">
+      <thead><tr><th>Artikel</th><th>Text in „Verwendung“</th><th>Gefundene Tag-Nr.</th></tr></thead>
+      <tbody>
+      {% for v in liste %}
+        <tr><td class="whitespace-nowrap align-top"><a class="font-semibold hover:underline" href="/artikel/{{ v.nummer|urlq }}">{{ v.nummer }}</a><span class="block text-sm">{{ v.bezeichnung }}</span></td>
+          <td class="text-sm text-muted align-top max-w-md break-words">{{ v.verwendung }}</td>
+          <td class="align-top"><div class="flex flex-col gap-1">{% for t in v.tags %}<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="paar" value="{{ v.id }}:{{ t.id }}" checked><b>{{ t.code }}</b> <span class="text-muted">{{ t.bezeichnung or "" }}</span></label>{% endfor %}</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="flex flex-wrap gap-2 items-center mt-4">
+    <button class="btn btn-primary">Ausgewählte Zuordnungen übernehmen</button>
+    <button type="button" class="btn" @click="document.querySelectorAll('input[name=paar]').forEach(c => c.checked = false)">Alle abwählen</button>
+    <span class="text-sm text-muted">{{ liste|length }} Artikel · {{ liste|sum(attribute="tags", start=[])|length }} Vorschläge</span>
+  </div>
+</form>
+{% else %}
+<div class="panel p-6 max-w-2xl"><p>Keine offenen Vorschläge: Kein Lagerartikel nennt im Feld „Verwendung“ eine Tag-Nr., die noch nicht zugeordnet ist.</p></div>
+{% endif %}
+{% endblock %}

@@ -318,6 +318,27 @@ ih_kampagnen = Table(
     Column("hinweis", Text),
     Column("vorlauf_wochen", Integer),      # so früh beauftragen/vorbereiten
     Column("geaendert_am", DateTime, server_default=func.current_timestamp()),
+    Column("rhythmus", String(20)),          # fest (ab erstem Termin, Standard) | ab_erledigung (ab letzter Durchführung) – ab 2.7.0
+    Column("taetigkeit", Text),              # eigene Kampagne: was genau zu tun ist – ab 2.7.0
+    Column("eigen", Boolean),                # im Programm angelegt (nicht aus dem Instandhaltungsplan)
+)
+
+ih_kampagne_bauteile = Table(
+    "ih_kampagne_bauteile", md,  # Kampagne für einzelne Bauteile statt für eine ganze Bauteilklasse (ab 2.7.0)
+    Column("kampagne_id", Integer, ForeignKey("ih_kampagnen.id", ondelete="CASCADE"), primary_key=True),
+    Column("platz_id", Integer, ForeignKey("ih_plaetze.id", ondelete="CASCADE"), primary_key=True),
+)
+
+ih_stueckliste = Table(
+    "ih_stueckliste", md,  # Ersatzteile je Bauteil: Lagerartikel <-> Tag-Nr. (n:m, ab 2.7.0)
+    Column("id", Integer, primary_key=True),
+    Column("platz_id", Integer, ForeignKey("ih_plaetze.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("artikel_id", Integer, ForeignKey("artikel.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("menge", Float),                  # Stück je Bauteil (optional)
+    Column("bemerkung", String(300)),
+    Column("erstellt_von", String(100)),
+    Column("erstellt_am", DateTime, server_default=func.current_timestamp()),
+    UniqueConstraint("platz_id", "artikel_id"),
 )
 
 ih_auftraege = Table(

@@ -46,9 +46,9 @@
     {% if achtung %}<div class="panel p-4 border-l-4 border-l-crit"><h2 class="text-base text-crit">Achtung</h2><p class="mt-1">{{ achtung }}</p></div>{% endif %}
     <section class="panel p-5">
       <h2 class="mb-2">Was ist zu tun</h2>
-      <p class="text-sm">{{ m.beschreibung or "" }}</p>
+      {% if a.taetigkeit %}<p class="whitespace-pre-line">{{ a.taetigkeit }}</p>{% if not a.eigen and m.beschreibung %}<p class="text-sm text-muted mt-2">{{ m.beschreibung }}</p>{% endif %}{% else %}<p class="text-sm">{{ m.beschreibung or "" }}</p>{% endif %}
       <dl class="text-sm mt-3 space-y-1">
-        {% for lab, wert in [("Wer", a.durchfuehrung or m.wer), ("Nachweis", m.nachweis), ("Grundlage", a.grundlage), ("Rechtsgrundlage", a.rechtsgrundlage), ("Hinweis", a.hinweis)] if wert %}
+        {% for lab, wert in [("Wer", a.durchfuehrung or m.wer), ("Nachweis", m.nachweis), ("Grundlage", a.grundlage), ("Rechtsgrundlage", a.rechtsgrundlage), ("Hinweis", a.hinweis if not a.eigen else None)] if wert %}
         <div class="flex gap-3"><dt class="w-32 shrink-0 text-muted">{{ lab }}</dt><dd>{{ wert }}</dd></div>{% endfor %}
       </dl>
       {% if not pflicht %}<p class="text-xs text-muted mt-3">Der Plan sagt WANN – WIE, steht ausschließlich in der Wartungs- bzw. Prüfanweisung des Bauteils. Steht dort nichts: nachfragen, nicht improvisieren.</p>{% endif %}
@@ -89,6 +89,48 @@
     </section>
     {% else %}
     <section class="panel p-5"><h2>Ohne Bauteilliste</h2><p class="text-sm text-muted mt-1">Diese Prüfung gilt für {{ a.gegenstand or "die Anlage als Ganzes" }}. Nachweis unten hochladen, dann „Technisch erledigt“ melden.</p></section>
+    {% endif %}
+
+    {% set entnahme_ok = a.status in ("freigegeben", "in_arbeit") and darf("ih.auftrag.ausfuehren") %}
+    {% if teile or entnahme_ok %}
+    <section id="ersatzteile" class="panel overflow-x-auto">
+      <div class="px-4 py-3 border-b border-line flex flex-wrap justify-between gap-2"><h2>Ersatzteile</h2>{% if entn %}<span class="text-sm text-muted">Material bisher {{ kosten|eur }}</span>{% endif %}</div>
+      {% if teile %}
+      <table class="tbl">
+        <thead><tr><th>Artikel</th><th>Für</th><th class="num">Bedarf</th><th>Lager</th><th class="num">Entnommen</th>{% if entnahme_ok %}<th class="no-print">Entnehmen</th>{% endif %}</tr></thead>
+        <tbody>
+        {% for t in teile %}
+          <tr><td class="whitespace-nowrap">{% if "lager" in module %}<a class="font-semibold hover:underline" href="/artikel/{{ t.nummer|urlq }}">{{ t.nummer }}</a>{% else %}<b>{{ t.nummer }}</b>{% endif %}<span class="block text-sm">{{ t.bezeichnung }}</span></td>
+            <td class="text-sm">{% for b in t.bauteile %}<span class="whitespace-nowrap">{{ b }}</span>{{ ", " if not loop.last }}{% else %}zusätzlich{% endfor %}</td>
+            <td class="num">{{ (t.bedarf|num ~ " " ~ t.einheit) if t.bedarf else "–" }}</td>
+            <td class="text-sm whitespace-nowrap {{ 'text-crit' if t.bestand <= 0 }}">{% if t.orte %}{% for o, mg in t.orte %}{{ o }}: {{ mg|num }}{{ ", " if not loop.last }}{% endfor %}{% else %}nicht vorrätig{% endif %}</td>
+            <td class="num">{{ t.entnommen|num if t.entnommen else "–" }}</td>
+            {% if entnahme_ok %}<td class="no-print">{% if t.orte %}
+              <form method="post" action="/ih/auftraege/{{ a.id }}/entnahme" class="flex gap-1 items-center">
+                <input type="hidden" name="artikel_nr" value="{{ t.nummer }}">
+                <select name="platz" class="field !w-auto py-1">{% for o, mg in t.orte %}{% if mg > 0 %}<option value="{{ o }}">{{ o }}</option>{% endif %}{% endfor %}</select>
+                <input name="menge" class="field w-20 py-1" inputmode="decimal" value="{{ t.bedarf|num if t.bedarf and t.bedarf > t.entnommen else 1 }}" aria-label="Menge">
+                <button class="btn btn-sm">Entnehmen</button>
+              </form>{% endif %}</td>{% endif %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="p-4 text-sm text-muted">Den Bauteilen dieses Auftrags sind keine Ersatzteile zugeordnet (Anlage → Ersatzteile im Lager).</p>{% endif %}
+      {% if entnahme_ok %}
+      <form method="post" action="/ih/auftraege/{{ a.id }}/entnahme" class="p-4 border-t border-line flex flex-wrap gap-2 items-end no-print">
+        <div><label class="label">Anderer Artikel</label><input name="artikel_nr" class="field w-44" placeholder="Artikelnummer" required></div>
+        <div><label class="label">Lagerplatz</label><input name="platz" class="field w-36" required></div>
+        <div><label class="label">Menge</label><input name="menge" class="field w-20" inputmode="decimal" value="1"></div>
+        <button class="btn">Entnehmen</button>
+        <p class="text-xs text-muted basis-full">Die Entnahme bucht den Lagerbestand ab (Buchungsliste: „Auftrag A-{{ "%05d"|format(a.id) }}“) und zählt zu den Materialkosten des Auftrags.</p>
+      </form>
+      {% endif %}
+      {% if entn %}
+      <div class="px-4 pb-4"><h3 class="text-sm text-muted mb-1">Entnommen</h3>
+        <ul class="text-sm space-y-0.5">{% for e in entn %}<li>{{ e.zeit|datum }} · {{ (-e.menge)|num }} {{ e.einheit or "" }} {{ e.artikel_nr }} von {{ e.lagerplatz }} · {{ e.benutzer }}{% if e.preis %} · {{ (-e.menge * e.preis)|eur }}{% endif %}</li>{% endfor %}</ul></div>
+      {% endif %}
+    </section>
     {% endif %}
   </div>
 

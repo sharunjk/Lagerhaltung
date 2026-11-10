@@ -4,7 +4,7 @@ import csv
 import io
 import mimetypes
 import uuid
-from datetime import date
+from datetime import date, datetime
 from urllib.parse import quote, urlencode
 from pathlib import Path
 
@@ -56,8 +56,49 @@ def form_daten(form: dict, cfg) -> dict:
 
 
 def _form_ctx(con):
+    from ..db import ih_plaetze
     return dict(lieferanten=[dict(r) for r in con.execute(select(lieferanten).order_by(lieferanten.c.name)).mappings()],
-                vs=queries.vorschlaege(con))
+                vs=queries.vorschlaege(con),
+                ih_tags=[(r.code, r.bezeichnung or "") for r in con.execute(select(ih_plaetze.c.code, ih_plaetze.c.bezeichnung)
+                                                                            .where(ih_plaetze.c.art == "platz", ih_plaetze.c.aktiv)
+                                                                            .order_by(ih_plaetze.c.code))])
+
+
+def zugeordnete_tags(con, artikel_id: int | None) -> list[dict]:
+    """Tag-Nummern (Instandhaltung → Anlagen), zu denen dieser Artikel als Ersatzteil gehört."""
+    if not artikel_id:
+        return []
+    from ..db import ih_plaetze, ih_stueckliste
+    return [dict(r) for r in con.execute(select(ih_plaetze.c.id, ih_plaetze.c.code, ih_plaetze.c.bezeichnung, ih_stueckliste.c.menge)
+                                         .select_from(ih_stueckliste.join(ih_plaetze, ih_plaetze.c.id == ih_stueckliste.c.platz_id))
+                                         .where(ih_stueckliste.c.artikel_id == artikel_id).order_by(ih_plaetze.c.code)).mappings()]
+
+
+def tags_speichern(con, artikel_id: int, codes: list[str], benutzer: str, nummer: str) -> None:
+    """Zuordnung Artikel ↔ Tag-Nr. auf genau diese Liste setzen. Unbekannte Tag-Nummern werden abgelehnt."""
+    from ..db import ih_plaetze, ih_stueckliste
+    from ..services.asset_import import schluessel
+    ziel, unbekannt = set(), []
+    for c in codes:
+        c = " ".join((c or "").split(" – ")[0].split())
+        if not c:
+            continue
+        pid = con.execute(select(ih_plaetze.c.id).where(ih_plaetze.c.schluessel == schluessel(c), ih_plaetze.c.art == "platz")).scalar()
+        if pid:
+            ziel.add(pid)
+        else:
+            unbekannt.append(c)
+    if unbekannt:
+        raise BuchungsFehler(f"Diese Tag-Nr. gibt es nicht unter Instandhaltung → Anlagen: {', '.join(unbekannt)}.")
+    alt = {r[0] for r in con.execute(select(ih_stueckliste.c.platz_id).where(ih_stueckliste.c.artikel_id == artikel_id))}
+    if alt == ziel:
+        return
+    if alt - ziel:
+        con.execute(ih_stueckliste.delete().where(ih_stueckliste.c.artikel_id == artikel_id, ih_stueckliste.c.platz_id.in_(alt - ziel)))
+    for pid in ziel - alt:
+        con.execute(insert(ih_stueckliste).values(artikel_id=artikel_id, platz_id=pid, erstellt_von=benutzer, erstellt_am=datetime.now()))
+    codes_neu = sorted(r[0] for r in con.execute(select(ih_plaetze.c.code).where(ih_plaetze.c.id.in_(ziel)))) if ziel else []
+    audit(con, benutzer, "Ersatzteil-Zuordnung geändert", nummer, {"tag_nr": codes_neu})
 
 
 @router.get("/artikel")
@@ -125,18 +166,20 @@ async def neu(request: Request):
     roh = await request.form()
     form = {k: v for k, v in roh.items() if isinstance(v, str)}
     dateien, zu_gross = await dateien_lesen(roh.getlist("dateien"))
+    tags = roh.getlist("tag") if form.get("tags_bearbeitet") else None
     try:
-        a, n = artikel_mit_dateien_anlegen(request, form, dateien)
+        a, n = artikel_mit_dateien_anlegen(request, form, dateien, tags=tags)
     except BuchungsFehler as e:
         with db.engine().connect() as con:
-            return render(request, "artikel_form.html", a=form, neu=True, fehler=str(e) + (" Fotos/Dateien bitte erneut auswählen." if dateien else ""),
-                          **_form_ctx(con))
+            return render(request, "artikel_form.html", a={**form, "_tags": tags or []}, neu=True,
+                          fehler=str(e) + (" Fotos/Dateien bitte erneut auswählen." if dateien else ""), **_form_ctx(con))
     flash(request, f"Artikel {a['nummer']} angelegt." + (f" {n} Foto(s)/Datei(en) gespeichert." if n else "")
           + (f" Nicht gespeichert (leer oder größer als 25 MB): {', '.join(zu_gross)}." if zu_gross else ""), "fehler" if zu_gross else "ok")
     return RedirectResponse(f"/artikel/{a['nummer']}" + ("?etikett=1" if form.get("etikett") == "on" else ""), status_code=303)
 
 
-def artikel_mit_dateien_anlegen(request, form: dict, dateien: list[tuple[str, str, bytes]], quelle: str = "pc") -> tuple[dict, int]:
+def artikel_mit_dateien_anlegen(request, form: dict, dateien: list[tuple[str, str, bytes]], quelle: str = "pc",
+                                tags: list[str] | None = None) -> tuple[dict, int]:
     """Artikel anlegen (Lieferant per Name, ggf. neu) und gleich Fotos/Dateien anhängen – alles in einer Transaktion."""
     geschrieben: list[Path] = []
     try:
@@ -146,6 +189,8 @@ def artikel_mit_dateien_anlegen(request, form: dict, dateien: list[tuple[str, st
             if "lieferant" in daten:
                 daten["lieferant_id"] = lg.lieferant_id(daten.pop("lieferant"))
             a = lg.artikel_anlegen(daten, form.get("platz", ""), form.get("anfangsbestand") or 0)
+            if tags:
+                tags_speichern(con, a["id"], tags, request.session["user"]["username"], a["nummer"])
             for name, typ, inhalt in dateien:
                 geschrieben.append(anhang_speichern(request, con, a["id"], a["nummer"], name, typ, inhalt))
     except Exception:
@@ -164,8 +209,9 @@ def detail(request: Request, nr: str, etikett: int = 0):
             return render(request, "fehler.html", titel="Artikel nicht gefunden", text=f"Artikel {nr} gibt es nicht.")
         hist, total = queries.bewegungen_liste(con, artikel_id=a["id"], limit=50)
         verlauf = queries.bestandsverlauf(con, a["id"], a["bestand"])
+        tags = zugeordnete_tags(con, a["id"])
     d = request.app.state.cfg.drucker
-    return render(request, "artikel_detail.html", a=a, hist=hist, hist_total=total, verlauf=verlauf, zeige_etikett=etikett,
+    return render(request, "artikel_detail.html", a=a, hist=hist, hist_total=total, verlauf=verlauf, zeige_etikett=etikett, tags=tags,
                   etikett_svg=labels.etikett_svg(a["nummer"], a["nummer"], a["bezeichnung"], d.standard_format, d.barcode, scale=1.6, schrift=d.schrift))
 
 
@@ -176,13 +222,16 @@ def bearbeiten_form(request: Request, nr: str):
         a = queries.artikel_detail(con, nr)
         if not a:
             return RedirectResponse("/artikel", status_code=303)
+        a["_tags"] = [t["code"] for t in zugeordnete_tags(con, a["id"])]
         return render(request, "artikel_form.html", a=a, neu=False, **_form_ctx(con))
 
 
 @router.post("/artikel/{nr}/bearbeiten")
 async def bearbeiten(request: Request, nr: str):
-    require(request, "lager")
-    form = dict(await request.form())
+    me = require(request, "lager")
+    roh = await request.form()
+    form = {k: v for k, v in roh.items() if isinstance(v, str)}
+    tags = roh.getlist("tag") if form.get("tags_bearbeitet") else None
     try:
         with db.schreiben() as con:
             aid = con.execute(select(artikel.c.id).where(artikel.c.nummer == nr)).scalar()
@@ -193,9 +242,12 @@ async def bearbeiten(request: Request, nr: str):
             if "lieferant" in daten:
                 daten["lieferant_id"] = lg.lieferant_id(daten.pop("lieferant"))
             lg.artikel_aendern(aid, daten)
+            if tags is not None:
+                tags_speichern(con, aid, tags, me["username"], daten.get("nummer") or nr)
     except BuchungsFehler as e:
         with db.engine().connect() as con:
-            return render(request, "artikel_form.html", a={**form, "nummer": form.get("nummer") or nr, "_alt": nr}, neu=False, fehler=str(e), **_form_ctx(con))
+            return render(request, "artikel_form.html", a={**form, "nummer": form.get("nummer") or nr, "_alt": nr, "_tags": tags or []},
+                          neu=False, fehler=str(e), **_form_ctx(con))
     flash(request, "Änderungen gespeichert.")
     return RedirectResponse(f"/artikel/{daten.get('nummer') or nr}", status_code=303)
 

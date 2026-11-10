@@ -14,6 +14,9 @@
     {% if a.doku_url %}<a href="{{ a.doku_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">{{ icon("link", "w-4 h-4") }}Dokumentation öffnen</a>{% endif %}
     {% if darf("ih.anlagen.pflegen") %}
     {% if a.art != "platz" and a.aktiv %}<a href="/ih/anlagen/neu?eltern={{ a.id }}" class="btn">{{ icon("plus", "w-4 h-4") }}Bauteil hier anlegen</a>{% endif %}
+    {% endif %}
+    {% if a.art == "platz" and a.aktiv and darf("ih.wartung.planen") %}<a href="/ih/wartung/kampagne/neu?platz={{ a.id }}" class="btn">{{ icon("plus", "w-4 h-4") }}Eigene Wartung anlegen</a>{% endif %}
+    {% if darf("ih.anlagen.pflegen") %}
     <a href="/ih/anlagen/{{ a.id }}/bearbeiten" class="btn">{{ icon("edit", "w-4 h-4") }}Bearbeiten</a>
     <form method="post" action="/ih/anlagen/{{ a.id }}/archivieren" onsubmit="return confirm('{{ 'Diese Anlage archivieren? Sie verschwindet aus Listen und Wartungsplänen, die Historie bleibt. Zurückholen geht jederzeit.' if a.aktiv else 'Anlage wieder aktiv setzen?' }}')"><button class="btn">{{ "Archivieren" if a.aktiv else "Wieder aktiv setzen" }}</button></form>
     {% endif %}
@@ -37,7 +40,7 @@
       <table class="tbl"><thead><tr><th></th><th>Maßnahme</th><th class="num">Intervall</th><th>Zuletzt</th><th>Nächster Termin</th></tr></thead><tbody>
       {% for r in plan %}<tr>
         <td class="w-10">{{ mass_symbol(r.mass, r.massnahme) }}</td>
-        <td>{{ r.mass.name }}{% if r.grundlage %}<span class="block text-xs text-muted">{{ r.grundlage }}</span>{% endif %}{% if r.achtung %}<span class="block text-xs text-crit">Achtung: {{ r.achtung }}</span>{% endif %}</td>
+        <td>{{ r.mass.name }}{% if r.eigen %} <span class="text-xs rounded border border-line px-1.5 text-muted">eigene</span>{% endif %}{% if r.grundlage %}<span class="block text-xs text-muted">{{ r.grundlage }}</span>{% endif %}{% if r.achtung %}<span class="block text-xs text-crit">Achtung: {{ r.achtung }}</span>{% endif %}</td>
         <td class="num whitespace-nowrap">{{ (r.intervall_monate ~ " Mon.") if r.intervall_monate else "laufend" }}</td>
         <td class="text-sm whitespace-nowrap">{{ r.letzte|datum(False) if r.letzte else "–" }}</td>
         <td class="text-sm whitespace-nowrap">{% if r.kampagne and r.kampagne.naechster %}<a class="text-primary hover:underline" href="/ih/wartung/kampagne/{{ r.kampagne.id }}">{{ kw(r.kampagne.naechster) }}</a>{% elif not r.intervall_monate %}Schichtbuch{% else %}–{% endif %}</td></tr>
@@ -64,12 +67,33 @@
   </div>
   <aside class="space-y-6">
     {% if a.art == "platz" %}
-    <section class="panel p-4">
+    <section id="ersatzteile" class="panel p-4">
       <h2 class="mb-2">Ersatzteile im Lager</h2>
       {% if teile %}
-      <ul class="text-sm space-y-1">{% for t in teile %}<li>{% if "lager" in module %}<a class="font-semibold hover:underline" href="/artikel/{{ t.nummer|urlq }}">{{ t.nummer }}</a>{% else %}<b>{{ t.nummer }}</b>{% endif %} {{ t.bezeichnung }}</li>{% endfor %}</ul>
-      <p class="text-xs text-muted mt-2">Gefunden über die Tag-Nr. im Feld „Verwendung“ der Artikel. Eine feste Ersatzteilliste je Bauteil folgt.</p>
-      {% else %}<p class="text-sm text-muted">Kein Lagerartikel nennt diese Tag-Nr. im Feld „Verwendung“.</p>{% endif %}
+      <ul class="text-sm divide-y divide-line">{% for t in teile %}
+        <li class="py-2 flex gap-2 items-start justify-between">
+          <div class="min-w-0">{% if "lager" in module %}<a class="font-semibold hover:underline" href="/artikel/{{ t.nummer|urlq }}">{{ t.nummer }}</a>{% else %}<b>{{ t.nummer }}</b>{% endif %} {{ t.bezeichnung }}{% if not t.aktiv %} <span class="text-muted">(archiviert)</span>{% endif %}
+            <span class="block text-xs {{ 'text-crit' if t.bestand <= 0 else ('text-warn' if t.meldebestand and t.bestand <= t.meldebestand else 'text-muted') }}">Bestand {{ t.bestand|num }} {{ t.einheit }}{% if t.orte %} · {% for o, m in t.orte %}{{ o }} ({{ m|num }}){{ ", " if not loop.last }}{% endfor %}{% endif %}{% if t.je_bauteil %} · {{ t.je_bauteil|num }} je Tausch{% endif %}</span>
+            {% if t.bemerkung %}<span class="block text-xs text-muted">{{ t.bemerkung }}</span>{% endif %}</div>
+          {% if darf("ih.anlagen.pflegen") %}<form method="post" action="/ih/anlagen/{{ a.id }}/ersatzteile" onsubmit="return confirm('Zuordnung lösen? Der Lagerartikel bleibt erhalten.')"><input type="hidden" name="loesen" value="{{ t.sid }}"><button class="btn btn-sm" title="Zuordnung lösen" aria-label="Zuordnung von {{ t.nummer }} lösen">×</button></form>{% endif %}
+        </li>{% endfor %}</ul>
+      {% else %}<p class="text-sm text-muted">Noch keine Ersatzteile zugeordnet.</p>{% endif %}
+      {% if darf("ih.anlagen.pflegen") %}
+      {% if vorschlaege %}
+      <div class="mt-3 rounded-md bg-soft p-3 text-sm">
+        <p class="font-semibold mb-1">Vorschlag aus dem Feld „Verwendung“</p>
+        {% for v in vorschlaege %}<form method="post" action="/ih/anlagen/{{ a.id }}/ersatzteile" class="flex items-center justify-between gap-2 py-1"><input type="hidden" name="artikel_nr" value="{{ v.nummer }}"><span><b>{{ v.nummer }}</b> {{ v.bezeichnung }}</span><button class="btn btn-sm">Zuordnen</button></form>{% endfor %}
+      </div>
+      {% endif %}
+      <form method="post" action="/ih/anlagen/{{ a.id }}/ersatzteile" class="mt-3 space-y-2 border-t border-line pt-3">
+        <label class="label">Lagerartikel zuordnen</label>
+        <input name="artikel_nr" list="artikelliste" class="field" placeholder="Artikelnummer oder Bezeichnung" autocomplete="off" required>
+        <div class="grid grid-cols-[110px_1fr] gap-2"><input name="menge" class="field" inputmode="decimal" placeholder="Menge je Tausch"><input name="bemerkung" class="field" placeholder="Bemerkung (optional)"></div>
+        <button class="btn btn-sm">{{ icon("plus", "w-4 h-4") }}Zuordnen</button>
+        <datalist id="artikelliste">{% for nr, bez in artikelliste %}<option value="{{ nr }} – {{ bez }}">{% endfor %}</datalist>
+      </form>
+      <p class="text-xs text-muted mt-2">Zuordnen geht auch beim Artikel im Lager (Bearbeiten → „Ersatzteil für Tag-Nr.“). Alle Altdaten auf einmal: <a class="text-primary hover:underline" href="/ih/ersatzteile/vorschlaege">Zuordnungen aus „Verwendung“ übernehmen</a>.</p>
+      {% endif %}
     </section>
     {% endif %}
     {% if zusatz %}

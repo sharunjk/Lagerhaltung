@@ -92,6 +92,7 @@
                             ("Bestellmenge", a.bestellmenge|num if a.bestellmenge else None)] %}
         <div><dt class="text-muted">{{ lab }}</dt><dd class="font-medium">{{ val or "–" }}</dd></div>
         {% endfor %}
+        {% if tags %}<div class="sm:col-span-2"><dt class="text-muted">Ersatzteil für Tag-Nr.</dt><dd class="flex flex-wrap gap-2 mt-1">{% for t in tags %}{% if "ih" in module %}<a href="/ih/anlagen/{{ t.id }}" class="rounded-full border border-line px-3 py-0.5 font-semibold hover:border-primary" title="{{ t.bezeichnung or '' }}">{{ t.code }}</a>{% else %}<span class="rounded-full border border-line px-3 py-0.5 font-semibold" title="{{ t.bezeichnung or '' }}">{{ t.code }}</span>{% endif %}{% endfor %}</dd></div>{% endif %}
         {% if a.verwendung %}<div class="sm:col-span-2"><dt class="text-muted">Verwendung / Anlage</dt><dd class="font-medium whitespace-pre-line">{{ a.verwendung }}</dd></div>{% endif %}
         {% if a.notiz %}<div class="sm:col-span-2"><dt class="text-muted">Notiz</dt><dd class="whitespace-pre-line">{{ a.notiz }}</dd></div>{% endif %}
       </dl>
