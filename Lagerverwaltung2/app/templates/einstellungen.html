@@ -16,6 +16,7 @@
   <div><label class="label">Standard-Einheit für neue Artikel</label><input name="standard_einheit" value="{{ cfg.lager.standard_einheit }}" class="field w-28"></div>
   <label class="flex items-start gap-2"><input type="checkbox" name="negative_bestaende_erlauben" class="mt-1" {% if cfg.lager.negative_bestaende_erlauben %}checked{% endif %}><span>Negative Bestände erlauben<span class="block text-sm text-muted">Aus: Entnahmen über den vorhandenen Bestand werden abgelehnt.</span></span></label>
   <label class="flex items-start gap-2"><input type="checkbox" name="lagerplaetze_automatisch_anlegen" class="mt-1" {% if cfg.lager.lagerplaetze_automatisch_anlegen %}checked{% endif %}><span>Unbekannte Lagerplätze beim Einbuchen automatisch anlegen<span class="block text-sm text-muted">Aus: Nur Plätze, die unter Lagerplätze angelegt sind, können bebucht werden (verhindert Tippfehler).</span></span></label>
+  <label class="flex items-start gap-2 rounded-md border border-line p-3"><input type="checkbox" name="cmms_aktiv" class="mt-1" {% if cfg.cmms.aktiv %}checked{% endif %}><span><b>Instandhaltung (CMMS) aktivieren</b><span class="block text-sm text-muted">Neuer Bereich für Anlagen und Asset-Import (im Aufbau). Sichtbar nur für Administratoren und Benutzer mit einer Instandhaltungs-Rolle (unter <i>Benutzer</i>). Aus: Die Lagerverwaltung bleibt genau wie bisher.</span></span></label>
   <div><label class="label">Aktualisierung „Letzte Buchungen“ (Sekunden)</label><input name="live_abfrage_sekunden" type="number" min="3" value="{{ cfg.lager.live_abfrage_sekunden }}" class="field w-28"></div>
   <div class="grid grid-cols-2 gap-3 max-w-sm">
     <div><label class="label">Port (http)</label><input name="port" type="number" value="{{ cfg.server.port }}" class="field"></div>
@@ -60,30 +61,32 @@
 <div class="grid xl:grid-cols-[1fr_380px] gap-6">
   <div class="panel overflow-hidden">
     <table class="tbl">
-      <thead><tr><th>Benutzer</th><th>Rolle</th><th>Status</th><th>Letzte Anmeldung</th></tr></thead>
+      <thead><tr><th>Benutzer</th><th>Lager</th>{% if cfg.cmms.aktiv %}<th>Instandhaltung</th>{% endif %}<th>Status</th><th>Letzte Anmeldung</th></tr></thead>
       <tbody>
       {% for u in users %}
         <tr x-data>
-          <td><button type="button" class="font-semibold hover:underline" @click='$dispatch("edit-user", {{ {"id": u.id, "username": u.username, "anzeigename": u.anzeigename, "rolle": u.rolle, "aktiv": u.aktiv or not u.pw_hash}|tojson }})'>{{ u.username }}</button><div class="text-xs text-muted">{{ u.anzeigename }}</div></td>
+          <td><button type="button" class="font-semibold hover:underline" @click='$dispatch("edit-user", {{ {"id": u.id, "username": u.username, "anzeigename": u.anzeigename, "rolle": u.rolle, "rolle_ih": u.rolle_ih, "aktiv": u.aktiv or not u.pw_hash}|tojson }})'>{{ u.username }}</button><div class="text-xs text-muted">{{ u.anzeigename }}</div></td>
           <td>{{ ROLLEN_NAMEN[u.rolle] }}</td>
+          {% if cfg.cmms.aktiv %}<td>{{ "alle Rechte (Administrator)" if u.rolle == "admin" else IH_ROLLEN.get(u.rolle_ih, "–") }}</td>{% endif %}
           <td>{% if u.aktiv %}<span class="status st-ok">Aktiv</span>{% elif not u.pw_hash %}<span class="status text-warn">Ohne Passwort</span>{% else %}<span class="status text-muted">Gesperrt</span>{% endif %}</td>
           <td class="text-sm text-muted">{{ u.letzter_login|datum if u.letzter_login else "nie" }}</td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
-    <p class="text-sm text-muted px-4 py-3 border-t border-line">Rollen: <b>Nur lesen</b> sieht alles, bucht nichts. <b>Lager</b> bucht, legt Artikel an und bestellt. <b>Administrator</b> löscht, schließt Inventuren ab und verwaltet Einstellungen. Der Benutzername steht bei jeder Buchung in der Historie.</p>
+    <p class="text-sm text-muted px-4 py-3 border-t border-line">Rollen: <b>Nur lesen</b> sieht alles, bucht nichts. <b>Lager</b> bucht, legt Artikel an und bestellt. <b>Administrator</b> löscht, schließt Inventuren ab und verwaltet Einstellungen. Der Benutzername steht bei jeder Buchung in der Historie.{% if cfg.cmms.aktiv %} <b>Instandhaltung:</b> Ingenieur/Planer und Manager dürfen Anlagen pflegen und die Asset-Liste importieren, alle anderen Rollen sehen Anlagen und Dokumentation. <b>Kein Lagerzugriff</b> + eine Instandhaltungs-Rolle = nur Instandhaltung.{% endif %}</p>
   </div>
   <form method="post" action="/benutzer/speichern" class="panel p-4 space-y-3 self-start"
-        x-data="{u: {id: '', username: '', anzeigename: '', rolle: 'lager', aktiv: true}}" @edit-user.window="u = $event.detail">
+        x-data="{u: {id: '', username: '', anzeigename: '', rolle: 'lager', rolle_ih: '', aktiv: true}}" @edit-user.window="u = $event.detail">
     <h2 x-text="u.id ? 'Benutzer bearbeiten' : 'Neuer Benutzer'"></h2>
     <input type="hidden" name="id" :value="u.id">
     <div><label class="label">Benutzername</label><input name="username" x-model="u.username" class="field" required maxlength="100"></div>
     <div><label class="label">Anzeigename</label><input name="anzeigename" x-model="u.anzeigename" class="field"></div>
-    <div><label class="label">Rolle</label><select name="rolle" x-model="u.rolle" class="field">{% for r, n in ROLLEN_NAMEN.items() %}<option value="{{ r }}">{{ n }}</option>{% endfor %}</select></div>
+    <div><label class="label">Rolle {% if cfg.cmms.aktiv %}Lager{% endif %}</label><select name="rolle" x-model="u.rolle" class="field">{% for r, n in ROLLEN_NAMEN.items() if r != "keine" or cfg.cmms.aktiv %}<option value="{{ r }}">{{ n }}</option>{% endfor %}</select></div>
+    {% if cfg.cmms.aktiv %}<div x-show="u.rolle !== 'admin'"><label class="label">Rolle Instandhaltung</label><select name="rolle_ih" x-model="u.rolle_ih" class="field"><option value="">Kein Zugriff</option>{% for r, n in IH_ROLLEN.items() %}<option value="{{ r }}">{{ n }}</option>{% endfor %}</select></div>{% endif %}
     <div><label class="label" x-text="u.id ? 'Neues Passwort (leer = unverändert)' : 'Passwort (mind. 10 Zeichen)'"></label><input name="passwort" type="password" class="field" autocomplete="new-password"></div>
     <label class="flex items-center gap-2"><input type="checkbox" name="aktiv" x-model="u.aktiv"> Aktiv</label>
-    <div class="flex gap-2"><button class="btn btn-primary flex-1">Speichern</button><button type="button" class="btn" x-show="u.id" @click="u = {id: '', username: '', anzeigename: '', rolle: 'lager', aktiv: true}">Neu</button></div>
+    <div class="flex gap-2"><button class="btn btn-primary flex-1">Speichern</button><button type="button" class="btn" x-show="u.id" @click="u = {id: '', username: '', anzeigename: '', rolle: 'lager', rolle_ih: '', aktiv: true}">Neu</button></div>
   </form>
 </div>
 

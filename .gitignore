@@ -5,6 +5,7 @@ Lagerverwaltung2/daten/
 Lagerverwaltung2/backups/
 Lagerverwaltung2/logs/
 Lagerverwaltung2/druckausgabe/
+Lagerverwaltung2/testsystem/
 Lagerverwaltung2/config.toml
 Lagerverwaltung2/.secret_key
 __pycache__/

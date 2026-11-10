@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ a.code }} bearbeiten{% endblock %}
+{% block content %}
+<div class="mb-5"><a href="/ih/anlagen/{{ a.id }}" class="text-sm text-muted hover:text-ink">{{ a.code }}</a><h1 class="mt-1">{{ ART_TEXT.get(a.art, "Anlage") }} bearbeiten</h1></div>
+{% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-fehler max-w-4xl">{{ fehler }}</div>{% endif %}
+{%- macro wert(v) -%}{{ v if v is not none else "" }}{%- endmacro -%}
+<form method="post" class="panel p-5 max-w-4xl space-y-4">
+  <p class="text-sm text-muted">Die Tag-Nr. <b>{{ a.code }}</b> bleibt fest (sie ist der Schlüssel für Importe und QR-Schilder).</p>
+  <div class="grid sm:grid-cols-2 gap-4">
+    <div class="sm:col-span-2"><label class="label">Bezeichnung</label><input name="bezeichnung" value="{{ wert(a.bezeichnung) }}" class="field" maxlength="300"></div>
+    <div><label class="label">Darüber (Bereich / Unit)</label><select name="eltern_id" class="field"><option value="">– oberste Ebene –</option>{% for e in ebenen if e.id != a.id %}<option value="{{ e.id }}" {% if a.eltern_id == e.id %}selected{% endif %}>{{ e.code }}{% if e.bezeichnung %} – {{ e.bezeichnung }}{% endif %}</option>{% endfor %}</select></div>
+    <div><label class="label">Bauteilklasse</label><input name="bauteilklasse" value="{{ wert(a.bauteilklasse) }}" class="field" placeholder="z. B. Messstelle, Absperrarmatur"></div>
+    <div><label class="label">PLT-Sicherheitseinrichtung</label><select name="sicherheitsgerichtet" class="field"><option value="">unbekannt</option><option value="ja" {% if a.sicherheitsgerichtet == true %}selected{% endif %}>Ja</option><option value="nein" {% if a.sicherheitsgerichtet == false %}selected{% endif %}>Nein</option></select></div>
+    <div><label class="label">Kritikalität</label><select name="kritikalitaet" class="field"><option value="">–</option>{% for k in "ABC" %}<option {% if a.kritikalitaet == k %}selected{% endif %}>{{ k }}</option>{% endfor %}</select></div>
+    {% for k, lab in [("kategorie", "Kategorie"), ("kuerzel", "Kürzel"), ("hersteller", "Hersteller"), ("modell", "Modell / Typ"), ("seriennummer", "Seriennummer"), ("lieferant", "Lieferant"), ("status", "Status"), ("bestellnummer", "Bestellnummer"), ("leistungsnummer", "Leistungsnummer")] %}
+    <div><label class="label">{{ lab }}</label><input name="{{ k }}" value="{{ wert(a[k]) }}" class="field"></div>
+    {% endfor %}
+    <div><label class="label">Inbetriebnahme</label><input name="inbetriebnahme" type="date" value="{{ a.inbetriebnahme or '' }}" class="field"></div>
+    <div><label class="label">Anschaffung</label><input name="anschaffung" type="date" value="{{ a.anschaffung or '' }}" class="field"></div>
+    <div><label class="label">Kosten Einkauf (€)</label><input name="kosten" value="{{ a.kosten|num if a.kosten is not none else '' }}" class="field" inputmode="decimal"></div>
+    <div><label class="label">Nebenkosten Einkauf (€)</label><input name="nebenkosten" value="{{ a.nebenkosten|num if a.nebenkosten is not none else '' }}" class="field" inputmode="decimal"></div>
+    <div class="sm:col-span-2"><label class="label">Link zur Dokumentation</label><input name="doku_url" value="{{ wert(a.doku_url) }}" class="field" placeholder="https://…"></div>
+    <div class="sm:col-span-2"><label class="label">Notiz</label><textarea name="notiz" rows="3" class="field">{{ wert(a.notiz) }}</textarea></div>
+  </div>
+  <div class="flex gap-2"><button class="btn btn-primary">Speichern</button><a href="/ih/anlagen/{{ a.id }}" class="btn">Abbrechen</a></div>
+</form>
+{% endblock %}

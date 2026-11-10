@@ -22,7 +22,7 @@ from pathlib import Path
 WURZEL = Path(__file__).resolve().parent.parent
 APP = "Lagerverwaltung2"
 AUSGABE = WURZEL / "ausgabe"
-NIE = ("lib/", "daten/", "backups/", "logs/", "python/", "druckausgabe/", "config.toml", ".secret_key")
+NIE = ("lib/", "daten/", "backups/", "logs/", "python/", "druckausgabe/", "testsystem/", "config.toml", ".secret_key")
 
 
 def git(*args: str) -> str:

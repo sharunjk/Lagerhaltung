@@ -123,7 +123,7 @@ class Lager:
     def _bewegung(self, a: dict, p: dict | None, typ: str, menge: float, nachher: float | None, **ext) -> Ergebnis:
         werte = dict(zeit=self.zeit, artikel_id=a["id"], artikel_nr=a["nummer"], lagerplatz_id=p["id"] if p else None,
                      lagerplatz=p["code"] if p else None, typ=typ, menge=menge, bestand_nachher=nachher,
-                     benutzer=self.benutzer, quelle=self.quelle)
+                     benutzer=self.benutzer, quelle=self.quelle, preis=a.get("preis"))  # Preis zum Buchungszeitpunkt (Kosten je Anlage)
         werte.update({k: (v.strip() if isinstance(v, str) else v) or None for k, v in ext.items()})
         if self.hinweis:
             werte["text"] = f"{werte['text']}; {self.hinweis}" if werte.get("text") else self.hinweis

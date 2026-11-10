@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Import {{ lauf.dateiname }}{% endblock %}
+{% block content %}
+{% set e = lauf.ergebnis or {} %}
+{% set fertig = lauf.status == "uebernommen" %}
+<div class="mb-1"><a href="/ih/import" class="text-sm text-muted hover:text-ink">Asset-Import</a></div>
+<div class="flex flex-wrap items-start justify-between gap-3 mb-5">
+  <div><h1>{{ lauf.dateiname }}</h1>
+    <p class="text-muted">{{ lauf.zeilen }} Datenzeilen, {{ lauf.spalten|length }} Spalten{% if lauf.optionen.blatt %} · Tabellenblatt „{{ lauf.optionen.blatt }}“{% endif %} · hochgeladen {{ lauf.zeit|datum }} von {{ lauf.benutzer }}</p>
+    {% if lauf.optionen.blaetter and lauf.optionen.blaetter|length > 1 %}<p class="text-xs text-muted">Weitere Blätter: {{ lauf.optionen.blaetter|reject("equalto", lauf.optionen.blatt)|join(", ") }} – für ein anderes Blatt die Datei erneut hochladen und den Blattnamen angeben.</p>{% endif %}
+  </div>
+  <div class="flex gap-2">
+    {% if e %}<a href="/ih/import/{{ lauf.id }}/bericht.xlsx" class="btn">{{ icon("download", "w-4 h-4") }}Importbericht (Excel)</a>{% endif %}
+    {% if not fertig %}<form method="post" action="/ih/import/{{ lauf.id }}/verwerfen" onsubmit="return confirm('Diesen Import verwerfen? An den Anlagen ändert sich nichts.')"><button class="btn">Verwerfen</button></form>{% endif %}
+  </div>
+</div>
+
+<ol class="flex flex-wrap gap-2 text-sm mb-5">
+  {% for nr, text, aktiv in [(1, "Spalten zuordnen", not e), (2, "Prüfen und Testlauf", e and not fertig), (3, "Übernehmen", fertig)] %}
+  <li class="rounded-full border px-3 py-1 {{ 'border-primary bg-primary/10 font-semibold' if aktiv else 'border-line text-muted' }}">{{ nr }}. {{ text }}</li>
+  {% endfor %}
+</ol>
+
+{% if fertig %}
+<div class="panel p-5 mb-6 border-l-4 border-l-ok">
+  <h2>Übernommen am {{ lauf.uebernommen_am|datum }}{% if e.uebernommen_von %} von {{ e.uebernommen_von }}{% endif %}</h2>
+  <p class="mt-1">{{ e.neu }} Anlagen neu, {{ e.geaendert }} geändert, {{ e.unveraendert }} unverändert, {{ e.fehler }} Zeilen übersprungen{% if e.neue_ebenen %}, {{ e.neue_ebenen|length }} Ebenen angelegt ({{ e.neue_ebenen|join(", ") }}){% endif %}.</p>
+  {% if e.sicherung %}<p class="text-sm text-muted mt-1">Stand vor dem Import gesichert als „{{ e.sicherung }}“ (Einstellungen → Datensicherung).</p>{% endif %}
+  <a href="/ih/anlagen" class="btn mt-3">Zu den Anlagen</a>
+</div>
+{% endif %}
+
+<form method="post" action="/ih/import/{{ lauf.id }}/pruefen" class="space-y-5">
+  <section class="panel overflow-x-auto">
+    <div class="px-4 py-3 border-b border-line"><h2>1. Spalten zuordnen</h2><p class="text-sm text-muted">Vorschlag aus den Spaltennamen. „Zusatzfeld“ übernimmt den Wert unverändert (sichtbar an der Anlage), „ignorieren“ lässt die Spalte weg. Pflicht ist nur die Tag-Nr.</p></div>
+    <table class="tbl">
+      <thead><tr><th>Spalte in der Datei</th><th>Beispielwerte</th><th class="w-72">Übernehmen als</th></tr></thead>
+      <tbody>
+      {% for s in lauf.spalten %}
+        {% set i = loop.index0 %}{% set bsp, gefuellt = beispiele[i] %}
+        <tr><td class="font-semibold">{{ s }}<span class="block text-xs text-muted font-normal">{{ gefuellt }} von {{ lauf.zeilen }} gefüllt</span></td>
+          <td class="text-sm text-muted max-w-md"><span class="line-clamp-2 break-all">{{ bsp|join(" · ") or "– leer –" }}</span></td>
+          <td><select name="spalte_{{ i }}" class="field" {% if fertig %}disabled{% endif %}><option value="">– ignorieren –</option>{% for f, (lab, typ) in FELDER.items() %}<option value="{{ f }}" {% if lauf.zuordnung[i] == f %}selected{% endif %}>{{ lab }}</option>{% endfor %}</select></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <section class="panel p-5 space-y-2">
+    <h2 class="mb-1">Ebenen und Regeln</h2>
+    <label class="flex items-start gap-2"><input type="checkbox" name="unit_aus_tag" class="mt-1" {% if lauf.optionen.unit_aus_tag %}checked{% endif %} {% if fertig %}disabled{% endif %}><span>Fehlende Unit aus der Tag-Nr. ableiten<span class="block text-sm text-muted">FIC 1040 01-01 → Unit 1040, P -10401 A → Unit 1040. Steht eine Unit in der Datei, gilt diese; weicht sie von der Tag-Nr. ab, gibt es einen Hinweis.</span></span></label>
+    <label class="flex items-start gap-2"><input type="checkbox" name="bereiche_bilden" class="mt-1" {% if lauf.optionen.bereiche_bilden %}checked{% endif %} {% if fertig %}disabled{% endif %}><span>Units zu Bereichen zusammenfassen<span class="block text-sm text-muted">Unit 1040 → Bereich 1000, Unit 3060 → Bereich 3000. Bezeichnungen der Ebenen lassen sich danach an der Anlage ändern.</span></span></label>
+    <label class="flex items-start gap-2"><input type="checkbox" name="leere_ueberschreiben" class="mt-1" {% if lauf.optionen.leere_ueberschreiben %}checked{% endif %} {% if fertig %}disabled{% endif %}><span>Leere Zellen löschen vorhandene Werte<span class="block text-sm text-muted">Normalerweise aus: Eine leere Zelle lässt den vorhandenen Wert stehen.</span></span></label>
+  </section>
+  {% if not fertig %}<button class="btn btn-primary btn-lg">Prüfen und Testlauf</button> <span class="text-sm text-muted ml-2">Der Testlauf führt den Import vollständig aus und nimmt ihn sofort zurück – es ändert sich nichts.</span>{% endif %}
+</form>
+
+{% if e %}
+<section id="ergebnis" class="mt-8 space-y-5">
+  <h2>2. Ergebnis {{ "der Übernahme" if fertig else "von Prüfung und Testlauf" }}{% if e.geprueft_am and not fertig %} <span class="text-sm text-muted font-normal">({{ e.geprueft_am|datum }})</span>{% endif %}</h2>
+  {% if not e.testlauf_ok %}
+  <div class="panel p-4 flash-fehler">Testlauf fehlgeschlagen: {{ e.testlauf_fehler }}</div>
+  {% else %}
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+    {% for k, lab, cls in [("neu", "neu", "text-ok"), ("geaendert", "werden geändert", "text-primary"), ("unveraendert", "unverändert", ""), ("fehler", "Fehler – übersprungen", "text-crit"), ("hinweise", "mit Hinweisen", "text-warn")] %}
+    <a href="/ih/import/{{ lauf.id }}?zeige={{ k }}#ergebnis" class="panel p-4 hover:border-primary {{ 'border-primary' if zeige == k }}"><span class="block text-3xl font-cond font-bold tabular-nums {{ cls }}">{{ e[k] }}</span><span class="text-sm text-muted">{{ lab }}</span></a>
+    {% endfor %}
+  </div>
+  <p class="text-sm text-muted">{% if e.neue_ebenen %}Neue Ebenen: {{ e.neue_ebenen|join(", ") }}. {% endif %}{% if e.nicht_in_datei %}{{ e.nicht_in_datei }} vorhandene Bauteile stehen nicht in der Datei – sie bleiben unverändert.{% endif %}</p>
+  <div class="panel overflow-x-auto">
+    <div class="px-4 py-3 border-b border-line flex justify-between"><h3 class="font-semibold">{{ {"neu": "Neue Anlagen", "geaendert": "Änderungen", "unveraendert": "Unveränderte Anlagen", "fehler": "Fehler", "hinweise": "Hinweise"}.get(zeige, "Fehler und Hinweise") }}</h3><span class="text-sm text-muted">höchstens 300 Zeilen – alle im Importbericht</span></div>
+    <table class="tbl">
+      <thead><tr><th class="num">Zeile</th><th>Tag-Nr.</th><th>Ergebnis</th><th>Meldungen / Änderungen</th></tr></thead>
+      <tbody>
+      {% for z in auswahl %}
+        <tr><td class="num text-muted">{{ z.nr }}</td><td class="whitespace-nowrap font-semibold">{{ z.code or "–" }}</td>
+          <td class="text-sm whitespace-nowrap"><span class="status {{ {'fehler': 'st-kritisch', 'neu': 'st-ok', 'geaendert': 'st-melden'}.get(z.ergebnis, '') }}">{{ ERGEBNIS_TEXT.get(z.ergebnis, z.ergebnis) }}</span></td>
+          <td class="text-sm">{% for art, text in z.meldungen %}<div class="{{ 'text-crit' if art == 'fehler' }}">{{ text }}</div>{% endfor %}
+            {% for f, (alt, neu) in z.aenderungen.items() %}<div class="text-muted">{{ FELDER[f][0] if f in FELDER else f }}: {{ alt if alt not in (none, "", {}) else "–" }} → <span class="text-ink">{{ neu if neu not in (none, "") else "–" }}</span></div>{% endfor %}</td></tr>
+      {% else %}<tr><td colspan="4" class="py-6 text-center text-muted">Keine Einträge.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if not fertig %}
+  <form method="post" action="/ih/import/{{ lauf.id }}/uebernehmen" class="panel p-5 space-y-3 border-l-4 border-l-primary">
+    <h2>3. Übernehmen</h2>
+    <p class="text-sm">Übernommen wird genau das Geprüfte: {{ e.neu }} neue Anlagen, {{ e.geaendert }} Änderungen. Zeilen mit Fehlern werden übersprungen – im Importbericht steht, welche und warum. Vorher wird automatisch eine Sicherung erstellt („vor_import“).</p>
+    <label class="flex items-center gap-2"><input type="checkbox" name="bestaetigt" value="ja" required> Ich habe das Ergebnis geprüft und möchte den Import übernehmen.</label>
+    <button class="btn btn-primary">Import übernehmen</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

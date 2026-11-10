@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Anlagen{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <div><h1>Anlagen</h1><p class="text-muted">{{ gesamt }} Bauteile{% if q or ebene or klasse or filter %} gefunden{% endif %}</p></div>
+</div>
+<form class="panel p-3 mb-4 flex flex-wrap items-end gap-3">
+  <div class="flex-1 min-w-[14rem]"><label class="label">Suche</label><input name="q" value="{{ q }}" class="field" placeholder="Tag-Nr., Bezeichnung, Hersteller, Modell, Seriennr."></div>
+  <div><label class="label">Bereich / Unit</label><select name="ebene" class="field" onchange="this.form.submit()"><option value="">Alle</option>
+    {% for e in ebenen %}<option value="{{ e.id }}" {% if ebene == e.id|string %}selected{% endif %}>{{ "  " if e.art == "unit" and e.eltern_id }}{{ e.code }}{% if e.bezeichnung and e.bezeichnung != "Unit " ~ e.code and e.bezeichnung != "Bereich " ~ e.code %} – {{ e.bezeichnung }}{% endif %}</option>{% endfor %}
+    <option value="ohne" {% if ebene == "ohne" %}selected{% endif %}>ohne Unit</option></select></div>
+  <div><label class="label">Bauteilklasse</label><select name="klasse" class="field" onchange="this.form.submit()"><option value="">Alle</option>{% for k in klassen %}<option {% if klasse == k %}selected{% endif %}>{{ k }}</option>{% endfor %}<option value="-" {% if klasse == "-" %}selected{% endif %}>ohne Klasse</option></select></div>
+  <div><label class="label">Filter</label><select name="filter" class="field" onchange="this.form.submit()"><option value="">–</option><option value="sicher" {% if filter == "sicher" %}selected{% endif %}>nur PLT-Sicherheitseinrichtungen</option><option value="ohne_doku" {% if filter == "ohne_doku" %}selected{% endif %}>ohne Doku-Link</option></select></div>
+  <button class="btn">{{ icon("search", "w-4 h-4") }}Suchen</button>
+  {% if q or ebene or klasse or filter %}<a href="/ih/anlagen" class="btn">Zurücksetzen</a>{% endif %}
+</form>
+<div class="panel overflow-x-auto">
+  <table class="tbl">
+    <thead><tr><th>Tag-Nr.</th><th>Bezeichnung</th><th>Bauteilklasse</th><th>Unit</th><th>Hersteller / Modell</th><th>Doku</th></tr></thead>
+    <tbody>
+    {% for a in rows %}
+      <tr>
+        <td class="whitespace-nowrap"><a class="font-semibold hover:underline" href="/ih/anlagen/{{ a.id }}">{{ a.code }}</a>{% if a.sicherheitsgerichtet %} <span class="status st-kritisch" title="PLT-Sicherheitseinrichtung">PLT-S</span>{% endif %}</td>
+        <td>{{ a.bezeichnung or "" }}</td>
+        <td class="text-sm">{{ a.bauteilklasse or "" }}</td>
+        <td class="text-sm">{{ a.ebene or "–" }}</td>
+        <td class="text-sm">{{ a.hersteller or "" }}{% if a.modell %}<span class="block text-muted text-xs truncate max-w-[16rem]">{{ a.modell }}</span>{% endif %}</td>
+        <td>{% if a.doku_url %}<a href="{{ a.doku_url }}" target="_blank" rel="noopener noreferrer" class="text-primary" title="Dokumentation öffnen">{{ icon("link", "w-5 h-5") }}</a>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="6" class="py-8 text-center text-muted">Keine Anlagen gefunden.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if seiten > 1 %}
+<div class="flex items-center gap-2 mt-4 text-sm">
+  {% set basis = "/ih/anlagen?q=" ~ (q|urlq) ~ "&ebene=" ~ (ebene|urlq) ~ "&klasse=" ~ (klasse|urlq) ~ "&filter=" ~ (filter|urlq) %}
+  {% if seite > 1 %}<a class="btn btn-sm" href="{{ basis }}&seite={{ seite - 1 }}">Zurück</a>{% endif %}
+  <span class="text-muted">Seite {{ seite }} von {{ seiten }}</span>
+  {% if seite < seiten %}<a class="btn btn-sm" href="{{ basis }}&seite={{ seite + 1 }}">Weiter</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -9,11 +9,12 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import delete, func, insert, select, update
 
 from .. import db
 from ..config import save_section
-from ..db import artikel, audit as audit_t, bewegungen, lieferanten, users
+from ..db import artikel, audit as audit_t, benutzer_rollen, bewegungen, lieferanten, users
+from ..rechte import IH_ROLLEN
 from ..services import betrieb, casper_import, labels, queries, sicherung
 from ..services.excel import import_lesen, import_vorlage, tabelle_xlsx
 from ..services.lager import BuchungsFehler, audit, parse_num
@@ -88,7 +89,8 @@ def einstellungen(request: Request, tab: str = "allgemein"):
     require(request, "admin")
     cfg = request.app.state.cfg
     with db.engine().connect() as con:
-        nutzer = con.execute(select(users).order_by(func.lower(users.c.username))).mappings().all()
+        ih_rollen = dict(con.execute(select(benutzer_rollen.c.user_id, benutzer_rollen.c.rolle).where(benutzer_rollen.c.modul == "ih")).all())
+        nutzer = [{**u, "rolle_ih": ih_rollen.get(u["id"], "")} for u in con.execute(select(users).order_by(func.lower(users.c.username))).mappings()]
         hat_daten = casper_import.hat_daten(con)
         bericht = betrieb.get_setting(con, "uebernahme_bericht")
         sich = sicherung.uebersicht(cfg, con) if tab == "backup" else []
@@ -121,6 +123,7 @@ async def allgemein(request: Request):
             "live_abfrage_sekunden": max(3, int(f.get("live_abfrage_sekunden") or 10)),
             "standard_einheit": (f.get("standard_einheit") or "Stk").strip() or "Stk",
         })
+        _cfg_update(request, "cmms", {"aktiv": f.get("cmms_aktiv") == "on"})
         _cfg_update(request, "server", {"firmenname": (f.get("firmenname") or "").strip() or "Lager",
                                         "port": int(f.get("port") or 8080), "https_port": int(f.get("https_port") or 0)})
     except ValueError:
@@ -387,9 +390,10 @@ async def uebernahme(request: Request, datei: UploadFile = File(...), ersetzen: 
 # ------------------------------------------------------------------ Benutzer
 @router.post("/benutzer/speichern")
 def benutzer_speichern(request: Request, id: str = Form(""), username: str = Form(...), anzeigename: str = Form(""),
-                       rolle: str = Form("lager"), passwort: str = Form(""), aktiv: str = Form("")):
+                       rolle: str = Form("lager"), passwort: str = Form(""), aktiv: str = Form(""), rolle_ih: str = Form("")):
     me = require(request, "admin")
-    rolle = rolle if rolle in ROLLEN else "lager"
+    rolle = rolle if rolle in ROLLEN or rolle == "keine" else "lager"
+    rolle_ih = rolle_ih if rolle_ih in IH_ROLLEN else ""
     username = username.strip()
     with db.schreiben() as con:
         werte = dict(username=username, anzeigename=anzeigename.strip() or username, rolle=rolle, aktiv=aktiv == "on")
@@ -424,7 +428,11 @@ def benutzer_speichern(request: Request, id: str = Form(""), username: str = For
                 flash(request, "Für neue Benutzer ist ein Passwort nötig.", "fehler")
                 return RedirectResponse("/einstellungen?tab=benutzer", status_code=303)
             con.execute(insert(users).values(**werte))
-        audit(con, me["username"], "Benutzer gespeichert", username, {"rolle": rolle, "aktiv": werte["aktiv"]})
+        uid = int(id) if id else con.execute(select(users.c.id).where(users.c.username == username)).scalar()
+        con.execute(delete(benutzer_rollen).where(benutzer_rollen.c.user_id == uid, benutzer_rollen.c.modul == "ih"))
+        if rolle_ih:
+            con.execute(insert(benutzer_rollen).values(user_id=uid, modul="ih", rolle=rolle_ih))
+        audit(con, me["username"], "Benutzer gespeichert", username, {"rolle": rolle, "rolle_ih": rolle_ih or None, "aktiv": werte["aktiv"]})
     flash(request, f"Benutzer {username} gespeichert.")
     return RedirectResponse("/einstellungen?tab=benutzer", status_code=303)
 

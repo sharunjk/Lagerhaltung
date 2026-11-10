@@ -100,6 +100,8 @@ bewegungen = Table(
     Column("storno_von", Integer),
     Column("storniert_durch", Integer),
     Column("quelle", String(20)),           # pc | mobil | api | import
+    Column("preis", Float),                 # Artikelpreis zum Buchungszeitpunkt (ab 2.5.0, Migration 1)
+    Column("auftrag_id", Integer),          # Instandhaltungsauftrag (ab 2.5.0, Migration 1; Aufträge folgen in Phase 1)
 )
 Index("ix_bew_typ", bewegungen.c.typ)
 
@@ -114,6 +116,7 @@ reservierungen = Table(
     Column("status", String(20), nullable=False, default="offen"),  # offen | entnommen | storniert
     Column("erstellt_am", DateTime, server_default=func.current_timestamp()),
     Column("erstellt_von", String(100)),
+    Column("auftrag_id", Integer),          # ab 2.5.0, Migration 1
 )
 
 bestellungen = Table(
@@ -193,6 +196,82 @@ settings = Table(
     Column("wert", Text),
 )
 
+schema_version = Table(
+    "schema_version", md,  # angewendete Datenbank-Migrationen (app/migrationen.py)
+    Column("version", Integer, primary_key=True),
+    Column("name", String(200)),
+    Column("angewendet_am", DateTime, server_default=func.current_timestamp()),
+    Column("programmversion", String(20)),
+)
+
+benutzer_rollen = Table(
+    "benutzer_rollen", md,  # Rolle je Modul (Lager-Rolle steht weiter in users.rolle)
+    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("modul", String(20), primary_key=True),  # ih
+    Column("rolle", String(30), nullable=False),
+)
+
+# ------------------------------------------------------------------ Instandhaltung (CMMS)
+ih_plaetze = Table(
+    "ih_plaetze", md,  # technischer Platz: Bereich, Unit oder Tag-Nummer (Position in der Anlage)
+    Column("id", Integer, primary_key=True),
+    Column("code", String(120), nullable=False, unique=True),
+    Column("schluessel", String(120), nullable=False, unique=True),  # Code ohne Leerzeichen, klein: findet Doppelte
+    Column("art", String(20), nullable=False, default="platz"),       # bereich | unit | platz
+    Column("eltern_id", Integer, ForeignKey("ih_plaetze.id"), index=True),
+    Column("bezeichnung", String(300)),
+    Column("kategorie", String(200)),
+    Column("kuerzel", String(30)),
+    Column("hersteller", String(200)),
+    Column("modell", String(300)),
+    Column("seriennummer", String(200)),
+    Column("lieferant", String(200)),
+    Column("bauteilklasse", String(100)),  # z. B. Absperrarmatur, Messstelle, PLTS-Sensor – bestimmt später die Wartungsintervalle
+    Column("sicherheitsgerichtet", Boolean),  # PLT-Sicherheitseinrichtung (SR 4)
+    Column("kritikalitaet", String(1)),   # A | B | C
+    Column("status", String(30)),
+    Column("inbetriebnahme", Date),
+    Column("anschaffung", Date),
+    Column("bestellnummer", String(100)),
+    Column("leistungsnummer", String(100)),
+    Column("kosten", Float),
+    Column("nebenkosten", Float),
+    Column("doku_url", String(1000)),
+    Column("notiz", Text),
+    Column("zusatz", Text),               # weitere Spalten aus dem Import (JSON: Spaltenname -> Wert)
+    Column("aktiv", Boolean, nullable=False, default=True),
+    Column("import_lauf_id", Integer),
+    Column("erstellt_am", DateTime, server_default=func.current_timestamp()),
+    Column("geaendert_am", DateTime, server_default=func.current_timestamp()),
+)
+
+ih_import_laeufe = Table(
+    "ih_import_laeufe", md,
+    Column("id", Integer, primary_key=True),
+    Column("dateiname", String(300)),
+    Column("zeit", DateTime, server_default=func.current_timestamp()),
+    Column("benutzer", String(100)),
+    Column("status", String(20), nullable=False, default="neu"),  # neu | geprueft | uebernommen
+    Column("spalten", Text),       # JSON: Spaltenüberschriften
+    Column("zuordnung", Text),     # JSON: Feld je Spalte
+    Column("optionen", Text),      # JSON
+    Column("ergebnis", Text),      # JSON: Zusammenfassung von Prüfung/Testlauf/Übernahme
+    Column("pruef_kennung", String(64)),  # Zuordnung + Optionen + Datenstand der letzten erfolgreichen Prüfung
+    Column("zeilen", Integer),
+    Column("uebernommen_am", DateTime),
+)
+
+ih_import_zeilen = Table(
+    "ih_import_zeilen", md,
+    Column("id", Integer, primary_key=True),
+    Column("lauf_id", Integer, ForeignKey("ih_import_laeufe.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("nr", Integer, nullable=False),  # Zeilennummer in der Datei
+    Column("werte", Text, nullable=False),  # JSON-Liste, eine Zelle je Spalte
+    Column("ergebnis", String(20)),         # neu | geaendert | unveraendert | fehler
+    Column("meldungen", Text),              # JSON-Liste
+    Column("aenderungen", Text),            # JSON: Feld -> [alt, neu]
+)
+
 _engine: Engine | None = None
 
 
@@ -218,7 +297,8 @@ def init_engine(url: str) -> Engine:
         # Reine Lesezugriffe blockieren niemanden (WAL-Modus).
         conn.exec_driver_sql("BEGIN IMMEDIATE" if conn.get_execution_options().get("schreiben") else "BEGIN")
 
-    md.create_all(eng)
+    from .migrationen import anwenden
+    anwenden(eng)  # neue Tabellen anlegen, ausstehende Migrationen ausführen (eine Transaktion)
     _engine = eng
     return eng
 

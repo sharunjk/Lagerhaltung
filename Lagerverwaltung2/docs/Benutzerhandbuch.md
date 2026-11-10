@@ -64,9 +64,35 @@ Fehlbuchung? Bei der Buchung **Storno** – es entsteht eine Gegenbuchung, nicht
 
 Verbrauch je Artikel und Kostenstelle, Lagerwert, Bestand je Gruppe, Ladenhüter – jeweils als Excel.
 
+## Instandhaltung (CMMS) – erste Ausbaustufe
+
+Ab 2.5.0 gibt es neben der Lagerverwaltung einen zweiten Bereich **Instandhaltung**. Er ist zunächst ausgeschaltet. Ein Administrator schaltet ihn unter *Einstellungen → Allgemein → Instandhaltung (CMMS) aktivieren* ein. Solange er aus ist, sieht die Lagerverwaltung genau wie bisher aus.
+
+- **Wer sieht was:** Administratoren haben alle Rechte. Alle anderen brauchen eine **Rolle Instandhaltung** (*Einstellungen → Benutzer*): *Nur lesen*, *Operator / Anlagenfahrer*, *Techniker*, *Schichtführer / Betriebsleiter*, *Instandhaltungsingenieur / Planer*, *Instandhaltungsmanager*. In dieser Ausbaustufe dürfen Ingenieur/Planer und Manager Anlagen bearbeiten und importieren. Alle anderen sehen Anlagen und Dokumentation. Wer nur in der Instandhaltung arbeitet, bekommt im Lager die Rolle *Kein Lagerzugriff*.
+- **Bereich wechseln:** Wer beide Bereiche nutzt, wählt nach der ersten Anmeldung *Lagerverwaltung* oder *Instandhaltung*. Danach öffnet sich der zuletzt genutzte Bereich. Oben in der Seitenleiste wechselt *Zur Instandhaltung* bzw. *Zur Lagerverwaltung* ohne neue Anmeldung.
+- **Anlagen:** Bereiche (z. B. 1000, 3000), darunter Units (1010, 1040 …), darunter die Bauteile mit Tag-Nr. Die Suche findet Tag-Nr. auch ohne Leerzeichen (`fic1040` findet *FIC 1040 01-01*), außerdem Bezeichnung, Hersteller, Modell und Seriennummer. Filter: Bereich/Unit, Bauteilklasse, nur PLT-Sicherheitseinrichtungen, ohne Doku-Link.
+- **Anlagenseite:** Stammdaten, *Dokumentation öffnen* (Link zum SharePoint-Ordner), Unterobjekte, weitere Angaben aus dem Import und *Ersatzteile im Lager*. Dort stehen die Lagerartikel, deren Feld *Verwendung* die Tag-Nr. nennt. Ingenieur/Planer und Manager können die Anlage bearbeiten. Die Tag-Nr. selbst bleibt fest, und jede Änderung steht im Protokoll.
+
+### Asset-Liste importieren
+
+*Instandhaltung → Asset-Import*. Geht mit Excel (.xlsx) oder CSV, auch mit dem SharePoint-Export („Als CSV exportieren“). Bei Excel-Mappen wird automatisch das Blatt mit der Tag-Nr.-Spalte und den meisten Zeilen gelesen, beim Instandhaltungsplan also die *Matrix*.
+
+1. **Hochladen.** Die Datei wird zunächst nur zwischengespeichert.
+2. **Spalten zuordnen.** Ein Vorschlag kommt aus den Spaltennamen. Pflicht ist nur die Tag-Nr. *Zusatzfeld* übernimmt eine Spalte unverändert, *ignorieren* lässt sie weg.
+   - Units: Fehlt die Unit, wird sie aus der Tag-Nr. abgeleitet (*FIC 1040 01-01* und *P -10401 A* gehören zu 1040).
+   - Bereiche: Units lassen sich zu Bereichen zusammenfassen (1040 → 1000).
+3. **Prüfen und Testlauf.** Der Import läuft einmal komplett durch und wird sofort zurückgenommen. Danach sehen Sie, was *neu* ist, was *geändert* würde, was *unverändert* bleibt und welche Zeilen *Fehler* haben und übersprungen werden, außerdem *Hinweise*. Alles steht auch im **Importbericht (Excel)**.
+   - Fehler: Tag-Nr. fehlt, Tag-Nr. doppelt in der Datei.
+   - Hinweise: Platzhalter wie „VV 3010 xx“, Unit passt nicht zur Tag-Nr., ähnliche Schreibweise, unlesbarer Wert, Link, der nicht mit http(s) beginnt.
+4. **Übernehmen** (Häkchen setzen). Vorher wird automatisch eine Sicherung *vor_import_…* erstellt. Übernommen wird genau das Geprüfte. Hat jemand inzwischen Anlagen geändert, verlangt das Programm eine neue Prüfung.
+
+Regeln: Der Import löscht nie etwas. Vorhandene Anlagen werden über die Tag-Nr. erkannt, Groß-/Kleinschreibung und Leerzeichen sind egal. Es ändern sich nur die zugeordneten Spalten, eine leere Zelle lässt den vorhandenen Wert stehen. Anlagen, die nicht in der Datei stehen, bleiben unverändert. Zahlen wie „67.200“ und „2.210,45“ und SharePoint-Datumsangaben (UTC) werden richtig umgerechnet.
+
+So entsteht der Anlagenbestand aus den heutigen Listen: erst die **Asset-Liste** (Stammdaten, Doku-Links, Bestelldaten), danach die **Matrix aus dem Instandhaltungsplan**. Die Matrix ergänzt Bauteilklasse, PLT-Sicherheitseinrichtung und die Intervalle als Zusatzfelder.
+
 ## Einstellungen (Administrator)
 
-Benutzer und Rollen (*Nur lesen*, *Lager*, *Administrator*), Etikettendrucker, tägliche Meldebestands-Mail, Datensicherung (mehrere Uhrzeiten und Speicherorte, z. B. externe Festplatte; Wiederherstellen mit Vorschau), Datenübernahme aus Casper, Handscanner-Zugang mit QR-Code, Schnittstelle (API) für andere Programme. *Protokoll* zeigt jede Änderung mit Benutzer und Zeit.
+Benutzer und Rollen (*Nur lesen*, *Lager*, *Administrator*, *Kein Lagerzugriff*; dazu die Rolle Instandhaltung), Etikettendrucker, tägliche Meldebestands-Mail, Datensicherung (mehrere Uhrzeiten und Speicherorte, z. B. externe Festplatte; Wiederherstellen mit Vorschau), Datenübernahme aus Casper, Handscanner-Zugang mit QR-Code, Schnittstelle (API) für andere Programme. *Protokoll* zeigt jede Änderung mit Benutzer und Zeit.
 
 **Etiketten-Schriftgröße** (*Einstellungen → Etikettendrucker → Schriftgröße der Bezeichnung*): *Automatisch* (empfohlen) verkleinert lange Bezeichnungen und bricht sie auf zwei Zeilen um, damit nichts abgeschnitten wird. *Groß*, *Normal* und *Klein* sind feste Größen; was nicht passt, wird dort gekürzt. Beim einzelnen Artikel lässt sich die Größe beim Drucken abweichend wählen; die Vorschau zeigt das Ergebnis.
 

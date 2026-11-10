@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Bereich wählen{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto mt-6">
+  <h1 class="mb-1">Willkommen, {{ user.name }}</h1>
+  <p class="text-muted mb-6">Womit möchten Sie arbeiten? Beim nächsten Mal öffnet sich der zuletzt gewählte Bereich. Wechseln geht jederzeit oben in der Seitenleiste, ohne neue Anmeldung.</p>
+  <div class="grid sm:grid-cols-2 gap-4">
+    <a href="/bereich/lager" class="panel p-6 hover:border-primary flex gap-4 items-start">
+      <span class="grid place-items-center w-12 h-12 rounded bg-tag text-tagink shrink-0">{{ icon("scan", "w-7 h-7") }}</span>
+      <span><span class="block font-cond font-bold text-2xl">Lagerverwaltung</span><span class="block text-muted mt-1">Artikel, Bestände, Buchen, Nachbestellen, Inventur</span></span>
+    </a>
+    <a href="/bereich/ih" class="panel p-6 hover:border-primary flex gap-4 items-start">
+      <span class="grid place-items-center w-12 h-12 rounded bg-primary text-white shrink-0">{{ icon("wrench", "w-7 h-7") }}</span>
+      <span><span class="block font-cond font-bold text-2xl">Instandhaltung</span><span class="block text-muted mt-1">Anlagen und Bauteile, Dokumentation, Asset-Import</span></span>
+    </a>
+  </div>
+</div>
+{% endblock %}

@@ -17,7 +17,7 @@ from .config import load_config
 from .services.betrieb import Zeitplaner
 from .web import Anmeldesperre, Forbidden, LoginRequired, render
 
-VERSION = "2.4.0"
+VERSION = "2.5.0"
 log = logging.getLogger("lagerverwaltung")
 
 
@@ -75,6 +75,8 @@ def server_plan(cfg, https_bereit: bool) -> list[dict]:
 
 def create_app(cfg=None, start_scheduler: bool = True) -> FastAPI:
     cfg = cfg or load_config()
+    from .migrationen import vor_start
+    vor_update = vor_start(cfg)  # stehen Datenbank-Änderungen an: Probelauf an einer Kopie + Sicherung (sonst Abbruch)
     db.init_engine(cfg.db_url)
     cfg.path(cfg.daten.anhaenge).mkdir(parents=True, exist_ok=True)
 
@@ -96,6 +98,7 @@ def create_app(cfg=None, start_scheduler: bool = True) -> FastAPI:
     app.state.code_geprueft = time.monotonic()
     app.state.neustart_noetig = False
     app.state.anmeldesperre = Anmeldesperre()
+    app.state.vor_update = vor_update
 
     @app.middleware("http")
     async def same_origin_check(request: Request, call_next):
@@ -130,8 +133,8 @@ def create_app(cfg=None, start_scheduler: bool = True) -> FastAPI:
 
     app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
-    from .routes import admin, api, artikel, buchen, core, lager, mobil
-    for r in (core.router, artikel.router, buchen.router, lager.router, admin.router, mobil.router, api.router):
+    from .routes import admin, api, artikel, buchen, core, ih, lager, mobil
+    for r in (core.router, artikel.router, buchen.router, lager.router, admin.router, mobil.router, ih.router, api.router):
         app.include_router(r)
     return app
 
@@ -150,7 +153,12 @@ def run() -> None:
     datei = RotatingFileHandler(BASE_DIR / "logs" / "lagerverwaltung.log", maxBytes=2_000_000, backupCount=5, encoding="utf-8")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", handlers=[logging.StreamHandler(sys.stderr), datei])
     cfg = load_config()
-    app = create_app(cfg)
+    from .migrationen import MigrationsFehler
+    try:
+        app = create_app(cfg)
+    except MigrationsFehler as e:
+        log.error("%s Die Datenbank ist unverändert. Bitte die vorherige Programmversion wieder einspielen und den Fehler melden.", e)
+        raise SystemExit(1)
     cert = key = None
     if int(cfg.server.https_port or 0):
         try:

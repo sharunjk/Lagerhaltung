@@ -1,10 +1,10 @@
-# Lagerverwaltung 2.4.0 – Installation
+# Lagerverwaltung 2.5.0 – Installation
 
 Eigenständige Lagerverwaltung mit eigener Datenbank. Sie braucht weder Casper noch MySQL noch den MIS Communicator. Die bisherigen Daten werden einmalig aus einem HeidiSQL-Export übernommen. Dauer: etwa 20 Minuten.
 
 ## Was Sie brauchen
 
-- Das Paket `Lagerverwaltung_v2.4.0.zip`
+- Das Paket `Lagerverwaltung_v2.5.0.zip`
 - Die Datei **python-3.12.10-embed-amd64.zip** von python.org (*Downloads → Windows → Python 3.12.10 → „Windows embeddable package (64-bit)“*). Keine Installation, keine Adminrechte nötig.
 - Den SQL-Export der Casper-Datenbank (HeidiSQL → Rechtsklick auf `daten` → *Datenbank als SQL exportieren*, Daten: „Einfügen“). Frisch exportieren, damit die letzten Buchungen enthalten sind.
 - Für Handscanner/Smartphones und andere PCs: einmalig Adminrechte für die Firewall-Freigabe (IT)
@@ -104,7 +104,7 @@ Die Lagerverwaltung muss dafür nicht beendet werden. Handscanner sollten ihre o
 
 ### Lager-PC defekt – Umzug auf einen neuen PC
 
-1. Auf dem neuen PC die Lagerverwaltung nach Abschnitt 1 einrichten. Dafür das **vollständige** Paket `Lagerverwaltung_v2.4.0.zip` nehmen, nicht ein Update-Paket. Die Datenübernahme aus Casper entfällt.
+1. Auf dem neuen PC die Lagerverwaltung nach Abschnitt 1 einrichten. Dafür das **vollständige** Paket `Lagerverwaltung_v2.5.0.zip` nehmen, nicht ein Update-Paket. Die Datenübernahme aus Casper entfällt.
 2. Einen vorläufigen Administrator anlegen, anmelden.
 3. Externe Festplatte anschließen → *Einstellungen → Datensicherung → Sicherung auswählen …* → neueste Sicherung → *Wiederherstellen*. Danach gelten die Benutzer aus der Sicherung, der vorläufige Administrator ist weg.
 4. Speicherorte, Drucker und E-Mail neu einstellen. Diese Einstellungen stehen in `config.toml` und sind nicht Teil der Sicherung. Firewall-Freigabe und Dienst wie bei der Ersteinrichtung.
@@ -120,6 +120,10 @@ Updates kommen als **Update-Paket** `Lagerverwaltung_Update_auf_<neu>.zip`; es g
 4. **Den Lager-PC neu starten.** Erst danach läuft die neue Version. Bis zum Neustart passen Seiten und Programm nicht zusammen, z. B. erscheint bei neuen Knöpfen „Not Found“. Ab 2.4.0 zeigt die Lagerverwaltung dann oben eine rote Meldung „Bitte neu starten“.
    Ohne PC-Neustart geht es so: `windows\4_AUTOSTART_AUS.bat` mit Rechtsklick → *Als Administrator ausführen*. Das Skript meldet jetzt, falls die Lagerverwaltung noch läuft. Danach starten: beim Dienst `schtasks /Run /TN Lagerverwaltung` als Administrator, sonst das Symbol *Lagerverwaltung*.
 5. **Prüfen:** Unten in der Seitenleiste steht die neue Versionsnummer. Steht dort noch die alte, läuft noch das alte Programm, dann den PC neu starten.
+
+**Datenbank-Änderungen bei Updates (ab 2.5.0):** Bringt ein Update Änderungen an der Datenbank mit, prüft die Lagerverwaltung sie beim ersten Start zuerst an einer Kopie. Danach sichert sie den bisherigen Stand als `vor_update_….zip` im Sicherungsordner und aktualisiert erst dann. Der erste Start nach einem solchen Update dauert deshalb einige Sekunden länger. Geht etwas schief, startet das Programm nicht, und die Datenbank bleibt, wie sie war. Der Grund steht in `logs\lagerverwaltung.log`. In diesem Fall die vorherigen Programmdateien wieder einspielen.
+
+**Testsystem:** `windows\TESTSYSTEM_STARTEN.bat` startet eine zweite Lagerverwaltung mit einer Kopie der echten Daten unter `http://localhost:8090` (nur an diesem PC). Dort lassen sich neue Funktionen, Importe und Abläufe gefahrlos ausprobieren. Was dort passiert, berührt den Echtbetrieb nicht. Beim nächsten Start fragt das Testsystem, ob es die Daten neu aus dem Echtbetrieb kopieren soll. Fenster schließen beendet es.
 
 `UPDATE_LIESMICH.txt` im Paket listet die geänderten Dateien und Besonderheiten des jeweiligen Updates. Die Scanner-App lädt sich beim nächsten Öffnen selbst neu.
 

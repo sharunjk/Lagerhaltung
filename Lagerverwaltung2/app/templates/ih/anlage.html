@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}{{ a.code }}{% endblock %}
+{% block content %}
+<div class="text-sm text-muted mb-1"><a href="/ih/anlagen" class="hover:text-ink">Anlagen</a>{% for p in ebenen_pfad %} › <a class="hover:text-ink" href="/ih/anlagen/{{ p.id }}">{{ p.code }}{% if p.bezeichnung and not p.bezeichnung.endswith(p.code) %} {{ p.bezeichnung }}{% endif %}</a>{% endfor %}</div>
+<div class="flex flex-wrap items-start justify-between gap-4 mb-6">
+  <div>
+    <h1 class="flex flex-wrap items-center gap-3">{{ a.code }}{% if a.sicherheitsgerichtet %}<span class="status st-kritisch text-base">PLT-Sicherheitseinrichtung</span>{% endif %}{% if not a.aktiv %}<span class="status text-muted text-base">archiviert</span>{% endif %}</h1>
+    <p class="text-lg">{{ a.bezeichnung or "" }}</p>
+    <p class="text-sm text-muted">{{ ART_TEXT.get(a.art, a.art) }}{% if a.bauteilklasse %} · {{ a.bauteilklasse }}{% endif %}{% if a.kritikalitaet %} · Kritikalität {{ a.kritikalitaet }}{% endif %}</p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    {% if a.doku_url %}<a href="{{ a.doku_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">{{ icon("link", "w-4 h-4") }}Dokumentation öffnen</a>{% endif %}
+    {% if darf("ih.anlagen.pflegen") %}<a href="/ih/anlagen/{{ a.id }}/bearbeiten" class="btn">{{ icon("edit", "w-4 h-4") }}Bearbeiten</a>{% endif %}
+  </div>
+</div>
+<div class="grid xl:grid-cols-[1fr_380px] gap-6">
+  <div class="space-y-6 min-w-0">
+    <section class="panel p-5">
+      <h2 class="mb-3">Stammdaten</h2>
+      <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+        {% for lab, wert in [("Kategorie", a.kategorie), ("Kürzel", a.kuerzel), ("Hersteller", a.hersteller), ("Modell / Typ", a.modell), ("Seriennummer", a.seriennummer), ("Lieferant", a.lieferant), ("Status", a.status), ("Inbetriebnahme", a.inbetriebnahme|datum(False) if a.inbetriebnahme else None), ("Anschaffung", a.anschaffung|datum(False) if a.anschaffung else None), ("Bestellnummer", a.bestellnummer), ("Leistungsnummer", a.leistungsnummer), ("Kosten Einkauf", a.kosten|eur if a.kosten is not none else None), ("Nebenkosten Einkauf", a.nebenkosten|eur if a.nebenkosten is not none else None)] %}
+        <div class="flex gap-3 border-b border-line py-1.5"><dt class="w-40 shrink-0 text-muted">{{ lab }}</dt><dd class="break-words min-w-0">{{ wert if wert not in (None, "") else "–" }}</dd></div>
+        {% endfor %}
+      </dl>
+      {% if a.notiz %}<div class="mt-4"><h3 class="text-sm text-muted mb-1">Notiz</h3><p class="whitespace-pre-line text-sm">{{ a.notiz }}</p></div>{% endif %}
+    </section>
+    {% if kinder %}
+    <section class="panel overflow-hidden">
+      <div class="px-4 py-3 border-b border-line flex justify-between"><h2>Darunter</h2><span class="text-sm text-muted">{{ kinder|length }}</span></div>
+      <table class="tbl"><tbody>
+      {% for k in kinder %}<tr><td class="whitespace-nowrap"><a class="font-semibold hover:underline" href="/ih/anlagen/{{ k.id }}">{{ k.code }}</a></td><td>{{ k.bezeichnung or "" }}</td><td class="text-sm text-muted">{{ k.bauteilklasse or ART_TEXT.get(k.art, "") }}</td></tr>{% endfor %}
+      </tbody></table>
+    </section>
+    {% endif %}
+  </div>
+  <aside class="space-y-6">
+    {% if a.art == "platz" %}
+    <section class="panel p-4">
+      <h2 class="mb-2">Ersatzteile im Lager</h2>
+      {% if teile %}
+      <ul class="text-sm space-y-1">{% for t in teile %}<li>{% if "lager" in module %}<a class="font-semibold hover:underline" href="/artikel/{{ t.nummer|urlq }}">{{ t.nummer }}</a>{% else %}<b>{{ t.nummer }}</b>{% endif %} {{ t.bezeichnung }}</li>{% endfor %}</ul>
+      <p class="text-xs text-muted mt-2">Gefunden über die Tag-Nr. im Feld „Verwendung“ der Artikel. Eine feste Ersatzteilliste je Bauteil folgt.</p>
+      {% else %}<p class="text-sm text-muted">Kein Lagerartikel nennt diese Tag-Nr. im Feld „Verwendung“.</p>{% endif %}
+    </section>
+    {% endif %}
+    {% if zusatz %}
+    <section class="panel p-4">
+      <h2 class="mb-2">Weitere Angaben aus dem Import</h2>
+      <dl class="text-sm space-y-1">{% for k, v in zusatz.items() %}<div class="flex gap-3"><dt class="w-40 shrink-0 text-muted break-words">{{ k }}</dt><dd class="break-words min-w-0">{{ v }}</dd></div>{% endfor %}</dl>
+    </section>
+    {% endif %}
+    <section class="panel p-4 text-sm text-muted">
+      Angelegt {{ a.erstellt_am|datum }}{% if a.geaendert_am and a.geaendert_am != a.erstellt_am %} · geändert {{ a.geaendert_am|datum }}{% endif %}{% if a.import_lauf_id and darf("ih.import") %} · <a class="text-primary" href="/ih/import/{{ a.import_lauf_id }}">aus Import {{ a.import_lauf_id }}</a>{% endif %}
+    </section>
+  </aside>
+</div>
+{% endblock %}

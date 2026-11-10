@@ -10,6 +10,7 @@ from urllib.parse import quote, urlsplit
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
+from .rechte import IH_ROLLEN
 from .services.labels import SCHRIFTEN
 from .services.lager import fmt_num
 from .services.queries import TYP_TEXT
@@ -75,7 +76,7 @@ class Anmeldesperre:
         with self._lock:
             self._fehl.pop(self._schluessel(ip, name)[0][0], None)
 
-ROLLEN_NAMEN = {"admin": "Administrator", "lager": "Lager", "lesen": "Nur lesen"}
+ROLLEN_NAMEN = {"admin": "Administrator", "lager": "Lager", "lesen": "Nur lesen", "keine": "Kein Lagerzugriff"}
 
 
 class LoginRequired(Exception):
@@ -105,15 +106,18 @@ def current_user(request: Request) -> dict | None:
     from sqlalchemy import select
 
     from . import db
-    from .db import users
+    from .db import benutzer_rollen, users
     with db.engine().connect() as con:
         row = con.execute(select(users).where(users.c.id == u.get("id"))).mappings().first()
-    if not row or not row["aktiv"] or not row["pw_hash"] or (u.get("pw") and u["pw"] != pw_kennung(row["pw_hash"])):
+        if not row or not row["aktiv"] or not row["pw_hash"] or (u.get("pw") and u["pw"] != pw_kennung(row["pw_hash"])):
+            row = None
+        ih = con.execute(select(benutzer_rollen.c.rolle).where(benutzer_rollen.c.user_id == row["id"], benutzer_rollen.c.modul == "ih")).scalar() if row else None
+    if not row:
         request.session.pop("user", None)
         request.scope["_geprueft"] = None
         return None
     frisch = {"id": row["id"], "username": row["username"], "name": row["anzeigename"] or row["username"], "rolle": row["rolle"],
-              "pw": pw_kennung(row["pw_hash"])}
+              "pw": pw_kennung(row["pw_hash"]), "ih": ih}
     if frisch != u:
         request.session["user"] = frisch
     request.scope["_geprueft"] = frisch
@@ -121,10 +125,22 @@ def current_user(request: Request) -> dict | None:
 
 
 def require(request: Request, rolle: str = "lesen") -> dict:
+    """Lager: Mindestrolle prüfen. Unbekannte Rollen und „keine“ (nur CMMS) haben keinen Lagerzugriff."""
     u = current_user(request)
     if not u:
         raise LoginRequired()
-    if ROLLEN.get(u["rolle"], 0) < ROLLEN[rolle]:
+    if ROLLEN.get(u["rolle"], -1) < ROLLEN[rolle]:
+        raise Forbidden()
+    return u
+
+
+def require_recht(request: Request, recht: str) -> dict:
+    """Instandhaltung (CMMS): Recht aus app/rechte.py prüfen – serverseitig für jede Seite und Aktion."""
+    from .rechte import hat_recht
+    u = current_user(request)
+    if not u:
+        raise LoginRequired()
+    if not hat_recht(u, recht, request.app.state.cfg):
         raise Forbidden()
     return u
 
@@ -150,15 +166,27 @@ def zurueck(request: Request, standard: str) -> str:
 
 
 def flash(request: Request, text: str, art: str = "ok") -> None:
-    request.session.setdefault("flash", []).append({"text": text, "art": art})
+    # Neu zuweisen statt anhängen: Die Sitzung merkt nur Zuweisungen. Mit .append() ging eine zweite Meldung verloren,
+    # wenn noch eine ungelesene in der Sitzung lag (z. B. „Testlauf ok“ und danach „Import übernommen“).
+    # Höchstens die letzten 3 ungelesenen Meldungen: Das Sitzungs-Cookie darf nicht wachsen (Grenze etwa 4 KB).
+    request.session["flash"] = [*request.session.get("flash", []), {"text": text[:500], "art": art}][-3:]
+
+
+RESERVIERT = {"flashes", "request", "pfad", "cfg", "bereich", "module", "darf"}
 
 
 def render(request: Request, name: str, **ctx):
+    if doppelt := RESERVIERT & ctx.keys():  # würde sonst still überschrieben (z. B. „pfad“ = URL-Pfad im Layout)
+        raise ValueError(f"Vorlagenvariable(n) {', '.join(sorted(doppelt))} sind reserviert")
     ctx.setdefault("user", current_user(request))
     ctx["flashes"] = request.session.pop("flash", [])
     ctx["request"] = request
     ctx["pfad"] = request.url.path
     ctx["cfg"] = request.app.state.cfg
+    from .rechte import bereiche, hat_recht
+    ctx["bereich"] = "ih" if request.url.path == "/ih" or request.url.path.startswith("/ih/") else "lager"
+    ctx["module"] = bereiche(ctx["user"], ctx["cfg"])  # Bereiche, die der Benutzer öffnen darf (lager, ih)
+    ctx["darf"] = lambda recht: hat_recht(ctx["user"], recht, ctx["cfg"])
     return templates.TemplateResponse(request, name, ctx)
 
 
@@ -192,11 +220,11 @@ def _datum(v, mit_zeit=True):
 
 _PLATZ = re.compile(r"^([A-Z]\d+-(R\d+-\d+|F\d+)(-B\d+)?|[A-ZÄÖÜ][a-zäöüß]+)$")  # -B<n>: Sichtlagerbox
 templates.env.tests["match_platz"] = lambda v: bool(_PLATZ.match(v or ""))
-templates.env.filters.update(num=_num, eur=_eur, datum=_datum, typ_text=lambda t: TYP_TEXT.get(t, t or ""),
+templates.env.filters.update(fromjson=lambda s: __import__("json").loads(s) if s else {}, num=_num, eur=_eur, datum=_datum, typ_text=lambda t: TYP_TEXT.get(t, t or ""),
                              urlq=lambda s: quote(str(s or ""), safe=""))
 def _qr(text: str) -> str:
     from .services.labels import qr_svg
     return qr_svg(text, 0, 0, 40)
 
 
-templates.env.globals.update(qr=_qr, ROLLEN=ROLLEN, ROLLEN_NAMEN=ROLLEN_NAMEN, now=datetime.now, TYP_TEXT=TYP_TEXT, SCHRIFTEN=SCHRIFTEN)
+templates.env.globals.update(qr=_qr, ROLLEN=ROLLEN, ROLLEN_NAMEN=ROLLEN_NAMEN, IH_ROLLEN=IH_ROLLEN, now=datetime.now, TYP_TEXT=TYP_TEXT, SCHRIFTEN=SCHRIFTEN)

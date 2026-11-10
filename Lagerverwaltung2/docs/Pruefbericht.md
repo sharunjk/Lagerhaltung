@@ -363,6 +363,27 @@ Prüfung: 128 Tests grün. Browserprüfung `werkzeuge/pruefung/boxen.cjs` mit 16
 
 **Offen:** Die genaue CAPHENIA-Firmenfarbe war hier nicht abrufbar. Der Wert steht an einer Stelle (`--wein` in `frontend/input.css`) und lässt sich austauschen.
 
+## Nachtrag: Instandhaltung (CMMS) Phase 0 und Asset-Import 2.5.0
+
+| Änderung | Umsetzung | Beleg |
+|---|---|---|
+| Datenbank-Migrationen | `schema_version`, nummerierte Migrationen, die nur hinzufügen, eine Transaktion. Beim Start Probelauf an einer Kopie mit Vergleich von Artikeln, Plätzen, Bestand (Prüfsumme je Artikel und Platz), Buchungen (Anzahl und Summe), Benutzern und Reservierungen sowie `integrity_check`. Danach Sicherung `vor_update_…`, erst dann die echte Datenbank. Auch beim Wiederherstellen alter Sicherungen | `test_update_von_2_4_probelauf_sicherung_und_daten_unveraendert`, `test_probelauf_bricht_ab_wenn_lagerdaten_sich_aendern_wuerden` (absichtlich fehlerhafte Migration: Programm startet nicht, Datenbank unberührt), `test_wiederherstellen_alter_sicherung_ergaenzt_spalten`, `test_neue_datenbank_hat_alle_migrationen` |
+| Preis zum Buchungszeitpunkt | `bewegungen.preis` wird bei jeder Buchung gesetzt, Grundlage für Kosten je Anlage | `test_buchung_speichert_preis` |
+| Rechte je Modul | Lager-Rolle unverändert plus „Kein Lagerzugriff“. CMMS-Rolle in `benutzer_rollen`, Rechte in `app/rechte.py`, serverseitig je Route. API ohne Lagerrolle gesperrt | `test_rechtematrix_jede_route_jede_rolle` (12 Routen × 6 Rollen), `test_lager_rollen_im_cmms` (3), `test_api_ohne_lagerrolle_gesperrt`, `test_benutzerverwaltung_cmms_rolle` |
+| Modulwahl | Auswahl beim ersten Login, danach der zuletzt genutzte Bereich. Wechsel ohne neue Anmeldung. Nur-CMMS-Benutzer landen direkt in der Instandhaltung, Benutzer ohne Bereich können sich nicht anmelden. CMMS abschaltbar, dann alles wie 2.4 | `test_modulwahl_und_wechsel_ohne_neue_anmeldung`, `test_cmms_aus_aendert_nichts` |
+| Asset-Import | CSV und Excel inkl. SharePoint-Export. Spaltenzuordnung mit Vorschlag, Prüfen, Testlauf (Rollback), Übernahme mit Sicherung und Prüfkennung, Bericht als Excel. Doppelte, fehlende und Platzhalter-Tags, Unit-Abgleich, Hierarchie Bereich → Unit → Bauteil, deutsche Zahlen und UTC-Daten, nur http(s)-Links | `test_import_sharepoint_csv_pruefen_testlauf_uebernehmen`, `test_import_matrix_aus_instandhaltungsplan_aktualisiert`, `test_import_fehlerfaelle`, `test_umwandlungen` |
+| Anlagen | Liste mit Suche und Filtern, Detailseite mit Pfad, Doku-Link, Lagerartikel mit dieser Tag-Nr., Bearbeiten (Ingenieur/Manager, Zyklus-Schutz, Protokoll) | `test_anlage_bearbeiten` |
+| Testsystem | zweite Instanz mit Kopie der Daten, eigene Einstellungen, Port 8090, nur lokal | `test_testsystem_kopie_und_eigene_einstellungen` |
+| Gefunden und behoben: Meldungen gingen verloren | Lag schon eine ungelesene Meldung in der Sitzung, ging jede weitere still verloren (Starlette erkennt `append` nicht als Änderung). Betraf auch die Lagerverwaltung. Jetzt Neuzuweisung, höchstens 3 Meldungen (Cookie-Grenze) | `test_import_sharepoint_csv_…` (zwei Meldungen nacheinander), `test_sammelentnahme_nicht_im_cookie_und_nicht_doppelt` |
+| Schutz vor Variablenkonflikten | `render()` lehnt reservierte Namen ab (`pfad`, `bereich`, `module` …). Gefunden, weil eine neue Seite `pfad` überschrieb | alle Tests (keine Seite verletzt die Regel) |
+
+Prüfung: 145 Tests grün (2 übersprungen: sie brauchen den vertraulichen Casper-Export, der in dieser Prüfumgebung nicht vorlag). Browserprüfung `werkzeuge/pruefung/cmms.cjs` mit 17/17 Schritten, mit der echten Asset-Liste (1.087 Zeilen) und der Matrix des Instandhaltungsplans (984 Zeilen):
+- Asset-Liste: 1.065 neu, 22 übersprungen (doppelte Tag-Nr. bzw. Platzhalter wie „VV 3010 xx“, eine Zeile ohne Tag-Nr.), 16 Ebenen angelegt.
+- Matrix: 964 Bauteile um Bauteilklasse und Sicherheitseinstufung ergänzt (67 PLT-Sicherheitseinrichtungen), 1 neu.
+- Weitere Schritte: Testlauf ohne Änderung, Suche, schmale Ansicht ohne seitliches Scrollen, dunkles Design, keine JS-Fehler.
+
+Die bisherigen 13 Browserprüfungen der Lagerverwaltung laufen unverändert durch.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

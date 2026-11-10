@@ -28,6 +28,8 @@ def _user(authorization: str | None, x_api_key: str | None) -> dict:
         u = con.execute(select(users).where(users.c.api_token == token)).mappings().first()
     if not u or not u["aktiv"]:
         raise HTTPException(401, "API-Schlüssel ungültig")
+    if u["rolle"] not in ("lesen", "lager", "admin"):  # z. B. „keine“: nur Instandhaltung, kein Lagerzugriff
+        raise HTTPException(403, "Keine Berechtigung für die Lagerverwaltung")
     return dict(u)
 
 

@@ -76,7 +76,12 @@ class BackupCfg:
     nur_bei_aenderung: bool = True  # unveränderten Stand nicht erneut ablegen
 
 
-SECTIONS = ("server", "daten", "lager", "drucker", "mail", "backup")
+@dataclass
+class CmmsCfg:
+    aktiv: bool = False  # Instandhaltung (CMMS) einschalten; aus = Lagerverwaltung unverändert wie bisher
+
+
+SECTIONS = ("server", "daten", "lager", "drucker", "mail", "backup", "cmms")
 
 
 @dataclass
@@ -87,6 +92,7 @@ class Config:
     drucker: DruckerCfg = field(default_factory=DruckerCfg)
     mail: MailCfg = field(default_factory=MailCfg)
     backup: BackupCfg = field(default_factory=BackupCfg)
+    cmms: CmmsCfg = field(default_factory=CmmsCfg)
 
     def path(self, p: str) -> Path:
         pp = Path(p)

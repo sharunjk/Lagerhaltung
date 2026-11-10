@@ -1,0 +1,26 @@
+Neu in 2.5.0 - Instandhaltung (CMMS), erste Ausbaustufe:
+- Nach dem Update ist ALLES WIE BISHER. Der neue Bereich "Instandhaltung" ist ausgeschaltet.
+  Einschalten: Einstellungen -> Allgemein -> "Instandhaltung (CMMS) aktivieren" -> Speichern.
+- Rollen: Administratoren haben alle Rechte. Andere Benutzer brauchen unter Einstellungen -> Benutzer eine
+  "Rolle Instandhaltung" (Ingenieur/Planer oder Manager duerfen importieren und bearbeiten).
+  "Kein Lagerzugriff" + Instandhaltungs-Rolle = nur Instandhaltung.
+- Bereich wechseln: oben in der Seitenleiste "Zur Instandhaltung" / "Zur Lagerverwaltung" (ohne neue Anmeldung).
+- Asset-Import: Instandhaltung -> Asset-Import -> Datei hochladen (Asset-Liste als CSV aus SharePoint,
+  danach Instandhaltungsplan_CAPHENIA_v2.xlsx - das Blatt "Matrix" wird automatisch gelesen) ->
+  Spalten pruefen -> "Pruefen und Testlauf" -> Ergebnis ansehen -> Haekchen -> "Import uebernehmen".
+  Vorher wird automatisch gesichert (vor_import_...). Der Import loescht nie etwas.
+- Testsystem: windows\TESTSYSTEM_STARTEN.bat startet eine zweite Lagerverwaltung mit einer Kopie der Daten
+  unter http://localhost:8090 - zum gefahrlosen Ausprobieren (z. B. den Import zuerst dort testen).
+- Behoben: Kamen zwei Hinweise direkt nacheinander (z. B. nach einem Speichern), ging der zweite verloren.
+
+Wichtig bei diesem Update - Datenbank-Erweiterung:
+Beim ersten Start nach dem Update ergaenzt die Lagerverwaltung die Datenbank um neue Tabellen und Spalten.
+Sie probt das vorher an einer Kopie, prueft dass Bestaende und Buchungen unveraendert bleiben, und legt den
+bisherigen Stand als vor_update_....zip im Sicherungsordner ab. Der erste Start dauert dadurch etwas laenger.
+Geht etwas schief, startet das Programm nicht und die Datenbank bleibt unveraendert (Grund in logs\lagerverwaltung.log).
+
+Kommen Sie von einer aelteren Version, ist auch alles aus 2.4.0, 2.3.1 und 2.3.0 enthalten:
+- 2.4.0: Sichtlagerboxen, weinrote Plaetze bei Nachbestellbedarf, Artikel endgueltig loeschen, Fotos beim Anlegen,
+  Artikel am Lagerplatz anlegen, Lieferant als Freitext, Etiketten-Schriftgroesse.
+- 2.3.1: Lagerplaetze nach Regal, Zurueck-Pfeil, Lagerplatz loeschen, "Profil" in der Scanner-App.
+- 2.3.0: Datensicherung mit mehreren Speicherorten und Uhrzeiten, Wiederherstellen mit Vorschau.

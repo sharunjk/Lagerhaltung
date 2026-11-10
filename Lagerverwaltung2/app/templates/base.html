@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Lager{% endblock %} – {{ cfg.server.firmenname }} Lagerverwaltung</title>
+  <title>{% block title %}Lager{% endblock %} – {{ cfg.server.firmenname }} {{ "Instandhaltung" if bereich == "ih" else "Lagerverwaltung" }}</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23FFC72C'/><path d='M8 10v12M12 10v12M15 10v12M19 10v12M23 10v12' stroke='%2318222E' stroke-width='2'/></svg>">
   <link rel="stylesheet" href="/static/app.css?v={{ request.app.state.static_v }}">
   <link rel="manifest" href="/manifest.webmanifest">
@@ -19,28 +19,36 @@
 {% if user %}
 <div class="flex min-h-screen">
   <aside class="no-print hidden lg:flex w-60 shrink-0 flex-col bg-nav text-navink sticky top-0 h-screen">
-    <a href="/" class="flex items-center gap-3 px-5 h-16 border-b border-white/10">
-      <span class="grid place-items-center w-9 h-9 rounded bg-tag text-tagink">{{ icon("scan", "w-6 h-6") }}</span>
-      <span class="leading-tight"><span class="block font-cond font-bold text-white text-lg">Lagerverwaltung</span><span class="block text-xs">{{ cfg.server.firmenname }}</span></span>
+    {% set ih = bereich == "ih" %}
+    <a href="{{ '/ih' if ih else '/' }}" class="flex items-center gap-3 px-5 h-16 border-b border-white/10">
+      <span class="grid place-items-center w-9 h-9 rounded {{ 'bg-primary text-white' if ih else 'bg-tag text-tagink' }}">{{ icon("wrench" if ih else "scan", "w-6 h-6") }}</span>
+      <span class="leading-tight"><span class="block font-cond font-bold text-white text-lg">{{ "Instandhaltung" if ih else "Lagerverwaltung" }}</span><span class="block text-xs">{{ cfg.server.firmenname }}</span></span>
     </a>
+    {% if module|length > 1 %}
+    <a href="/bereich/{{ 'lager' if ih else 'ih' }}" class="navlink mx-3 mt-3 border border-white/15" title="Bereich wechseln, ohne neue Anmeldung">{{ icon("switch") }}{{ "Zur Lagerverwaltung" if ih else "Zur Instandhaltung" }}</a>
+    {% endif %}
     <nav class="flex-1 overflow-y-auto p-3 space-y-0.5">
+      {% if ih %}
+      {% set nav = [("/ih", "home", "Übersicht"), ("/ih/anlagen", "plant", "Anlagen")] + ([("/ih/import", "upload", "Asset-Import")] if darf("ih.import") else []) %}
+      {% else %}
       {% set nav = [("/", "home", "Übersicht"), ("/buchen", "scan", "Buchen"), ("/artikel", "box", "Artikel"), ("/bewegungen", "history", "Bewegungen"),
                     ("/lagerplaetze", "shelf", "Lagerplätze"), ("/nachbestellung", "cart", "Nachbestellung"), ("/bestellungen", "cart", "Bestellungen"),
                     ("/reservierungen", "list", "Reservierungen"), ("/ausleihen", "history", "Ausleihen"),
                     ("/inventur", "clipboard", "Inventur"), ("/auswertungen", "chart", "Auswertungen"), ("/lieferanten", "truck", "Lieferanten")] %}
+      {% endif %}
       {% for href, ic, label in nav %}
-      <a href="{{ href }}" class="navlink {% if (href == '/' and pfad == '/') or (href != '/' and pfad.startswith(href)) %}aktiv{% endif %}">{{ icon(ic) }}{{ label }}</a>
+      <a href="{{ href }}" class="navlink {% if pfad == href or (href not in ('/', '/ih') and pfad.startswith(href)) %}aktiv{% endif %}">{{ icon(ic) }}{{ label }}</a>
       {% endfor %}
       {% if user.rolle == "admin" %}
       <div class="pt-4 mt-4 border-t border-white/10 space-y-0.5">
-        <a href="/import" class="navlink {% if pfad.startswith('/import') %}aktiv{% endif %}">{{ icon("upload") }}Excel-Import</a>
+        {% if not ih %}<a href="/import" class="navlink {% if pfad.startswith('/import') %}aktiv{% endif %}">{{ icon("upload") }}Excel-Import</a>{% endif %}
         <a href="/protokoll" class="navlink {% if pfad.startswith('/protokoll') %}aktiv{% endif %}">{{ icon("log") }}Protokoll</a>
         <a href="/einstellungen" class="navlink {% if pfad.startswith('/einstellungen') %}aktiv{% endif %}">{{ icon("settings") }}Einstellungen</a>
       </div>
       {% endif %}
     </nav>
     <div class="p-3 border-t border-white/10 text-sm">
-      <div class="px-3 pb-2"><span class="text-white font-semibold">{{ user.name }}</span><span class="block text-xs">{{ ROLLEN_NAMEN[user.rolle] }}</span></div>
+      <div class="px-3 pb-2"><span class="text-white font-semibold">{{ user.name }}</span><span class="block text-xs">{{ ("Administrator" if user.rolle == "admin" else IH_ROLLEN.get(user.ih, "")) if ih else ROLLEN_NAMEN.get(user.rolle, "") }}</span></div>
       <div class="flex gap-1">
         <a href="/passwort" class="navlink flex-1 text-xs">Passwort</a>
         <button type="button" class="navlink" title="Hell/Dunkel umschalten" onclick="lvTheme()">{{ icon("moon") }}</button>
@@ -58,11 +66,18 @@
           <div class="absolute left-0 mt-2 w-60 rounded-lg bg-nav p-2 shadow-xl z-30">
             {% for href, ic, label in nav %}<a href="{{ href }}" class="navlink">{{ icon(ic) }}{{ label }}</a>{% endfor %}
             {% if user.rolle == "admin" %}<a href="/einstellungen" class="navlink">{{ icon("settings") }}Einstellungen</a>{% endif %}
-            <a href="/m" class="navlink">{{ icon("scan") }}Scanner-Ansicht</a>
+            {% if module|length > 1 %}<a href="/bereich/{{ 'lager' if ih else 'ih' }}" class="navlink">{{ icon("switch") }}{{ "Zur Lagerverwaltung" if ih else "Zur Instandhaltung" }}</a>{% endif %}
+            {% if not ih %}<a href="/m" class="navlink">{{ icon("scan") }}Scanner-Ansicht</a>{% endif %}
             <a href="/logout" class="navlink">{{ icon("logout") }}Abmelden</a>
           </div>
         </details>
-        {% if pfad != "/" %}<button type="button" class="btn px-2.5" onclick="lvZurueck('/')" title="Zurück (Alt+←)" aria-label="Zurück">{{ icon("back", "w-5 h-5") }}</button>{% endif %}
+        {% if pfad not in ("/", "/ih") %}<button type="button" class="btn px-2.5" onclick="lvZurueck('{{ '/ih' if ih else '/' }}')" title="Zurück (Alt+←)" aria-label="Zurück">{{ icon("back", "w-5 h-5") }}</button>{% endif %}
+        {% if ih %}
+        <form action="/ih/anlagen" method="get" class="relative flex-1 max-w-2xl">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">{{ icon("search", "w-5 h-5") }}</span>
+          <input id="scanfeld" name="q" autocomplete="off" class="field pl-10 h-11 text-base" placeholder="Anlage, Tag-Nr., Hersteller oder Modell suchen">
+        </form>
+        {% else %}
         <form action="/scan" method="get" class="relative flex-1 max-w-2xl" x-data="{offen:false}" @click.outside="offen=false">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">{{ icon("scan", "w-5 h-5") }}</span>
           <input id="scanfeld" name="code" autocomplete="off" class="field pl-10 pr-16 h-11 text-base"
@@ -74,6 +89,7 @@
         </form>
         <a href="/m" class="btn px-2.5 md:px-3.5" title="Ansicht für Handscanner und Smartphone" aria-label="Scanner-Ansicht">{{ icon("scan", "w-5 h-5 md:hidden") }}<span class="hidden md:inline">Scanner-Ansicht</span></a>
         <a href="/buchen" class="btn btn-primary hidden sm:inline-flex">{{ icon("scan", "w-4 h-4") }}Buchen</a>
+        {% endif %}
       </div>
     </header>
 
@@ -113,7 +129,7 @@ document.addEventListener("submit", function(e){
     const now=Date.now();
     if (now-last>60) buf="";
     last=now;
-    if (e.key==="Enter" && buf.length>=3) { e.preventDefault(); window.location="/scan?code="+encodeURIComponent(buf); buf=""; return; }
+    if (e.key==="Enter" && buf.length>=3) { e.preventDefault(); window.location=(location.pathname.startsWith("/ih") ? "/ih/anlagen?q=" : "/scan?code=")+encodeURIComponent(buf); buf=""; return; }
     if (e.key.length===1) buf+=e.key;
   });
 })();

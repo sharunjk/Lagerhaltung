@@ -11,11 +11,12 @@ from sqlalchemy import func, insert, select, update
 from .. import db
 from ..db import artikel, lagerplaetze, users
 from ..services import queries, sicherung
-from ..services.betrieb import check_pw, hash_pw
+from ..rechte import bereiche
+from ..services.betrieb import check_pw, get_setting, hash_pw, set_setting
 from ..services.lager import audit
 import logging
 
-from ..web import MIN_PASSWORT, flash, ist_lokal, pw_kennung, render, require, sicheres_ziel
+from ..web import MIN_PASSWORT, Forbidden, current_user, flash, ist_lokal, pw_kennung, render, require, sicheres_ziel
 
 log = logging.getLogger("lagerverwaltung")
 
@@ -61,12 +62,56 @@ def login(request: Request, username: str = Form(...), passwort: str = Form(""),
     request.session["user"] = {"id": u["id"], "username": u["username"], "name": u["anzeigename"] or u["username"], "rolle": u["rolle"],
                                "pw": pw_kennung(u["pw_hash"])}
     weiter = sicheres_ziel(weiter, "/")
+    request.scope.pop("_geprueft", None)
+    erlaubt = bereiche(current_user(request), request.app.state.cfg)
+    if not erlaubt:
+        request.session.clear()
+        return render(request, "login.html", weiter=weiter, username=username,
+                      fehler="Ihr Benutzer hat keinen Zugriff auf Lager oder Instandhaltung. Bitte an den Administrator wenden.")
     if len(passwort) < MIN_PASSWORT:
         flash(request, f"Ihr Passwort ist kürzer als {MIN_PASSWORT} Zeichen. Bitte jetzt ein neues vergeben.", "fehler")
         return RedirectResponse("/m/passwort" if weiter.startswith("/m") or ist_mobil(request) else "/passwort", status_code=303)
-    if weiter == "/" and ist_mobil(request):
-        weiter = "/m"
+    if weiter == "/":
+        weiter = startziel(request, u["id"], erlaubt)
+    elif "lager" not in erlaubt and not weiter.startswith("/ih"):
+        weiter = "/ih"  # nur Instandhaltung (z. B. Anmeldung aus der Scanner-App)
     return RedirectResponse(weiter, status_code=303)
+
+
+def startziel(request: Request, uid: int, erlaubt: list[str]) -> str:
+    """Wohin nach dem Login: nur ein Bereich -> dorthin; beide -> zuletzt genutzter, beim ersten Mal die Auswahl."""
+    if erlaubt == ["ih"]:
+        return "/ih"
+    lager = "/m" if ist_mobil(request) else "/"
+    if "ih" not in erlaubt:
+        return lager
+    with db.engine().connect() as con:
+        letzter = get_setting(con, f"bereich:{uid}")
+    return {"ih": "/ih", "lager": lager}.get(letzter or "", "/bereich")
+
+
+@router.get("/bereich")
+def bereich_waehlen(request: Request):
+    me = current_user(request)
+    if not me:
+        return RedirectResponse("/login", status_code=303)
+    erlaubt = bereiche(me, request.app.state.cfg)
+    if len(erlaubt) < 2:
+        return RedirectResponse("/ih" if erlaubt == ["ih"] else "/", status_code=303)
+    return render(request, "bereich.html", erlaubt=erlaubt)
+
+
+@router.get("/bereich/{name}")
+def bereich_wechseln(request: Request, name: str):
+    """Modul wechseln (ohne neue Anmeldung) und als zuletzt genutzten Bereich merken."""
+    me = current_user(request)
+    if not me:
+        return RedirectResponse("/login", status_code=303)
+    if name not in bereiche(me, request.app.state.cfg):
+        raise Forbidden()
+    with db.schreiben() as con:
+        set_setting(con, f"bereich:{me['id']}", name)
+    return RedirectResponse("/ih" if name == "ih" else ("/m" if ist_mobil(request) and request.query_params.get("mobil") else "/"), status_code=303)
 
 
 @router.get("/logout")
@@ -118,6 +163,9 @@ def setup(request: Request, username: str = Form(...), anzeigename: str = Form("
 
 @router.get("/")
 def dashboard(request: Request):
+    me = current_user(request)
+    if me and me["rolle"] == "keine" and "ih" in bereiche(me, request.app.state.cfg):
+        return RedirectResponse("/ih", status_code=303)  # nur Instandhaltung
     me = require(request)
     with db.engine().connect() as con:
         d = queries.dashboard(con)

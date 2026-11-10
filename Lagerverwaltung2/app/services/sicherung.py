@@ -648,7 +648,6 @@ def wiederherstellen(cfg, eng, datei: Path, benutzer: str) -> dict:
 
     Die Datenbank wird über die SQLite-Backup-Funktion in die laufende Datenbank kopiert: Gleichzeitige Buchungen
     warten kurz, niemand liest einen halben Stand, und es bleiben keine alten -wal-Reste zurück."""
-    from .. import db
     from .betrieb import get_setting, set_setting
     from .lager import audit
     with _sperre:
@@ -685,7 +684,8 @@ def wiederherstellen(cfg, eng, datei: Path, benutzer: str) -> dict:
                 shutil.rmtree(neu, ignore_errors=True)
                 raise
         eng.dispose()  # offene Verbindungen verwerfen, die neue Datenbank frisch öffnen
-        db.md.create_all(eng)  # Sicherung aus älterer Version: neue Tabellen ergänzen
+        from ..migrationen import anwenden
+        anwenden(eng)  # Sicherung aus älterer Version: neue Tabellen und Spalten ergänzen
         if anh.exists():
             _ersetzen(anh, alt)
         _ersetzen(neu, anh)

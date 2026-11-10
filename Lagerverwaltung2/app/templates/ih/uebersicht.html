@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Instandhaltung{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div><h1>Instandhaltung</h1><p class="text-muted">Anlagen und Bauteile der Pilotanlage. Wartungsplanung, Störmeldungen und Aufträge folgen in den nächsten Ausbaustufen.</p></div>
+  {% if darf("ih.import") %}<a href="/ih/import" class="btn btn-primary">{{ icon("upload", "w-4 h-4") }}Asset-Liste importieren</a>{% endif %}
+</div>
+{% if not k.bauteile %}
+<div class="panel p-8 max-w-2xl">
+  <h2 class="mb-2">Noch keine Anlagen</h2>
+  <p class="text-muted">Am schnellsten geht es über den Import der bestehenden Asset-Liste (Excel oder CSV, auch der SharePoint-Export). {% if darf("ih.import") %}<a class="text-primary" href="/ih/import">Zum Asset-Import</a>{% else %}Den Import macht ein Instandhaltungsingenieur oder Administrator.{% endif %}</p>
+</div>
+{% else %}
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+  {% for wert, text, link in [(k.bauteile, "Bauteile", "/ih/anlagen"), (k.sicher, "PLT-Sicherheitseinrichtungen", "/ih/anlagen?filter=sicher"), (k.ohne_klasse, "ohne Bauteilklasse", "/ih/anlagen?klasse=-"), (k.ohne_doku, "ohne Doku-Link", "/ih/anlagen?filter=ohne_doku"), (k.ohne_unit, "ohne Unit", "/ih/anlagen?ebene=ohne")] %}
+  <a href="{{ link }}" class="panel p-4 hover:border-primary"><span class="block text-3xl font-cond font-bold tabular-nums {{ 'text-warn' if loop.index > 2 and wert }}">{{ wert }}</span><span class="text-sm text-muted">{{ text }}</span></a>
+  {% endfor %}
+</div>
+<div class="grid xl:grid-cols-2 gap-6">
+  <section class="panel overflow-hidden">
+    <div class="px-4 py-3 border-b border-line"><h2>Bereiche und Units</h2></div>
+    <table class="tbl"><thead><tr><th>Ebene</th><th>Bezeichnung</th><th class="num">Bauteile</th></tr></thead><tbody>
+    {% for e in ebenen %}<tr><td class="{{ 'pl-8' if e.art == 'unit' and e.eltern_id }}"><a class="font-semibold hover:underline" href="/ih/anlagen?ebene={{ e.id }}">{{ e.code }}</a></td><td>{{ e.bezeichnung or "" }}</td><td class="num">{{ e.anzahl or "" }}</td></tr>
+    {% else %}<tr><td colspan="3" class="text-muted">Keine Ebenen angelegt.</td></tr>{% endfor %}
+    </tbody></table>
+  </section>
+  <div class="space-y-6">
+    <section class="panel overflow-hidden">
+      <div class="px-4 py-3 border-b border-line"><h2>Bauteilklassen</h2></div>
+      <table class="tbl"><tbody>
+      {% for kl, n in klassen %}<tr><td><a class="hover:underline" href="/ih/anlagen?klasse={{ (kl or '-')|urlq }}">{{ kl or "– ohne Klasse –" }}</a></td><td class="num">{{ n }}</td></tr>{% endfor %}
+      </tbody></table>
+    </section>
+    {% if laeufe and darf("ih.import") %}
+    <section class="panel overflow-hidden">
+      <div class="px-4 py-3 border-b border-line"><h2>Letzte Importe</h2></div>
+      <table class="tbl"><tbody>
+      {% for l in laeufe %}<tr><td><a class="hover:underline" href="/ih/import/{{ l.id }}">{{ l.dateiname }}</a></td><td class="text-sm text-muted">{{ l.zeit|datum }}</td><td class="text-sm">{{ {"neu": "hochgeladen", "geprueft": "geprüft", "uebernommen": "übernommen"}[l.status] }}</td></tr>{% endfor %}
+      </tbody></table>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

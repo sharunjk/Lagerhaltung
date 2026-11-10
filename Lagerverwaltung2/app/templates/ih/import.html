@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Asset-Import{% endblock %}
+{% block content %}
+<h1 class="mb-1">Asset-Import</h1>
+<p class="text-muted mb-5 max-w-3xl">Anlagen und Bauteile aus Excel oder CSV übernehmen – zum Beispiel die Asset-Liste aus SharePoint oder die Matrix des Instandhaltungsplans. Nach dem Hochladen ordnen Sie die Spalten zu, prüfen das Ergebnis im Testlauf und übernehmen erst dann. Der Import löscht nie etwas; vorhandene Anlagen werden über die Tag-Nr. erkannt und nur in den zugeordneten Spalten aktualisiert.</p>
+<div class="grid xl:grid-cols-[420px_1fr] gap-6">
+  <form method="post" action="/ih/import" enctype="multipart/form-data" class="panel p-5 space-y-4 self-start">
+    <h2>Datei hochladen</h2>
+    <div><label class="label">Excel (.xlsx) oder CSV, höchstens 10 MB</label><input type="file" name="datei" accept=".xlsx,.xlsm,.csv,.txt" required class="field"></div>
+    <div><label class="label">Tabellenblatt (nur Excel, optional)</label><input name="blatt" class="field" placeholder="leer = automatisch, z. B. „Matrix“">
+      <p class="text-xs text-muted mt-1">Ohne Angabe wird das Blatt mit der Tag-Nr.-Spalte und den meisten Zeilen gelesen.</p></div>
+    <button class="btn btn-primary">{{ icon("upload", "w-4 h-4") }}Hochladen und Spalten zuordnen</button>
+  </form>
+  <section class="panel overflow-hidden self-start">
+    <div class="px-4 py-3 border-b border-line"><h2>Bisherige Importe</h2></div>
+    <table class="tbl">
+      <thead><tr><th>Datei</th><th>Hochgeladen</th><th class="num">Zeilen</th><th>Stand</th></tr></thead>
+      <tbody>
+      {% for l in laeufe %}
+        {% set e = l.ergebnis|fromjson if l.ergebnis else {} %}
+        <tr><td><a class="font-semibold hover:underline" href="/ih/import/{{ l.id }}">{{ l.dateiname }}</a></td><td class="text-sm">{{ l.zeit|datum }}<span class="block text-xs text-muted">{{ l.benutzer }}</span></td><td class="num">{{ l.zeilen }}</td>
+          <td class="text-sm">{% if l.status == "uebernommen" %}<span class="status st-ok">übernommen</span><span class="block text-xs text-muted">{{ e.neu }} neu, {{ e.geaendert }} geändert</span>{% elif l.status == "geprueft" %}<span class="status st-melden">geprüft, nicht übernommen</span>{% else %}hochgeladen{% endif %}</td></tr>
+      {% else %}<tr><td colspan="4" class="py-6 text-center text-muted">Noch keine Importe.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}
