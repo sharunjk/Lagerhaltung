@@ -161,8 +161,11 @@ def _kampagne_werte(f, neu: bool = False) -> tuple[dict, list[str]]:
 @router.get("/wartung/kampagne/neu")
 def kampagne_neu_form(request: Request, platz: str = ""):
     require_recht(request, "ih.wartung.planen")
-    with db.schreiben() as con:
-        w.massnahmen_sicherstellen(con)
+    with db.engine().connect() as con:
+        fehlt = not {"S", "W", "F"} <= set(w.massnahmen(con))
+    if fehlt:
+        with db.schreiben() as con:
+            w.massnahmen_sicherstellen(con)
     with db.engine().connect() as con:
         mass = w.massnahmen(con)
         klassen = [r[0] for r in con.execute(select(ih_plaetze.c.bauteilklasse).where(ih_plaetze.c.bauteilklasse.isnot(None),
@@ -204,6 +207,7 @@ async def kampagne_neu(request: Request):
     klasse = (f.get("bauteilklasse") or "").strip() if ziel == "klasse" else None
     gegenstand = (f.get("gegenstand") or "").strip() or None
     with db.schreiben() as con:
+        w.massnahmen_sicherstellen(con)
         mass = w.massnahmen(con)
         if massnahme not in mass:
             fehler.append("Bitte eine Maßnahme wählen.")

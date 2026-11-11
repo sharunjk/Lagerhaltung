@@ -26,6 +26,15 @@ def _tags(con) -> list[tuple[str, str]]:
                                                                .where(ih_plaetze.c.aktiv, ih_plaetze.c.art == "platz").order_by(ih_plaetze.c.code))]
 
 
+def _grunddaten() -> None:
+    """Teams und Schichtzeiten beim ersten Aufruf anlegen – sonst nur lesen (keine Schreibsperre bei jedem Seitenaufruf)."""
+    with db.engine().connect() as con:
+        if sb.grunddaten_vorhanden(con):
+            return
+    with db.schreiben() as con:
+        sb.sicherstellen(con)
+
+
 def _datum(text: str) -> date | None:
     try:
         return date.fromisoformat(text) if text else None
@@ -37,8 +46,7 @@ def _datum(text: str) -> date | None:
 @router.get("")
 def dashboard(request: Request, team: str = ""):
     me = require_recht(request, "ih.schichtbuch.ansehen")
-    with db.schreiben() as con:
-        sb.sicherstellen(con)
+    _grunddaten()
     jetzt = datetime.now()
     with db.engine().connect() as con:
         teams = sb.teams(con)
@@ -86,8 +94,7 @@ def _form_ctx(con, f: dict | None = None, **extra) -> dict:
 @router.get("/neu")
 def neu_form(request: Request, platz: str = ""):
     require_recht(request, "ih.schichtbuch.schreiben")
-    with db.schreiben() as con:
-        sb.sicherstellen(con)
+    _grunddaten()
     with db.engine().connect() as con:
         vor = {}
         if platz.isdigit():
@@ -274,8 +281,7 @@ def export(request: Request):
 @router.get("/einrichten")
 def einrichten(request: Request):
     require_recht(request, "ih.schichtbuch.einrichten")
-    with db.schreiben() as con:
-        sb.sicherstellen(con)
+    _grunddaten()
     with db.engine().connect() as con:
         teams, zeiten = sb.teams(con, alle=True), sb.zeiten(con, alle=True)
         zuordnung = dict(con.execute(select(sb_mitglieder.c.user_id, sb_mitglieder.c.team_id)).all())

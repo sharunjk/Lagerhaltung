@@ -44,6 +44,10 @@ def sicherstellen(con: Connection) -> None:
             con.execute(insert(sb_zeiten).values(name=name, beginn=b, ende=e, reihenfolge=i, aktiv=True))
 
 
+def grunddaten_vorhanden(con: Connection) -> bool:
+    return bool(con.execute(select(func.count()).select_from(sb_teams)).scalar() and con.execute(select(func.count()).select_from(sb_zeiten)).scalar())
+
+
 def teams(con: Connection, alle: bool = False) -> list[dict]:
     q = select(sb_teams).order_by(sb_teams.c.reihenfolge, sb_teams.c.id)
     if not alle:

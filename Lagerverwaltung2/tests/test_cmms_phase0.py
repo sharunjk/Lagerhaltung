@@ -233,7 +233,7 @@ def test_benutzerverwaltung_cmms_rolle(env):
         uid, rolle = con.execute(select(users.c.id, users.c.rolle).where(users.c.username == "anna")).one()
         assert rolle == "keine"
         assert con.execute(select(benutzer_rollen.c.rolle).where(benutzer_rollen.c.user_id == uid)).scalar() == "ingenieur"
-    c.post("/benutzer/speichern", data={"id": str(uid), "username": "anna", "rolle": "lesen", "rolle_ih": "", "aktiv": "on"})
+    c.post("/benutzer/speichern", data={"id": str(uid), "username": "anna", "rolle": "lesen", "rolle_ih": "", "rolle_ih_feld": "1", "aktiv": "on"})
     assert anzahl(eng, "SELECT count(*) FROM benutzer_rollen") == 0
     c.post("/einstellungen/allgemein", data={"firmenname": "X", "port": "8080", "https_port": "8443", "standard_einheit": "Stk",
                                              "live_abfrage_sekunden": "10"})

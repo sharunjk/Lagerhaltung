@@ -434,6 +434,36 @@ Kalenderwochen in der Kopfzeile stehen alle auf einer Höhe (Jahreszahl in eigen
 
 Prüfung: 173 Tests grün (2 übersprungen). Browserprüfung `werkzeuge/pruefung/schichtbuch.cjs` mit Demodaten 18/18 (Navigation, Einrichten, Beginn, Meldung mit Asset aus der Auswahlliste, Ergänzung, Schichtende mit Übergabe, Übernahme, Liste, Excel, Anlage, vier Seiten am Handy mit 390 px ohne seitliches Scrollen, keine JS-Fehler). Update von 2.7.1 nachgestellt: sechs neue Tabellen, Bestand unverändert. `ersatzteile.cjs`, `wartung.cjs` (echte Dateien, nur lokal), `cmms.cjs` und `pc.cjs` laufen unverändert.
 
+## Gesamtprüfung 2.8.1 – Lager und Instandhaltung zusammen, mehrere Benutzer
+
+**Umfang:** alle automatischen Tests, alle 17 Browserprüfungen (Lager, Scanner-App, Offline, Druck, Sicherung, Instandhaltung, Wartung, Ersatzteile, Schichtbuch), Rollenmatrix aller 184 Routen, neue Tests zum Zusammenspiel beider Bereiche und zu gleichzeitigem Arbeiten, Lasttest gegen einen echten Server mit 10 Benutzern.
+
+**Gefunden und behoben:**
+
+| Befund | Auswirkung | Behebung | Beleg |
+|---|---|---|---|
+| Storno einer Auftrags-Entnahme im Lager | Der Auftrag zählte die stornierte Entnahme weiter als entnommen und als Materialkosten | Stornierte Buchungen zählen im Auftrag nicht mehr | `test_storno_im_lager_nimmt_entnahme_aus_dem_auftrag` |
+| Benutzer speichern bei ausgeschalteter Instandhaltung | Die Rolle in der Instandhaltung wurde gelöscht (z. B. beim Zurücksetzen eines Passworts) | Rolle bleibt, wenn das Formular kein Instandhaltungs-Feld enthält (verstecktes Kennfeld) | `test_benutzer_speichern_bei_ausgeschaltetem_cmms_behaelt_rolle` |
+| Eigene Kampagne ohne vorheriges Öffnen des Formulars | S/W/F fehlten, Anlegen scheiterte (nur bei direktem Aufruf, nicht im Browser) | Maßnahmen werden auch beim Speichern sichergestellt | Lasttest |
+| Schichtbuch-Seiten holten bei jedem Aufruf die Schreibsperre | Lesende Aufrufe warteten unter Last auf Buchungen | Grunddaten nur noch beim ersten Mal schreiben | Lasttest |
+
+**Zusammenspiel Lager ↔ Instandhaltung (`tests/test_zusammenspiel.py`, 8 Tests):** Artikelnummer umbenannt (Zuordnung hängt an der ID und bleibt), Bestand 0 (im Auftrag „nicht vorrätig“, Entnahme verweigert, kein Minusbestand), Artikel archiviert (an der Anlage gekennzeichnet, Entnahme verweigert) und gelöscht (Zuordnung entfernt, Seiten laufen weiter), Anlage archiviert (fällt aus neuen Aufträgen, Meldungen und Artikel-Historie bleiben), Techniker ohne Lagerrolle entnimmt über den Auftrag (Buchung mit seinem Namen, keine Links ins Lager), Lager-Benutzer ohne CMMS-Rolle (Tag-Nr. als Text, /ih gesperrt), Rolle entzogen während der Sitzung (nächste Aktion gesperrt), Benutzer deaktiviert (abgemeldet).
+
+**Gleichzeitiges Arbeiten:** 12 gleichzeitige Entnahmen (Lager und Auftrag) auf 5 Stück → genau 5 gebucht, Rest abgelehnt, kein Minusbestand. Zwei Benutzer beginnen gleichzeitig dieselbe Schicht und melden parallel → eine Schicht, alle 10 Meldungen. Zwei übernehmen gleichzeitig dieselbe Übergabe → eine Übernahme. Zwei Planer legen gleichzeitig fällige Aufträge an → keine Doppelten; Freigeben und Stornieren gleichzeitig → ein klarer Endzustand, Verlauf passt.
+
+**Lasttest `werkzeuge/pruefung/last.py`** (echter Server, 10 Benutzer, je 60 s; nur Demodaten):
+
+| Lauf | Anfragen | Ergebnis |
+|---|---|---|
+| realistisch (2–6 s zwischen zwei Klicks) | rund 500 | Median 6–13 ms je Aktion, 95 % unter 40 ms, keine Fehler |
+| Stress (ohne Pause, rund 100 Anfragen/s) | rund 2.300 | keine Fehler; Buchungen 40–75 ms, große Seiten im Mittel 0,3–0,75 s (Warteschlange, einzeln unter 20 ms) |
+
+Nach beiden Läufen: Bestand = Summe aller Buchungen je Artikel und Platz, keine Minusbestände, keine doppelten Schichten, jede Meldung mit Verlauf.
+
+**Bekannte Grenzen (kein Fehler, bewusst so):** Bearbeiten zwei Benutzer gleichzeitig dieselben Stammdaten (Artikel, Anlage, Kampagne, Meldung), gilt der zuletzt gespeicherte Stand; Buchungen und Bestände sind davon nicht betroffen (sie laufen streng nacheinander). Rückgabe nicht verbrauchter Teile wird als normaler Lager-Eingang gebucht, ohne Bezug zum Auftrag. Entnahmen – im Lager wie im Auftrag – prüfen den Platzbestand, nicht Reservierungen.
+
+Prüfung: 181 Tests grün (2 übersprungen), 17 Browserprüfungen ohne Fehler, Rollenmatrix 184 Routen ohne Serverfehler.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

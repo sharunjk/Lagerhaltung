@@ -699,7 +699,8 @@ def entnahmen(con: Connection, aid: int) -> list[dict]:
         select(bewegungen.c.id, bewegungen.c.zeit, bewegungen.c.artikel_id, bewegungen.c.artikel_nr, bewegungen.c.lagerplatz, bewegungen.c.menge,
                bewegungen.c.preis, bewegungen.c.benutzer, bewegungen.c.typ, artikel.c.bezeichnung, artikel.c.einheit)
         .select_from(bewegungen.outerjoin(artikel, artikel.c.id == bewegungen.c.artikel_id))
-        .where(bewegungen.c.auftrag_id == aid, bewegungen.c.typ == "ausgang").order_by(bewegungen.c.id)).mappings()]
+        .where(bewegungen.c.auftrag_id == aid, bewegungen.c.typ == "ausgang", bewegungen.c.storniert_durch.is_(None))  # im Lager stornierte zählen nicht
+        .order_by(bewegungen.c.id)).mappings()]
 
 
 def tag_muster(code: str) -> re.Pattern:

@@ -390,9 +390,10 @@ async def uebernahme(request: Request, datei: UploadFile = File(...), ersetzen: 
 # ------------------------------------------------------------------ Benutzer
 @router.post("/benutzer/speichern")
 def benutzer_speichern(request: Request, id: str = Form(""), username: str = Form(...), anzeigename: str = Form(""),
-                       rolle: str = Form("lager"), passwort: str = Form(""), aktiv: str = Form(""), rolle_ih: str = Form("")):
+                       rolle: str = Form("lager"), passwort: str = Form(""), aktiv: str = Form(""), rolle_ih: str = Form(""), rolle_ih_feld: str = Form("")):
     me = require(request, "admin")
     rolle = rolle if rolle in ROLLEN or rolle == "keine" else "lager"
+    ih_feld = rolle_ih_feld == "1" or bool(rolle_ih)  # Feld fehlt bei ausgeschalteter Instandhaltung: CMMS-Rolle bleibt dann unverändert
     rolle_ih = rolle_ih if rolle_ih in IH_ROLLEN else ""
     username = username.strip()
     with db.schreiben() as con:
@@ -429,10 +430,11 @@ def benutzer_speichern(request: Request, id: str = Form(""), username: str = For
                 return RedirectResponse("/einstellungen?tab=benutzer", status_code=303)
             con.execute(insert(users).values(**werte))
         uid = int(id) if id else con.execute(select(users.c.id).where(users.c.username == username)).scalar()
-        con.execute(delete(benutzer_rollen).where(benutzer_rollen.c.user_id == uid, benutzer_rollen.c.modul == "ih"))
-        if rolle_ih:
-            con.execute(insert(benutzer_rollen).values(user_id=uid, modul="ih", rolle=rolle_ih))
-        audit(con, me["username"], "Benutzer gespeichert", username, {"rolle": rolle, "rolle_ih": rolle_ih or None, "aktiv": werte["aktiv"]})
+        if ih_feld:
+            con.execute(delete(benutzer_rollen).where(benutzer_rollen.c.user_id == uid, benutzer_rollen.c.modul == "ih"))
+            if rolle_ih:
+                con.execute(insert(benutzer_rollen).values(user_id=uid, modul="ih", rolle=rolle_ih))
+        audit(con, me["username"], "Benutzer gespeichert", username, {"rolle": rolle, "rolle_ih": (rolle_ih or None) if ih_feld else "unverändert", "aktiv": werte["aktiv"]})
     flash(request, f"Benutzer {username} gespeichert.")
     return RedirectResponse("/einstellungen?tab=benutzer", status_code=303)
 

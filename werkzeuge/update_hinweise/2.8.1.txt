@@ -1,0 +1,12 @@
+2.8.1 - Gesamtpruefung Lager + Instandhaltung (Korrekturen):
+- Wird im Lager eine Entnahme storniert, die fuer einen Wartungsauftrag gebucht war, zaehlt der Auftrag sie nicht
+  mehr als entnommen und nicht mehr bei den Materialkosten.
+- Benutzer speichern bei ausgeschalteter Instandhaltung loescht die Instandhaltungs-Rolle nicht mehr.
+- Schichtbuch: Seiten schneller, wenn viele gleichzeitig buchen.
+- Eigene Kampagne: Anlegen auch ohne vorher geoeffnetes Formular.
+
+Enthaelt alles aus 2.8.0 (Schichtbuch), 2.7.1, 2.7.0, 2.6.0, 2.5.0, 2.4.0, 2.3.1 und 2.3.0.
+Datenbank: keine Aenderung gegenueber 2.8.0. Wer von 2.7.x kommt: sechs neue Tabellen fuer das Schichtbuch.
+Wer von 2.6.0 oder aelter kommt: Die Datenbank wird beim ersten Start erst als Probelauf an einer Kopie ergaenzt,
+mit Sicherung vor_update_... vorher. Nach einem Update von vor 2.5.0 ist die Instandhaltung zunaechst ausgeschaltet
+(Einstellungen -> Allgemein -> Instandhaltung (CMMS) aktivieren).
