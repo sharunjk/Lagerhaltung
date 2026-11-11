@@ -278,7 +278,9 @@ def anlage(request: Request, aid: int):
         plan = wartung.plan_fuer_bauteil(con, a) if a["art"] == "platz" else []
         hist = wartung.historie(con, aid) if a["art"] == "platz" else []
         mass = wartung.massnahmen(con)
-    return render(request, "ih/anlage.html", a=a, ebenen_pfad=pfad, kinder=kinder, zusatz=_zusatz(a), teile=teile, ART_TEXT=ART_TEXT,
+        from ..services import schichtbuch as sb
+        meldungen = sb.suche(con, platz_id=aid, grenze=10) if a["art"] == "platz" else []
+    return render(request, "ih/anlage.html", meldungen=meldungen, SB_STATUS=sb.STATUS, SB_PRIO=sb.PRIO, a=a, ebenen_pfad=pfad, kinder=kinder, zusatz=_zusatz(a), teile=teile, ART_TEXT=ART_TEXT,
                   vorschlaege=vorschlaege, artikelliste=artikelliste,
                   plan=plan, hist=hist, mass=mass, ERGEBNIS=wartung.ERGEBNIS, kw=wartung.kw)
 

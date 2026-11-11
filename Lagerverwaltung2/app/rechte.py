@@ -25,6 +25,9 @@ RECHTE: dict[str, set[str]] = {
     "ih.auftrag.freigeben": _PFLEGE,                   # Wartungsauftrag freigeben
     "ih.auftrag.ausfuehren": {"techniker", "schichtfuehrer", "ingenieur", "manager"},  # Protokolle erfassen, Nachweise hochladen
     "ih.auftrag.abschliessen": _PFLEGE,                # technisch erledigte Aufträge prüfen und abschließen (Vier-Augen-Prinzip)
+    "ih.schichtbuch.ansehen": set(IH_ROLLEN),          # Schichtbuch, Übergaben und Meldungen lesen
+    "ih.schichtbuch.schreiben": {"operator", "techniker", "schichtfuehrer", "ingenieur", "manager"},  # Meldungen, Schicht beginnen/übergeben
+    "ih.schichtbuch.einrichten": {"schichtfuehrer", "manager"},  # Teams, Schichtzeiten, Ereignistypen, Zuordnung der Benutzer
 }
 
 

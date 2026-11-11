@@ -17,7 +17,7 @@ from .config import load_config
 from .services.betrieb import Zeitplaner
 from .web import Anmeldesperre, Forbidden, LoginRequired, render
 
-VERSION = "2.7.1"
+VERSION = "2.8.0"
 log = logging.getLogger("lagerverwaltung")
 
 
@@ -133,8 +133,8 @@ def create_app(cfg=None, start_scheduler: bool = True) -> FastAPI:
 
     app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
-    from .routes import admin, api, artikel, buchen, core, ih, ih_wartung, lager, mobil
-    for r in (core.router, artikel.router, buchen.router, lager.router, admin.router, mobil.router, ih.router, ih_wartung.router, api.router):
+    from .routes import admin, api, artikel, buchen, core, ih, ih_wartung, lager, mobil, schichtbuch
+    for r in (core.router, artikel.router, buchen.router, lager.router, admin.router, mobil.router, ih.router, ih_wartung.router, schichtbuch.router, api.router):
         app.include_router(r)
     return app
 

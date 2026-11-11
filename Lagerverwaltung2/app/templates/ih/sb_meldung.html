@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_ih.html" import team_chip, sb_chips, status_chip %}
+{% block title %}M-{{ "%05d"|format(m.id) }}{% endblock %}
+{% block content %}
+{% set schreiben = darf("ih.schichtbuch.schreiben") %}
+<div class="text-sm text-muted mb-1"><a href="/ih/schichtbuch" class="hover:text-ink">Schichtbuch</a> · <a href="/ih/schichtbuch/meldungen" class="hover:text-ink">Meldungen</a></div>
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div><h1>M-{{ "%05d"|format(m.id) }} {{ m.titel }}</h1>
+    <p class="mt-1">{{ sb_chips(m, PRIO, STATUS) }}</p></div>
+  <div class="flex gap-2 no-print">
+    {% if schreiben %}<a href="/ih/schichtbuch/meldung/{{ m.id }}/bearbeiten" class="btn">{{ icon("edit", "w-4 h-4") }}Bearbeiten</a>{% endif %}
+    <button type="button" class="btn" onclick="window.print()">{{ icon("print", "w-4 h-4") }}Drucken</button>
+  </div>
+</div>
+<div class="grid xl:grid-cols-[1fr_380px] gap-6">
+  <div class="space-y-6 min-w-0">
+    <section class="panel p-5">
+      <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+        <div class="flex gap-3"><dt class="w-36 shrink-0 text-muted">Gemeldet</dt><dd>{{ m.erstellt_am|datum }} · {{ m.erstellt_von }}</dd></div>
+        <div class="flex gap-3"><dt class="w-36 shrink-0 text-muted">Schicht</dt><dd>{{ m.schicht_text }} {{ team_chip(m.team, m.team_farbe) }}</dd></div>
+        <div class="flex gap-3"><dt class="w-36 shrink-0 text-muted">Schichtführer</dt><dd>{{ m.schichtfuehrer or "–" }}</dd></div>
+        <div class="flex gap-3"><dt class="w-36 shrink-0 text-muted">Ereignistyp</dt><dd>{{ m.ereignistyp or "–" }}</dd></div>
+        <div class="flex gap-3"><dt class="w-36 shrink-0 text-muted">Asset</dt><dd>{% if m.platz_id and "ih" in module %}<a class="text-primary hover:underline" href="/ih/anlagen/{{ m.platz_id }}">{{ m.asset }}</a>{% else %}{{ m.asset or "–" }}{% endif %}</dd></div>
+        <div class="flex gap-3"><dt class="w-36 shrink-0 text-muted">Functional Location</dt><dd>{{ m.functional_location or "–" }}</dd></div>
+        <div class="flex gap-3"><dt class="w-36 shrink-0 text-muted">Work Order</dt><dd>{% if m.auftrag_id %}<a class="text-primary hover:underline" href="/ih/auftraege/{{ m.auftrag_id }}">A-{{ "%05d"|format(m.auftrag_id) }}</a> <span class="text-muted">{{ m.auftrag_titel }}</span> · <b>{{ m.auftrag_status }}</b>{% else %}{{ m.work_order or "–" }}{% endif %}</dd></div>
+        <div class="flex gap-3"><dt class="w-36 shrink-0 text-muted">Stillstand</dt><dd>{{ ("Ja" ~ (", " ~ m.stillstand_h|num ~ " h" if m.stillstand_h else "")) if m.stillstand else "Nein" }}</dd></div>
+        {% if m.erledigt_am %}<div class="flex gap-3"><dt class="w-36 shrink-0 text-muted">Erledigt</dt><dd>{{ m.erledigt_am|datum }} · {{ m.erledigt_von }}{% if m.erledigt_schicht_id and m.erledigt_schicht_id != m.schicht_id %} (von einer späteren Schicht){% endif %}</dd></div>{% endif %}
+      </dl>
+      {% for lab, wert in [("Beschreibung", m.beschreibung), ("Maßnahme", m.massnahme)] if wert %}
+      <h3 class="text-sm text-muted mt-4 mb-1">{{ lab }}</h3><p class="whitespace-pre-line">{{ wert }}</p>
+      {% endfor %}
+    </section>
+
+    {% if schreiben %}
+    <section id="ergaenzen" class="panel p-5 no-print">
+      <h2 class="mb-2">Ergänzen / Status ändern</h2>
+      <form method="post" action="/ih/schichtbuch/meldung/{{ m.id }}/ergaenzen" class="space-y-3">
+        <textarea name="text" rows="3" class="field" placeholder="z. B. Gleitring getauscht, Pumpe läuft wieder dicht. Ersatzteil aus dem Lager entnommen." aria-label="Ergänzung"></textarea>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="seg">{% for k, lab in STATUS.items() %}<label class="px-3 py-1.5 rounded cursor-pointer has-[:checked]:bg-primary has-[:checked]:text-white has-[:checked]:font-semibold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary"><input type="radio" name="status" value="{{ k }}" class="sr-only" {% if m.status == k %}checked{% endif %}>{{ lab }}</label>{% endfor %}</div>
+          <button class="btn btn-primary">Speichern</button>
+        </div>
+      </form>
+    </section>
+    {% endif %}
+
+    <section class="panel overflow-hidden">
+      <div class="px-4 py-3 border-b border-line"><h2>Verlauf</h2></div>
+      <ul class="divide-y divide-line text-sm">
+      {% for e in verlauf %}
+        <li class="px-4 py-2.5">
+          <span class="text-muted">{{ e.zeit|datum }}</span> <b>{{ e.benutzer }}</b>
+          {% if e.schicht %}<span class="text-xs text-muted">({{ e.schicht.text }}{% if e.schicht.team %}, {{ e.schicht.team }}{% endif %})</span>{% endif %}:
+          {{ {"angelegt": "gemeldet", "ergaenzung": "ergänzt", "status": "Status → " ~ STATUS.get(e.status, e.status), "uebergabe": "an die nächste Schicht übergeben", "uebernahme": "Übergabe übernommen", "geaendert": ""}.get(e.art, e.art) }}{% if e.art == "angelegt" and e.status %} ({{ STATUS.get(e.status) }}){% endif %}
+          {% if e.text %}<span class="block whitespace-pre-line mt-0.5">{{ e.text }}</span>{% endif %}
+        </li>
+      {% endfor %}
+      </ul>
+    </section>
+  </div>
+  <aside class="space-y-6">
+    <section class="panel p-4">
+      <h2 class="mb-2">Übergabe</h2>
+      {% if m.uebergabe %}
+        <p class="text-sm">Übergeben{% if ueb_von %} von {{ team_chip(ueb_von.team, ueb_von.team_farbe) }} {{ ueb_von.text }}{% endif %}.</p>
+        {% if m.uebergabe_text %}<p class="text-sm rounded-md bg-soft px-3 py-2 mt-2 whitespace-pre-line">{{ m.uebergabe_text }}</p>{% endif %}
+        {% if m.uebernommen_am %}<p class="text-sm text-ok mt-2">Übernommen {{ m.uebernommen_am|datum }} von {{ m.uebernommen_von }}.</p>
+        {% elif schreiben %}
+        <form method="post" action="/ih/schichtbuch/meldung/{{ m.id }}/uebernehmen" class="mt-3 space-y-2"><input type="hidden" name="weiter" value="meldung">
+          <input name="kommentar" class="field" placeholder="Kommentar (optional)" aria-label="Kommentar zur Übernahme"><button class="btn btn-primary btn-sm">Gelesen &amp; übernommen</button></form>
+        {% endif %}
+      {% else %}<p class="text-sm text-muted">Nicht übergeben. Übergeben wird beim Schichtende („Schicht beenden &amp; übergeben“).</p>{% endif %}
+    </section>
+  </aside>
+</div>
+{% endblock %}

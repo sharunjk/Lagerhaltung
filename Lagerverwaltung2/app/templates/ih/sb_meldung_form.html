@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neue Meldung" if neu else "Meldung bearbeiten" }}{% endblock %}
+{% block content %}
+{%- macro v(feld) -%}{{ f.get(feld) if f.get(feld) is not none else "" }}{%- endmacro -%}
+<div class="text-sm text-muted mb-1"><a href="/ih/schichtbuch" class="hover:text-ink">Schichtbuch</a>{% if not neu %} · <a class="hover:text-ink" href="/ih/schichtbuch/meldung/{{ m.id }}">M-{{ "%05d"|format(m.id) }}</a>{% endif %}</div>
+<h1 class="mb-1">{{ "Neue Meldung" if neu else "Meldung bearbeiten" }}</h1>
+{% if neu %}<p class="text-muted mb-4">Wird der Schicht <b>{{ slot_text }}</b> zugeordnet, mit Ihrem Namen und der Uhrzeit.</p>{% endif %}
+{% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-fehler max-w-3xl">{{ fehler }}</div>{% endif %}
+<form method="post" class="max-w-3xl space-y-5 mt-4" x-data="{still: {{ 'true' if f.get('stillstand') in ('on', True) else 'false' }}}">
+  <section class="panel p-5 space-y-4">
+    <div><label class="label" for="titel">Titel – was ist passiert? (Pflicht)</label><input id="titel" name="titel" value="{{ v('titel') }}" class="field" required maxlength="200" {% if neu %}autofocus{% endif %} placeholder="z. B. Pumpe P -10401 A undicht am Gleitring"></div>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div><label class="label" for="typ">Ereignistyp</label><select id="typ" name="ereignistyp" class="field"><option value="">–</option>{% for t in typen %}<option {% if v('ereignistyp') == t %}selected{% endif %}>{{ t }}</option>{% endfor %}{% if v('ereignistyp') and v('ereignistyp') not in typen %}<option selected>{{ v('ereignistyp') }}</option>{% endif %}</select></div>
+      <fieldset><legend class="label">Priorität</legend>
+        <div class="seg">{% for k, lab in PRIO.items() %}<label class="px-3 py-1.5 rounded cursor-pointer has-[:checked]:bg-primary has-[:checked]:text-white has-[:checked]:font-semibold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary"><input type="radio" name="prioritaet" value="{{ k }}" class="sr-only" {% if (v('prioritaet') or 'mittel') == k %}checked{% endif %}>{{ lab }}</label>{% endfor %}</div></fieldset>
+    </div>
+    <div><label class="label" for="beschreibung">Beschreibung</label><textarea id="beschreibung" name="beschreibung" rows="4" class="field" placeholder="Was wurde beobachtet? Wann, wo, Messwerte, Auswirkungen.">{{ v('beschreibung') }}</textarea></div>
+    <div><label class="label" for="massnahme">Maßnahme</label><textarea id="massnahme" name="massnahme" rows="3" class="field" placeholder="Was wurde getan bzw. ist zu tun?">{{ v('massnahme') }}</textarea></div>
+  </section>
+  <section class="panel p-5 space-y-4">
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div><label class="label" for="asset">Asset (Tag-Nr.)</label><input id="asset" name="asset" value="{{ v('asset') }}" list="sb_tags" class="field" autocomplete="off" placeholder="Tag-Nr. suchen und wählen">
+        <datalist id="sb_tags">{% for c, b in tags %}<option value="{{ c }}{% if b %} – {{ b }}{% endif %}">{% endfor %}</datalist></div>
+      <div><label class="label" for="fl">Functional Location</label><input id="fl" name="functional_location" value="{{ v('functional_location') }}" class="field" placeholder="leer = Unit des Assets"></div>
+      <div><label class="label" for="wo">Work Order</label><input id="wo" name="work_order" value="{{ v('work_order') }}" class="field" placeholder="z. B. A-00012 oder externe Nummer">
+        <p class="text-xs text-muted mt-1">Eine Auftragsnummer A-… wird mit dem Wartungsauftrag verknüpft (Status sichtbar).</p></div>
+    </div>
+    <div class="flex flex-wrap gap-x-6 gap-y-3 items-center">
+      <label class="flex items-center gap-2"><input type="checkbox" name="sicherheitsrelevant" {% if f.get('sicherheitsrelevant') in ('on', True) %}checked{% endif %}> Sicherheitsrelevant</label>
+      <label class="flex items-center gap-2"><input type="checkbox" name="stillstand" x-model="still" {% if f.get('stillstand') in ('on', True) %}checked{% endif %}> Stillstand Anlage</label>
+      <div x-show="still" class="flex items-center gap-2"><label for="sth" class="text-sm">Dauer (h)</label><input id="sth" name="stillstand_h" value="{{ v('stillstand_h')|replace('.', ',') }}" class="field w-24" inputmode="decimal"></div>
+    </div>
+    {% if neu %}
+    <fieldset><legend class="label">Status</legend>
+      <div class="seg">{% for k, lab in STATUS.items() %}<label class="px-3 py-1.5 rounded cursor-pointer has-[:checked]:bg-primary has-[:checked]:text-white has-[:checked]:font-semibold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary"><input type="radio" name="status" value="{{ k }}" class="sr-only" {% if (v('status') or 'offen') == k %}checked{% endif %}>{{ lab }}</label>{% endfor %}</div>
+      <p class="text-xs text-muted mt-1">„Erledigt“ für reine Information oder sofort behobene Ereignisse.</p></fieldset>
+    {% endif %}
+  </section>
+  <div class="flex flex-wrap gap-2">
+    {% if neu %}
+    <button class="btn btn-primary btn-lg" name="weiter" value="dashboard">Speichern</button>
+    <button class="btn btn-lg" name="weiter" value="meldung">Speichern und Meldung öffnen</button>
+    {% else %}<button class="btn btn-primary btn-lg">Änderungen speichern</button>{% endif %}
+    <a href="{{ '/ih/schichtbuch' if neu else '/ih/schichtbuch/meldung/' ~ m.id }}" class="btn btn-lg">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

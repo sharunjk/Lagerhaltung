@@ -15,3 +15,15 @@ background-color:{{ f[0] }};color:{{ f[1] }}
 {% macro mass_symbol(m, code) -%}
 <span class="inline-grid place-items-center w-7 h-7 rounded font-semibold text-sm shrink-0" style="{{ mass_stil(code) }}" title="{{ m.name if m else code }}">{{ (m.symbol if m and m.symbol else "") or code[:1] }}</span>
 {%- endmacro %}
+{# Schichtbuch #}
+{% macro team_chip(name, farbe) -%}
+{% if name %}<span class="inline-flex items-center gap-1.5 font-semibold whitespace-nowrap"><span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" style="background-color:{{ farbe or '#5B6773' }}"></span>{{ name }}</span>{% endif %}
+{%- endmacro %}
+{% macro sb_chips(m, PRIO, STATUS, status=True) -%}
+<span class="inline-flex flex-wrap gap-1 align-middle">
+{%- if status %}<span class="status {{ {'offen': 'st-melden', 'in_arbeit': 'text-primary', 'erledigt': 'st-ok'}.get(m.status, '') }}">{{ STATUS.get(m.status, m.status) }}</span>{% endif -%}
+{%- if m.prioritaet == "hoch" %}<span class="status st-kritisch">Prio hoch</span>{% elif m.prioritaet == "niedrig" %}<span class="status text-muted">Prio niedrig</span>{% endif -%}
+{%- if m.sicherheitsrelevant %}<span class="status st-kritisch">Sicherheit</span>{% endif -%}
+{%- if m.stillstand %}<span class="status st-melden">Stillstand{% if m.stillstand_h %} {{ m.stillstand_h|num }} h{% endif %}</span>{% endif -%}
+</span>
+{%- endmacro %}

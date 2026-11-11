@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon %}
-{% from "ih/_ih.html" import mass_symbol %}
+{% from "ih/_ih.html" import mass_symbol, sb_chips, team_chip %}
 {% block title %}{{ a.code }}{% endblock %}
 {% block content %}
 <div class="text-sm text-muted mb-1"><a href="/ih/anlagen" class="hover:text-ink">Anlagen</a>{% for p in ebenen_pfad %} › <a class="hover:text-ink" href="/ih/anlagen/{{ p.id }}">{{ p.code }}{% if p.bezeichnung and not p.bezeichnung.endswith(p.code) %} {{ p.bezeichnung }}{% endif %}</a>{% endfor %}</div>
@@ -94,6 +94,13 @@
       </form>
       <p class="text-xs text-muted mt-2">Zuordnen geht auch beim Artikel im Lager (Bearbeiten → „Ersatzteil für Tag-Nr.“). Alle Altdaten auf einmal: <a class="text-primary hover:underline" href="/ih/ersatzteile/vorschlaege">Zuordnungen aus „Verwendung“ übernehmen</a>.</p>
       {% endif %}
+    </section>
+    {% endif %}
+    {% if a.art == "platz" %}
+    <section class="panel p-4">
+      <div class="flex justify-between items-center gap-2 mb-2"><h2>Schichtbuch</h2>{% if a.aktiv and darf("ih.schichtbuch.schreiben") %}<a class="btn btn-sm" href="/ih/schichtbuch/neu?platz={{ a.id }}">{{ icon("plus", "w-4 h-4") }}Meldung</a>{% endif %}</div>
+      <ul class="text-sm space-y-1.5">{% for m in meldungen %}<li><a class="hover:underline" href="/ih/schichtbuch/meldung/{{ m.id }}">{{ m.titel }}</a> {{ sb_chips(m, SB_PRIO, SB_STATUS) }}<span class="block text-xs text-muted">{{ m.erstellt_am|datum }} · {{ team_chip(m.team, m.team_farbe) }}</span></li>{% else %}<li class="text-muted">Keine Meldungen zu dieser Tag-Nr.</li>{% endfor %}</ul>
+      {% if meldungen|length >= 10 %}<a class="text-sm text-primary hover:underline" href="/ih/schichtbuch/meldungen?q={{ a.code|urlencode }}">alle Meldungen</a>{% endif %}
     </section>
     {% endif %}
     {% if zusatz %}

@@ -408,6 +408,92 @@ ih_dokumente = Table(
     Column("hochgeladen_am", DateTime, server_default=func.current_timestamp()),
 )
 
+# ------------------------------------------------------------------ Schichtbuch (ab 2.8.0)
+sb_teams = Table(
+    "sb_teams", md,  # Schichtteams, z. B. Grün, Blau, Gelb, Rot (Anzahl einstellbar)
+    Column("id", Integer, primary_key=True),
+    Column("name", String(60), nullable=False, unique=True),
+    Column("farbe", String(9), nullable=False, default="#5B6773"),
+    Column("reihenfolge", Integer, nullable=False, default=0),
+    Column("aktiv", Boolean, nullable=False, default=True),
+)
+
+sb_zeiten = Table(
+    "sb_zeiten", md,  # Schichtzeiten, z. B. Tag 06:00–18:00, Nacht 18:00–06:00
+    Column("id", Integer, primary_key=True),
+    Column("name", String(40), nullable=False, unique=True),
+    Column("beginn", String(5), nullable=False),   # HH:MM
+    Column("ende", String(5), nullable=False),     # HH:MM, kleiner/gleich Beginn = am Folgetag
+    Column("reihenfolge", Integer, nullable=False, default=0),
+    Column("aktiv", Boolean, nullable=False, default=True),
+)
+
+sb_mitglieder = Table(
+    "sb_mitglieder", md,  # Benutzer -> Schichtteam
+    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("team_id", Integer, ForeignKey("sb_teams.id", ondelete="CASCADE"), nullable=False, index=True),
+)
+
+sb_schichten = Table(
+    "sb_schichten", md,  # eine gelaufene Schicht (Datum = Tag des Schichtbeginns)
+    Column("id", Integer, primary_key=True),
+    Column("datum", Date, nullable=False),
+    Column("zeit_id", Integer, ForeignKey("sb_zeiten.id"), nullable=False),
+    Column("team_id", Integer, ForeignKey("sb_teams.id")),
+    Column("schichtfuehrer", String(200)),
+    Column("begonnen_am", DateTime),
+    Column("begonnen_von", String(100)),
+    Column("beendet_am", DateTime),
+    Column("beendet_von", String(100)),
+    Column("uebergabe_notiz", Text),
+    UniqueConstraint("datum", "zeit_id", name="uq_sb_schicht"),
+)
+
+sb_meldungen = Table(
+    "sb_meldungen", md,  # Schichtbuch-Eintrag (Felder wie die bisherige SharePoint-Liste)
+    Column("id", Integer, primary_key=True),
+    Column("schicht_id", Integer, ForeignKey("sb_schichten.id"), index=True),
+    Column("titel", String(200), nullable=False),
+    Column("ereignistyp", String(60)),
+    Column("beschreibung", Text),
+    Column("massnahme", Text),
+    Column("status", String(20), nullable=False, default="offen"),      # offen | in_arbeit | erledigt
+    Column("prioritaet", String(10), nullable=False, default="mittel"), # hoch | mittel | niedrig
+    Column("platz_id", Integer, ForeignKey("ih_plaetze.id", ondelete="SET NULL"), index=True),
+    Column("asset", String(120)),                 # Tag-Nr. (Momentaufnahme oder Freitext)
+    Column("functional_location", String(200)),
+    Column("work_order", String(60)),
+    Column("auftrag_id", Integer, ForeignKey("ih_auftraege.id", ondelete="SET NULL")),
+    Column("sicherheitsrelevant", Boolean, nullable=False, default=False),
+    Column("stillstand", Boolean, nullable=False, default=False),
+    Column("stillstand_h", Float),
+    Column("uebergabe", Boolean, nullable=False, default=False),   # an die nächste Schicht übergeben (noch nicht übernommen)
+    Column("uebergabe_text", Text),
+    Column("uebergeben_schicht_id", Integer),
+    Column("uebernommen_am", DateTime),
+    Column("uebernommen_von", String(100)),
+    Column("uebernommen_schicht_id", Integer),
+    Column("erledigt_am", DateTime),
+    Column("erledigt_von", String(100)),
+    Column("erledigt_schicht_id", Integer),
+    Column("erstellt_am", DateTime, nullable=False),
+    Column("erstellt_von", String(100)),
+    Column("geaendert_am", DateTime),
+    Column("geaendert_von", String(100)),
+)
+
+sb_verlauf = Table(
+    "sb_verlauf", md,  # Ergänzungen, Statuswechsel, Übergaben und Übernahmen je Meldung
+    Column("id", Integer, primary_key=True),
+    Column("meldung_id", Integer, ForeignKey("sb_meldungen.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("schicht_id", Integer),
+    Column("zeit", DateTime, nullable=False),
+    Column("benutzer", String(100)),
+    Column("art", String(20), nullable=False),    # angelegt | ergaenzung | status | uebergabe | uebernahme | geaendert
+    Column("text", Text),
+    Column("status", String(20)),
+)
+
 _engine: Engine | None = None
 
 

@@ -37,7 +37,7 @@ def _alte_datenbank(pfad: Path):
     con.execute("DROP TABLE schema_version")
     for t, s in (("bewegungen", "preis"), ("bewegungen", "auftrag_id"), ("reservierungen", "auftrag_id")):
         con.execute(f"ALTER TABLE {t} DROP COLUMN {s}")
-    for t in ("ih_stueckliste", "ih_kampagne_bauteile", "ih_dokumente", "ih_statuslog", "ih_auftrag_positionen", "ih_auftraege", "ih_kampagnen", "ih_klassen_intervalle",
+    for t in ("sb_verlauf", "sb_meldungen", "sb_schichten", "sb_mitglieder", "sb_zeiten", "sb_teams", "ih_stueckliste", "ih_kampagne_bauteile", "ih_dokumente", "ih_statuslog", "ih_auftrag_positionen", "ih_auftraege", "ih_kampagnen", "ih_klassen_intervalle",
               "ih_massnahmen", "ih_import_zeilen", "ih_import_laeufe", "ih_plaetze", "benutzer_rollen"):
         con.execute(f"DROP TABLE {t}")
     con.commit()

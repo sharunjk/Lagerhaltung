@@ -1,0 +1,19 @@
+Neu in 2.8.0 - Schichtbuch (Instandhaltung -> Schichtbuch):
+- Einrichten (Schichtfuehrer oder Manager): Schichtbuch -> Einrichten. Vorbelegt sind die Teams Gruen, Blau, Gelb,
+  Rot und die Schichten Tag 06:00-18:00 / Nacht 18:00-06:00 - bitte Zeiten pruefen. Unter "Benutzer und Teams"
+  jedem Benutzer sein Team zuordnen. Weitere Teams oder Schichten ueber die leere Zeile.
+- Schichtbeginn: "Schicht beginnen", offene Uebergaben lesen und "Gelesen & uebernommen". Rechts: was seit der
+  letzten Schicht des eigenen Teams passiert ist und die vorherigen Schichten.
+- Waehrend der Schicht: "Neue Meldung" (Felder wie die SharePoint-Liste), spaeter ergaenzen und Status aendern.
+  Work Order A-... verknuepft den Wartungsauftrag.
+- Schichtende: "Schicht beenden & uebergeben" - Punkte auswaehlen, Hinweise schreiben, Uebergabenotiz, beenden.
+- Alle Meldungen: suchen, filtern, Excel-Export mit den Spalten der SharePoint-Liste.
+- Rollen: Operator, Techniker, Schichtfuehrer, Ingenieur und Manager schreiben ins Schichtbuch; "Nur lesen" liest.
+  Schichtbenutzer brauchen eine Rolle in der Instandhaltung (Einstellungen -> Benutzer).
+
+Datenbank: Beim ersten Start kommen sechs neue Tabellen dazu. Der Lagerbestand bleibt unveraendert.
+
+Enthaelt alles aus 2.7.1 (Kalenderfarben), 2.7.0 (Rhythmus, eigene Wartungen, Ersatzteile je Tag-Nr., Entnahme),
+2.6.0, 2.5.0, 2.4.0, 2.3.1 und 2.3.0. Wer von 2.6.0 oder aelter kommt: Die Datenbank wird beim ersten Start erst als
+Probelauf an einer Kopie ergaenzt, mit Sicherung vor_update_... vorher. Nach einem Update von vor 2.5.0 ist die
+Instandhaltung zunaechst ausgeschaltet (Einstellungen -> Allgemein -> Instandhaltung (CMMS) aktivieren).

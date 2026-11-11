@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "ih/_ih.html" import team_chip, sb_chips %}
+{% block title %}Schicht beenden{% endblock %}
+{% block content %}
+<div class="text-sm text-muted mb-1"><a href="/ih/schichtbuch" class="hover:text-ink">Schichtbuch</a></div>
+<h1 class="flex flex-wrap items-center gap-3">Schicht beenden: {{ s.text }} {{ team_chip(s.team, s.team_farbe) }}</h1>
+<p class="text-muted mb-5 max-w-3xl">Offene Meldungen prüfen und alles Relevante an die nächste Schicht übergeben. Vorausgewählt sind Meldungen dieser Schicht, übernommene Übergaben sowie Punkte mit hoher Priorität, Sicherheitsbezug oder Stillstand. Die nächste Schicht sieht die Übergaben beim Schichtbeginn und bestätigt sie.</p>
+{% if s.beendet_am %}<div class="panel p-4 mb-4 text-sm">Diese Schicht wurde schon {{ s.beendet_am|datum }} von {{ s.beendet_von }} beendet.</div>{% else %}
+<form method="post" action="/ih/schichtbuch/beenden" class="space-y-6 max-w-4xl" onsubmit="return confirm('Schicht beenden und die ausgewählten Punkte übergeben?')">
+  <input type="hidden" name="schicht_id" value="{{ s.id }}">
+  <section class="panel overflow-hidden">
+    <div class="px-4 py-3 border-b border-line"><h2>Offene Meldungen ({{ offene|length }})</h2></div>
+    <ul class="divide-y divide-line">
+    {% for m in offene %}
+      <li class="p-4" x-data="{an: {{ 'true' if m.vorschlag else 'false' }}}">
+        <label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" name="ueb" value="{{ m.id }}" x-model="an" class="mt-1 w-5 h-5" {% if m.vorschlag %}checked{% endif %}>
+          <span class="min-w-0"><span class="font-semibold">{{ m.titel }}</span> {{ sb_chips(m, PRIO, STATUS) }}
+            <span class="block text-xs text-muted">M-{{ "%05d"|format(m.id) }} · {{ m.erstellt_am|datum }} · {{ team_chip(m.team, m.team_farbe) }}{% if m.asset %} · {{ m.asset }}{% endif %}</span></span></label>
+        <textarea name="text_{{ m.id }}" rows="2" class="field mt-2" x-show="an" placeholder="Hinweis für die nächste Schicht: Stand, was ist noch zu tun, worauf achten?" aria-label="Übergabehinweis zu {{ m.titel }}"></textarea>
+      </li>
+    {% else %}<li class="p-4 text-sm text-muted">Keine offenen Meldungen.</li>{% endfor %}
+    </ul>
+  </section>
+  {% if erledigt %}
+  <section class="panel p-4 text-sm"><h2 class="mb-1">In dieser Schicht erledigt</h2>
+    <ul class="space-y-0.5">{% for m in erledigt %}<li>✓ <a class="hover:underline" href="/ih/schichtbuch/meldung/{{ m.id }}">{{ m.titel }}</a></li>{% endfor %}</ul></section>
+  {% endif %}
+  <section class="panel p-4">
+    <label class="label" for="notiz">Übergabenotiz (allgemein: Anlagenzustand, Fahrweise, Besonderheiten)</label>
+    <textarea id="notiz" name="notiz" rows="4" class="field"></textarea>
+  </section>
+  <div class="flex gap-2"><button class="btn btn-primary btn-lg">Schicht beenden und übergeben</button><a href="/ih/schichtbuch" class="btn btn-lg">Abbrechen</a></div>
+</form>
+{% endif %}
+{% endblock %}

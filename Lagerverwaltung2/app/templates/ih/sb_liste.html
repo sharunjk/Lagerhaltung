@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_ih.html" import team_chip, sb_chips %}
+{% block title %}Schichtbuch – Meldungen{% endblock %}
+{% block content %}
+<div class="text-sm text-muted mb-1"><a href="/ih/schichtbuch" class="hover:text-ink">Schichtbuch</a></div>
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div><h1>Meldungen</h1><p class="text-muted">{{ liste|length }}{% if liste|length >= 500 %}+ (die neuesten 500; Export enthält alle){% endif %} Einträge</p></div>
+  <div class="flex gap-2">
+    {% if darf("ih.schichtbuch.schreiben") %}<a href="/ih/schichtbuch/neu" class="btn btn-primary">{{ icon("plus", "w-4 h-4") }}Neue Meldung</a>{% endif %}
+    <a href="/ih/schichtbuch/export.xlsx{% if query %}?{{ query }}{% endif %}" class="btn">{{ icon("download", "w-4 h-4") }}Excel</a>
+  </div>
+</div>
+<form method="get" class="panel p-4 mb-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+  <div class="sm:col-span-2"><label class="label" for="q">Suche</label><input id="q" name="q" value="{{ fl.q }}" class="field" placeholder="Titel, Beschreibung, Asset, Work Order …"></div>
+  <div><label class="label" for="st">Status</label><select id="st" name="status" class="field"><option value="">alle</option><option value="offen_alle" {% if fl.status == "offen_alle" %}selected{% endif %}>offen + in Bearbeitung</option>{% for k, lab in STATUS.items() %}<option value="{{ k }}" {% if fl.status == k %}selected{% endif %}>{{ lab }}</option>{% endfor %}</select></div>
+  <div><label class="label" for="te">Team</label><select id="te" name="team" class="field"><option value="">alle</option>{% for t in teams %}<option value="{{ t.id }}" {% if fl.team == t.id|string %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
+  <div><label class="label" for="ty">Ereignistyp</label><select id="ty" name="typ" class="field"><option value="">alle</option>{% for t in typen %}<option {% if fl.typ == t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></div>
+  <div><label class="label" for="nu">Nur</label><select id="nu" name="nur" class="field"><option value="">–</option>{% for k, lab in [("sicherheit", "sicherheitsrelevant"), ("stillstand", "mit Stillstand"), ("uebergabe", "übergeben")] %}<option value="{{ k }}" {% if fl.nur == k %}selected{% endif %}>{{ lab }}</option>{% endfor %}</select></div>
+  <div><label class="label" for="von">Von</label><input id="von" type="date" name="von" value="{{ fl.von or '' }}" class="field"></div>
+  <div><label class="label" for="bis">Bis</label><input id="bis" type="date" name="bis" value="{{ fl.bis or '' }}" class="field"></div>
+  <div class="flex gap-2"><button class="btn btn-primary">Filtern</button><a href="/ih/schichtbuch/meldungen" class="btn">Zurücksetzen</a></div>
+</form>
+<div class="panel overflow-x-auto">
+  <table class="tbl">
+    <thead><tr><th>Nr.</th><th>Gemeldet</th><th>Meldung</th><th>Asset</th><th>Übergabe</th><th>Work Order</th></tr></thead>
+    <tbody>
+    {% for m in liste %}
+      <tr>
+        <td class="whitespace-nowrap text-sm"><a class="text-primary hover:underline" href="/ih/schichtbuch/meldung/{{ m.id }}">M-{{ "%05d"|format(m.id) }}</a></td>
+        <td class="whitespace-nowrap text-sm">{{ m.erstellt_am|datum }}<span class="block text-xs text-muted">{{ m.schicht_zeit or "" }} · {{ team_chip(m.team, m.team_farbe) }}</span></td>
+        <td><a class="font-semibold hover:underline" href="/ih/schichtbuch/meldung/{{ m.id }}">{{ m.titel }}</a> {{ sb_chips(m, PRIO, STATUS) }}<span class="block text-xs text-muted">{{ m.ereignistyp or "" }}</span></td>
+        <td class="text-sm whitespace-nowrap">{% if m.platz_id %}<a class="hover:underline" href="/ih/anlagen/{{ m.platz_id }}">{{ m.asset }}</a>{% else %}{{ m.asset or "" }}{% endif %}<span class="block text-xs text-muted">{{ m.functional_location or "" }}</span></td>
+        <td class="text-sm">{% if m.uebergabe %}{{ "übernommen" if m.uebernommen_am else "offen" }}{% endif %}</td>
+        <td class="text-sm whitespace-nowrap">{% if m.auftrag_id %}<a class="text-primary hover:underline" href="/ih/auftraege/{{ m.auftrag_id }}">A-{{ "%05d"|format(m.auftrag_id) }}</a>{% else %}{{ m.work_order or "" }}{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="6" class="py-6 text-center text-muted">Keine Meldungen in dieser Auswahl.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="text-xs text-muted mt-2">Der Excel-Export hat dieselben Spalten wie die bisherige SharePoint-Liste (Titel, Datum, Schicht, Schichtführer, Team, Ereignistyp … Stillstandsdauer).</p>
+{% endblock %}

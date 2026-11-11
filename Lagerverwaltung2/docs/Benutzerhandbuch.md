@@ -75,6 +75,9 @@ Ab 2.5.0 gibt es neben der Lagerverwaltung einen zweiten Bereich **Instandhaltun
   | Anlagen, Wartungsplan, Kalender, Aufträge, Nachweise ansehen | alle Rollen |
   | Protokolle erfassen, Nachweise hochladen, „technisch erledigt“ melden | Techniker, Schichtführer, Ingenieur/Planer, Manager |
   | Anlagen anlegen, bearbeiten, archivieren, importieren, Instandhaltungsplan übernehmen, Aufträge anlegen, freigeben, stornieren, prüfen und abschließen | Ingenieur/Planer, Manager (und Administratoren) |
+  | Schichtbuch lesen | alle Rollen |
+  | Schichtbuch: Meldungen erfassen und ergänzen, Schicht beginnen, übergeben und beenden | Operator, Techniker, Schichtführer, Ingenieur/Planer, Manager |
+  | Schichtbuch einrichten (Teams, Schichtzeiten, Ereignistypen, Benutzer den Teams zuordnen) | Schichtführer, Manager (und Administratoren) |
 - **Bereich wechseln:** Wer beide Bereiche nutzt, wählt nach der ersten Anmeldung *Lagerverwaltung* oder *Instandhaltung*. Danach öffnet sich der zuletzt genutzte Bereich. Oben in der Seitenleiste wechselt *Zur Instandhaltung* bzw. *Zur Lagerverwaltung* ohne neue Anmeldung.
 - **Anlagen:** Bereiche (z. B. 1000, 3000), darunter Units (1010, 1040 …), darunter die Bauteile mit Tag-Nr. Die Suche findet Tag-Nr. auch ohne Leerzeichen (`fic1040` findet *FIC 1040 01-01*), außerdem Bezeichnung, Hersteller, Modell und Seriennummer. Filter: Bereich/Unit, Bauteilklasse, nur PLT-Sicherheitseinrichtungen, ohne Doku-Link.
 - **Genaue Filter:** *+ Bedingung* → Feld (z. B. Kürzel, Tag-Nr., Kategorie, Unit, Hersteller) → Bedingung (*enthält*, *enthält nicht*, *ist genau*, *ist nicht*, *beginnt mit*, *beginnt nicht mit*, *ist leer*, *ist nicht leer*) → Wert. Beispiel: *Kürzel ist nicht CAP01* blendet alle CAP01-Positionen aus. Mehrere Bedingungen müssen alle zutreffen. Groß-/Kleinschreibung ist egal, und „ist nicht“ zeigt auch Bauteile, bei denen das Feld leer ist. *Excel (diese Auswahl)* exportiert genau die gefilterte Liste. Die Adresse der Seite enthält den Filter, so lässt er sich als Lesezeichen speichern.
@@ -129,6 +132,25 @@ Die Intervalle hängen an der **Bauteilklasse**. Ein neues Bauteil braucht nur s
 **Ersatzteile im Auftrag:** Der Abschnitt *Ersatzteile* listet die Teile, die den Bauteilen des Auftrags zugeordnet sind, mit Bedarf, Lagerort und Bestand. Bei freigegebenen Aufträgen in Arbeit bucht *Entnehmen* (Lagerplatz und Menge wählen) direkt vom Lagerbestand ab; *Anderer Artikel* nimmt auch Teile außerhalb der Liste. Die Buchung steht im Lager mit „Auftrag A-…“ als Empfänger, der Auftrag zeigt die Materialkosten zum Preis der Buchung. Entnehmen dürfen alle, die Protokolle erfassen.
 
 Jede Statusänderung steht mit Name und Zeit im *Verlauf* des Auftrags. Die Anlagenseite zeigt *Wartung und Prüfungen* (geltende Maßnahmen mit letzter Durchführung und nächstem Termin) und die *Historie* aller Protokolle. **Pflichtprüfungen** werden extern durchgeführt (ZÜS, befähigte Person, Fachfirma). Das Programm plant, erinnert und verwahrt die Nachweise, es ersetzt die Prüfung nicht.
+
+### Schichtbuch
+
+Das Schichtbuch ersetzt die bisherige SharePoint-Liste. Jede Meldung hat dieselben Felder: Titel, Datum, Schicht, Schichtführer, Team, Ereignistyp, Beschreibung, Maßnahme, Status, Priorität, Asset, Functional Location, Work Order, Übergabe an nächste Schicht, Erledigt von nächster Schicht, Kommentar nächste Schicht, Sicherheitsrelevant, Stillstand Anlage und Stillstandsdauer. Datum, Schicht, Team und Schichtführer trägt das Programm selbst ein.
+
+**Einrichten (einmalig, Schichtführer oder Manager):** *Schichtbuch → Einrichten*.
+- **Teams:** vorbelegt sind Grün, Blau, Gelb und Rot, jeweils mit Farbe. Weitere Teams kommen über die leere Zeile dazu. Ein Team nicht löschen, sondern deaktivieren: seine Schichten bleiben im Schichtbuch.
+- **Schichtzeiten:** vorbelegt sind Tag 06:00–18:00 und Nacht 18:00–06:00. Liegt das Ende vor dem Beginn, endet die Schicht am Folgetag. Die Nachtschicht gehört zum Tag ihres Beginns. Drei Schichten (z. B. 06–14, 14–22, 22–06) gehen genauso. Überschneidungen lehnt das Programm ab.
+- **Benutzer und Teams:** Jeder Benutzer mit einer Rolle in der Instandhaltung bekommt sein Team. Danach zeigt das Schichtbuch ihm die Sicht seines Teams.
+- **Ereignistypen:** einer je Zeile, z. B. Störung, Prozessabweichung, Sicherheit / Beinahe-Unfall, Information.
+
+**Ablauf einer Schicht** (*Instandhaltung → Schichtbuch*):
+1. **Schichtbeginn:** *Schicht beginnen* wählen. Team (vorbelegt: Ihr Team) und Schichtführer sind schon eingetragen. Danach die **offenen Übergaben** lesen und mit *Gelesen & übernommen* bestätigen, auf Wunsch mit Kommentar. Rechts stehen *Seit der letzten Schicht von Team …* (alles, was neu ist oder sich geändert hat, seit Ihr Team zuletzt Dienst hatte) und die *vorherigen Schichten* mit Übergabenotiz und Meldungen.
+2. **Während der Schicht:** *Neue Meldung* für jedes besondere Ereignis, sofort. Pflicht ist nur der Titel. Das Asset wählen Sie aus der Liste aller Tag-Nummern; die Functional Location (die Unit) trägt das Programm dann selbst ein. Bei *Work Order* verknüpft eine Auftragsnummer A-… die Meldung mit dem Wartungsauftrag, dessen Status direkt sichtbar ist. Nach der Maßnahme die Meldung öffnen und unter *Ergänzen / Status ändern* nachtragen (*Offen*, *In Bearbeitung*, *Erledigt*). Jede Ergänzung steht mit Name, Zeit und Schicht im Verlauf.
+3. **Schichtende:** *Schicht beenden & übergeben* listet alle offenen Meldungen. Vorausgewählt sind Meldungen dieser Schicht, übernommene Übergaben und alles mit hoher Priorität, Sicherheitsbezug oder Stillstand. Je Punkt einen Hinweis für die nächste Schicht schreiben, dazu eine allgemeine Übergabenotiz (Anlagenzustand, Fahrweise), dann beenden.
+
+Danach beginnt die nächste Schicht wieder bei 1. Wurde eine Schicht begonnen, aber nicht beendet, zeigt das Schichtbuch das an, mit *Übergabe nachholen*.
+
+**Sicht für Team:** Oben rechts lässt sich die Sicht eines anderen Teams wählen, z. B. für den Schichtführer. *Alle Meldungen* sucht und filtert nach Status, Team, Ereignistyp, Zeitraum, sicherheitsrelevant, Stillstand und übergeben. *Excel* exportiert die Auswahl mit den Spalten der bisherigen SharePoint-Liste. Die Anlagenseite zeigt die Schichtbuch-Meldungen zu ihrer Tag-Nr. und hat den Knopf *Meldung*.
 
 ## Einstellungen (Administrator)
 

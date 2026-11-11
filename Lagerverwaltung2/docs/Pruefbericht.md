@@ -422,6 +422,18 @@ Prüfung: 168 Tests grün (2 übersprungen). Neue Browserprüfung `werkzeuge/pru
 
 Kalenderwochen in der Kopfzeile stehen alle auf einer Höhe (Jahreszahl in eigener Zeile), dünne Linien je Kalenderwoche, kräftigere Linie am Jahreswechsel. Farben der Maßnahmen wie im Instandhaltungsplan (aus den Zellfarben der Excel-Datei übernommen: S #BDD7EE, W #FFE699, F #F8CBAD, Za/Zv #E4D5F0, Zi #D9C2EC, Zf #CDB0E4, B #EDEDED, weitere Pflichtprüfungen #F4EEFA, Symbolfarbe je Maßnahme), in Kalender, Wartungsplan, Aufträgen und an der Anlage. Überfällig = rot umrandet, abgeschlossen = blass mit ✓. Geprüft im Browser bei 13, 52 und 156 Wochen (alle KW-Zahlen auf einer Höhe, keine JS-Fehler), hell und dunkel; `wartung.cjs` 19/19.
 
+## Nachtrag: Schichtbuch 2.8.0
+
+| Änderung | Umsetzung | Beleg |
+|---|---|---|
+| Teams und Schichtzeiten | vorbelegt Grün/Blau/Gelb/Rot und Tag 06–18/Nacht 18–06, beliebig erweiterbar, deaktivieren statt löschen, eindeutige Namen, Farbe #RRGGBB, Überschneidungen abgelehnt, laufende Schicht aus der Uhrzeit (Nacht nach Mitternacht gehört zum Vortag), drei Schichten möglich | `test_schichtzeiten_und_aktuelle_schicht`, `test_einrichten_teams_zeiten_typen` |
+| Ablauf | Schicht beginnen (Team, Schichtführer), Meldung (Titel Pflicht, Asset aus Anlagen mit Functional Location, Stillstandsdauer, Sicherheit), ergänzen und Status ändern mit Verlauf, Schichtende mit vorausgewählten Punkten und Hinweisen, Übergabe in der nächsten Schicht übernehmen, „Seit der letzten Schicht“ je Team, Hinweis auf nicht beendete Schichten. Über drei Schichten mit simulierter Uhrzeit geprüft | `test_ablauf_beginn_meldung_uebergabe_naechste_schicht` |
+| Work Order, Bearbeiten | A-… verknüpft den Wartungsauftrag (Status sichtbar), externe Nummern bleiben Text, Änderungen im Verlauf | `test_work_order_verknuepft_auftrag_und_bearbeiten` |
+| Export | Excel mit den 19 Spalten der SharePoint-Liste, „Erledigt von nächster Schicht“ und „Kommentar nächste Schicht“ aus dem Verlauf | im Ablauftest |
+| Rechte | 18 Routen × alle Rollen; Lager ohne CMMS-Rolle und CMMS aus: kein Zugriff | `test_rechte_schichtbuch` |
+
+Prüfung: 173 Tests grün (2 übersprungen). Browserprüfung `werkzeuge/pruefung/schichtbuch.cjs` mit Demodaten 18/18 (Navigation, Einrichten, Beginn, Meldung mit Asset aus der Auswahlliste, Ergänzung, Schichtende mit Übergabe, Übernahme, Liste, Excel, Anlage, vier Seiten am Handy mit 390 px ohne seitliches Scrollen, keine JS-Fehler). Update von 2.7.1 nachgestellt: sechs neue Tabellen, Bestand unverändert. `ersatzteile.cjs`, `wartung.cjs` (echte Dateien, nur lokal), `cmms.cjs` und `pc.cjs` laufen unverändert.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

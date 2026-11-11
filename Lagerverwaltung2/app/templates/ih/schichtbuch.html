@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_ih.html" import team_chip, sb_chips, status_chip %}
+{% block title %}Schichtbuch{% endblock %}
+{% block content %}
+{% set schreiben = darf("ih.schichtbuch.schreiben") %}
+{% set begonnen = akt and akt.begonnen_am %}
+{% set beendet = akt and akt.beendet_am %}
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div>
+    <h1>Schichtbuch</h1>
+    <p class="text-muted">Jetzt: <b class="text-ink">{{ slot_text }}</b> ({{ slot_zeit.beginn }}–{{ slot_zeit.ende }} Uhr){% if mein_team %} · Ihr Team: {{ team_chip(mein_team.name, mein_team.farbe) }}{% endif %}</p>
+  </div>
+  <div class="flex flex-wrap gap-2 items-center">
+    <form method="get" class="flex items-center gap-2"><label class="text-sm text-muted" for="sicht">Sicht für Team</label>
+      <select id="sicht" name="team" class="field !w-auto py-1.5" onchange="this.form.submit()">{% for t in teams %}<option value="{{ t.id }}" {% if sicht and sicht.id == t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></form>
+    <a href="/ih/schichtbuch/meldungen" class="btn">{{ icon("list", "w-4 h-4") }}Alle Meldungen</a>
+    {% if darf("ih.schichtbuch.einrichten") %}<a href="/ih/schichtbuch/einrichten" class="btn">{{ icon("settings", "w-4 h-4") }}Einrichten</a>{% endif %}
+  </div>
+</div>
+
+{% for h in haengend %}
+<div class="panel p-3 mb-3 border-l-4 border-l-warn flex flex-wrap items-center justify-between gap-2 text-sm">
+  <span>Die Schicht <b>{{ h.text }}</b>{% if h.team %} (Team {{ h.team }}){% endif %} wurde begonnen, aber nicht beendet – Übergabe fehlt.</span>
+  {% if schreiben %}<a class="btn btn-sm" href="/ih/schichtbuch/beenden?schicht={{ h.id }}">Übergabe nachholen</a>{% endif %}
+</div>
+{% endfor %}
+
+{# ------------------------------------------------------------ aktuelle Schicht #}
+<section class="panel p-4 mb-5 border-l-[6px]" style="border-left-color: {{ (akt.team_farbe if akt and akt.team_farbe else (sicht.farbe if sicht else '#5B6773')) }}">
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      {% if begonnen %}
+      <h2 class="flex flex-wrap items-center gap-2">{{ "Schicht beendet" if beendet else "Schicht läuft" }} {{ team_chip(akt.team, akt.team_farbe) }}</h2>
+      <p class="text-sm text-muted mt-1">Schichtführer <b class="text-ink">{{ akt.schichtfuehrer or "–" }}</b> · begonnen {{ akt.begonnen_am|datum }} von {{ akt.begonnen_von }}{% if beendet %} · <span class="text-ok font-semibold">beendet {{ akt.beendet_am|datum }}, übergeben</span>{% endif %}</p>
+      {% else %}
+      <h2>Schicht noch nicht begonnen</h2>
+      <p class="text-sm text-muted mt-1">Zum Schichtbeginn: Team und Schichtführer eintragen, dann die offenen Übergaben lesen und übernehmen.</p>
+      {% endif %}
+    </div>
+    {% if schreiben %}
+    <div class="flex flex-wrap gap-2">
+      {% if not begonnen %}
+      <form method="post" action="/ih/schichtbuch/beginnen" class="flex flex-wrap gap-2 items-end">
+        <div><label class="label" for="b_team">Team</label><select id="b_team" name="team_id" class="field !w-auto">{% for t in teams %}<option value="{{ t.id }}" {% if sicht and sicht.id == t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
+        <div><label class="label" for="b_sf">Schichtführer</label><input id="b_sf" name="schichtfuehrer" value="{{ user.name }}" class="field w-48"></div>
+        <button class="btn btn-primary">Schicht beginnen</button>
+      </form>
+      {% endif %}
+      <a href="/ih/schichtbuch/neu" class="btn {{ 'btn-primary' if begonnen }} btn-lg">{{ icon("plus", "w-5 h-5") }}Neue Meldung</a>
+      {% if begonnen and not beendet %}<a href="/ih/schichtbuch/beenden" class="btn btn-lg">Schicht beenden &amp; übergeben</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  <ol class="grid sm:grid-cols-3 gap-2 mt-4 text-sm">
+    <li class="rounded-md border px-3 py-2 {{ 'border-ok text-ok' if begonnen and not uebergaben else ('border-warn' if uebergaben else 'border-line') }}"><b>1 · Schichtbeginn</b><span class="block text-xs {{ 'text-muted' if not uebergaben }}">{% if uebergaben %}{{ uebergaben|length }} Übergabe(n) lesen und übernehmen{% else %}keine offenen Übergaben{% endif %}</span></li>
+    <li class="rounded-md border px-3 py-2 {{ 'border-primary' if begonnen and not beendet else 'border-line' }}"><b>2 · Während der Schicht</b><span class="block text-xs text-muted">{{ diese|length }} Meldung(en) in dieser Schicht · Ereignisse sofort melden, nach Maßnahmen ergänzen</span></li>
+    <li class="rounded-md border px-3 py-2 {{ 'border-ok text-ok' if beendet else 'border-line' }}"><b>3 · Schichtende</b><span class="block text-xs {{ 'text-muted' if not beendet }}">{{ "übergeben" if beendet else "offene Meldungen prüfen, Punkte an die nächste Schicht übergeben" }}</span></li>
+  </ol>
+</section>
+
+<div class="grid xl:grid-cols-[1fr_380px] gap-6">
+  <div class="space-y-6 min-w-0">
+    {# ---------------------------------------------------------- Übergaben #}
+    <section id="uebergaben" class="panel overflow-hidden">
+      <div class="px-4 py-3 border-b border-line flex flex-wrap items-center justify-between gap-2">
+        <h2>Offene Übergaben ({{ uebergaben|length }})</h2>
+        {% if schreiben and uebergaben|length > 1 %}<form method="post" action="/ih/schichtbuch/uebernehmen-alle" onsubmit="return confirm('Alle {{ uebergaben|length }} Übergaben als gelesen und übernommen markieren?')"><button class="btn btn-sm">Alle übernehmen</button></form>{% endif %}
+      </div>
+      <ul class="divide-y divide-line">
+      {% for m in uebergaben %}
+        <li class="p-4 space-y-1.5">
+          <div class="flex flex-wrap items-center gap-2"><a class="font-semibold hover:underline" href="/ih/schichtbuch/meldung/{{ m.id }}">{{ m.titel }}</a>{{ sb_chips(m, PRIO, STATUS) }}</div>
+          <p class="text-sm text-muted">{% if m.asset %}{{ m.asset }} · {% endif %}{{ m.ereignistyp or "" }}{% if m.von %} · übergeben von {{ team_chip(m.von.team, m.von.team_farbe) }} {{ m.von.text }}{% endif %}</p>
+          {% if m.uebergabe_text %}<p class="text-sm rounded-md bg-soft px-3 py-2 whitespace-pre-line">{{ m.uebergabe_text }}</p>{% endif %}
+          {% if schreiben %}
+          <form method="post" action="/ih/schichtbuch/meldung/{{ m.id }}/uebernehmen" class="flex flex-wrap gap-2 pt-1">
+            <input name="kommentar" class="field flex-1 min-w-[12rem]" placeholder="Kommentar (optional)" aria-label="Kommentar zur Übernahme">
+            <button class="btn btn-sm btn-primary">Gelesen &amp; übernommen</button>
+          </form>
+          {% endif %}
+        </li>
+      {% else %}<li class="p-4 text-sm text-muted">Keine offenen Übergaben.</li>{% endfor %}
+      </ul>
+    </section>
+
+    {# ---------------------------------------------------------- offene Meldungen #}
+    <section class="panel overflow-hidden">
+      <div class="px-4 py-3 border-b border-line flex flex-wrap items-center justify-between gap-2"><h2>Offene Meldungen ({{ offene|length }})</h2><a class="text-sm text-primary hover:underline" href="/ih/schichtbuch/meldungen?status=offen_alle">als Liste</a></div>
+      <ul class="divide-y divide-line">
+      {% for m in offene %}
+        <li class="px-4 py-3 flex flex-wrap items-start justify-between gap-2">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2"><a class="font-semibold hover:underline" href="/ih/schichtbuch/meldung/{{ m.id }}">{{ m.titel }}</a>{{ sb_chips(m, PRIO, STATUS) }}</div>
+            <p class="text-xs text-muted mt-0.5">M-{{ "%05d"|format(m.id) }} · {{ m.erstellt_am|datum }} · {{ team_chip(m.team, m.team_farbe) }}{% if m.asset %} · {{ m.asset }}{% endif %}{% if m.ereignistyp %} · {{ m.ereignistyp }}{% endif %}{% if m.uebergabe and m.uebernommen_am %} · übernommen {{ m.uebernommen_am|datum }}{% endif %}</p>
+          </div>
+          {% if m.auftrag_id %}<a class="text-sm text-primary hover:underline whitespace-nowrap" href="/ih/auftraege/{{ m.auftrag_id }}">A-{{ "%05d"|format(m.auftrag_id) }} · {{ m.auftrag_status }}</a>{% elif m.work_order %}<span class="text-sm text-muted whitespace-nowrap">WO {{ m.work_order }}</span>{% endif %}
+        </li>
+      {% else %}<li class="p-4 text-sm text-muted">Keine offenen Meldungen.</li>{% endfor %}
+      </ul>
+    </section>
+
+    {% if akt %}
+    <section class="panel overflow-hidden">
+      <div class="px-4 py-3 border-b border-line"><h2>Meldungen dieser Schicht ({{ diese|length }})</h2></div>
+      <ul class="divide-y divide-line">
+      {% for m in diese %}
+        <li class="px-4 py-2.5 flex flex-wrap items-center gap-2 text-sm"><span class="text-muted tabular-nums">{{ m.erstellt_am.strftime("%H:%M") }}</span><a class="font-semibold hover:underline" href="/ih/schichtbuch/meldung/{{ m.id }}">{{ m.titel }}</a>{{ sb_chips(m, PRIO, STATUS) }}<span class="text-muted">{{ m.erstellt_von }}</span></li>
+      {% else %}<li class="p-4 text-sm text-muted">Noch keine.</li>{% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-6">
+    {% if sicht %}
+    <section class="panel p-4">
+      <h2 class="mb-1 flex items-center gap-2">Seit der letzten Schicht von {{ team_chip(sicht.name, sicht.farbe) }}</h2>
+      {% if team_letzte %}
+      <p class="text-xs text-muted mb-2">Letzte Schicht: {{ team_letzte.text }}{% if seit_ab %} · neu oder geändert seit {{ seit_ab|datum }}{% endif %}</p>
+      <ul class="text-sm space-y-1.5">{% for m in seit[:12] %}<li><a class="hover:underline" href="/ih/schichtbuch/meldung/{{ m.id }}">{{ m.titel }}</a> {{ sb_chips(m, PRIO, STATUS) }}<span class="block text-xs text-muted">{{ m.erstellt_am|datum }} · {{ team_chip(m.team, m.team_farbe) }}</span></li>{% else %}<li class="text-muted">Nichts Neues.</li>{% endfor %}</ul>
+      {% if seit|length > 12 %}<a class="text-sm text-primary hover:underline" href="/ih/schichtbuch/meldungen?von={{ seit_ab.date() }}">alle {{ seit|length }} ansehen</a>{% endif %}
+      {% else %}<p class="text-sm text-muted">Team {{ sicht.name }} hatte noch keine Schicht im Schichtbuch.</p>{% endif %}
+    </section>
+    {% endif %}
+    <section class="panel overflow-hidden">
+      <div class="px-4 py-3 border-b border-line"><h2>Vorherige Schichten</h2></div>
+      <ul class="divide-y divide-line">
+      {% for s in letzte %}
+        <li class="p-3 border-l-4" style="border-left-color: {{ s.team_farbe or '#D5DBE0' }}">
+          <div class="flex flex-wrap justify-between gap-1 text-sm"><b>{{ s.text }}</b>{{ team_chip(s.team, s.team_farbe) }}</div>
+          <p class="text-xs text-muted">{{ s.schichtfuehrer or "–" }}{% if s.beendet_am %} · übergeben {{ s.beendet_am|datum }}{% elif s.begonnen_am %} · <span class="text-warn">nicht beendet</span>{% endif %}</p>
+          {% if s.uebergabe_notiz %}<p class="text-sm mt-1 whitespace-pre-line">{{ s.uebergabe_notiz }}</p>{% endif %}
+          {% if s.meldungen %}<ul class="mt-1 text-sm space-y-0.5">{% for m in s.meldungen[:8] %}<li class="flex gap-1.5"><span class="{{ 'text-ok' if m.status == 'erledigt' else ('text-crit' if m.sicherheitsrelevant or m.prioritaet == 'hoch' else 'text-warn') }}">{{ "✓" if m.status == "erledigt" else "●" }}</span><a class="hover:underline" href="/ih/schichtbuch/meldung/{{ m.id }}">{{ m.titel }}</a></li>{% endfor %}{% if s.meldungen|length > 8 %}<li class="text-xs text-muted">… {{ s.meldungen|length - 8 }} weitere</li>{% endif %}</ul>{% endif %}
+        </li>
+      {% else %}<li class="p-4 text-sm text-muted">Noch keine Schichten im Schichtbuch.</li>{% endfor %}
+      </ul>
+    </section>
+    <section class="panel p-4 text-sm">
+      <h2 class="mb-1">Instandhaltung</h2>
+      <a class="text-primary hover:underline" href="/ih/auftraege">{{ auftraege }} Wartungsaufträge freigegeben bzw. in Arbeit</a>
+    </section>
+  </aside>
+</div>
+{% endblock %}

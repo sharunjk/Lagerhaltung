@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "ih/_ih.html" import team_chip %}
+{% block title %}Schichtbuch einrichten{% endblock %}
+{% block content %}
+<div class="text-sm text-muted mb-1"><a href="/ih/schichtbuch" class="hover:text-ink">Schichtbuch</a></div>
+<h1 class="mb-1">Schichtbuch einrichten</h1>
+<p class="text-muted mb-5 max-w-3xl">Teams, Schichtzeiten, Ereignistypen und welcher Benutzer zu welchem Team gehört. Jeder sieht im Schichtbuch sein Team: was seit der letzten Schicht des Teams passiert ist.</p>
+<div class="grid xl:grid-cols-2 gap-6 items-start">
+  <form id="teams" method="post" action="/ih/schichtbuch/einrichten/teams" class="panel overflow-hidden">
+    <div class="px-4 py-3 border-b border-line"><h2>Teams</h2></div>
+    <table class="tbl"><thead><tr><th>Farbe</th><th>Name</th><th class="num">Mitglieder</th><th>Aktiv</th></tr></thead><tbody>
+    {% for t in teams %}
+      <tr><td><input type="color" name="farbe_{{ t.id }}" value="{{ t.farbe|lower }}" class="w-10 h-8 rounded border border-line" aria-label="Farbe {{ t.name }}"></td>
+        <td><input name="name_{{ t.id }}" value="{{ t.name }}" class="field" maxlength="60" aria-label="Name"></td>
+        <td class="num">{{ anzahl.get(t.id, 0) }}</td>
+        <td><input type="checkbox" name="aktiv_{{ t.id }}" {% if t.aktiv %}checked{% endif %} aria-label="{{ t.name }} aktiv"></td></tr>
+    {% endfor %}
+      <tr class="bg-soft"><td><input type="color" name="neu_farbe" value="#7a5af8" class="w-10 h-8 rounded border border-line" aria-label="Farbe neues Team"></td>
+        <td colspan="3"><input name="neu_name" class="field" maxlength="60" placeholder="Neues Team (optional)"></td></tr>
+    </tbody></table>
+    <div class="p-4 border-t border-line"><button class="btn btn-primary">Teams speichern</button>
+      <p class="text-xs text-muted mt-2">Ein Team nicht löschen, sondern deaktivieren – seine Schichten bleiben im Schichtbuch.</p></div>
+  </form>
+
+  <form id="zeiten" method="post" action="/ih/schichtbuch/einrichten/zeiten" class="panel overflow-hidden">
+    <div class="px-4 py-3 border-b border-line"><h2>Schichtzeiten</h2></div>
+    <table class="tbl"><thead><tr><th>Name</th><th>Beginn</th><th>Ende</th><th>Aktiv</th></tr></thead><tbody>
+    {% for z in zeiten %}
+      <tr><td><input name="name_{{ z.id }}" value="{{ z.name }}" class="field" maxlength="40" aria-label="Name"></td>
+        <td><input type="time" name="beginn_{{ z.id }}" value="{{ z.beginn }}" class="field" aria-label="Beginn {{ z.name }}"></td>
+        <td><input type="time" name="ende_{{ z.id }}" value="{{ z.ende }}" class="field" aria-label="Ende {{ z.name }}"></td>
+        <td><input type="checkbox" name="aktiv_{{ z.id }}" {% if z.aktiv %}checked{% endif %} aria-label="{{ z.name }} aktiv"></td></tr>
+    {% endfor %}
+      <tr class="bg-soft"><td><input name="neu_name" class="field" maxlength="40" placeholder="Neue Schicht (optional)"></td>
+        <td><input type="time" name="neu_beginn" class="field" aria-label="Beginn neue Schicht"></td><td><input type="time" name="neu_ende" class="field" aria-label="Ende neue Schicht"></td><td></td></tr>
+    </tbody></table>
+    <div class="p-4 border-t border-line"><button class="btn btn-primary">Schichtzeiten speichern</button>
+      <p class="text-xs text-muted mt-2">Ende vor dem Beginn = am Folgetag (Nachtschicht). Eine Schicht gehört zum Tag ihres Beginns. Schichten dürfen sich nicht überschneiden.</p></div>
+  </form>
+
+  <form id="mitglieder" method="post" action="/ih/schichtbuch/einrichten/mitglieder" class="panel overflow-hidden xl:col-span-2">
+    <div class="px-4 py-3 border-b border-line"><h2>Benutzer und Teams</h2></div>
+    <div class="overflow-x-auto">
+    <table class="tbl"><thead><tr><th>Benutzer</th><th>Rolle Instandhaltung</th><th>Team</th></tr></thead><tbody>
+    {% for b in benutzer %}
+      <tr><td><b>{{ b.anzeigename or b.username }}</b> <span class="text-xs text-muted">{{ b.username }}</span></td>
+        <td class="text-sm">{{ "Administrator" if b.rolle == "admin" and b.id not in ih_rolle else IH_ROLLEN.get(ih_rolle.get(b.id), "") }}</td>
+        <td><select name="team_{{ b.id }}" class="field !w-auto" aria-label="Team von {{ b.anzeigename or b.username }}"><option value="">– kein Team –</option>{% for t in teams %}<option value="{{ t.id }}" {% if zuordnung.get(b.id) == t.id %}selected{% endif %}>{{ t.name }}{{ "" if t.aktiv else " (inaktiv)" }}</option>{% endfor %}</select></td></tr>
+    {% else %}<tr><td colspan="3" class="text-muted">Keine Benutzer mit Rolle in der Instandhaltung (Einstellungen → Benutzer).</td></tr>{% endfor %}
+    </tbody></table></div>
+    <div class="p-4 border-t border-line"><button class="btn btn-primary">Zuordnung speichern</button>
+      <p class="text-xs text-muted mt-2">Aufgeführt sind alle aktiven Benutzer mit einer Rolle in der Instandhaltung. Neue Benutzer legt der Administrator unter Einstellungen → Benutzer an.</p></div>
+  </form>
+
+  <form id="typen" method="post" action="/ih/schichtbuch/einrichten/typen" class="panel p-4 space-y-2">
+    <h2>Ereignistypen</h2>
+    <textarea name="typen" rows="9" class="field" aria-label="Ereignistypen, einer je Zeile">{{ typen|join("\n") }}</textarea>
+    <p class="text-xs text-muted">Einer je Zeile. Bestehende Meldungen behalten ihren Typ.</p>
+    <button class="btn btn-primary">Ereignistypen speichern</button>
+  </form>
+</div>
+{% endblock %}

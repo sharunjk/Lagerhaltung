@@ -29,7 +29,7 @@
     {% endif %}
     <nav class="flex-1 overflow-y-auto p-3 space-y-0.5">
       {% if ih %}
-      {% set nav = [("/ih", "home", "Übersicht"), ("/ih/wartung", "wrench", "Wartungsplan"), ("/ih/wartung/kalender", "calendar", "Kalender"),
+      {% set nav = [("/ih", "home", "Übersicht"), ("/ih/schichtbuch", "log", "Schichtbuch"), ("/ih/wartung", "wrench", "Wartungsplan"), ("/ih/wartung/kalender", "calendar", "Kalender"),
                     ("/ih/auftraege", "clipboard", "Aufträge"), ("/ih/anlagen", "plant", "Anlagen")] + ([("/ih/import", "upload", "Asset-Import")] if darf("ih.import") else []) %}
       {% else %}
       {% set nav = [("/", "home", "Übersicht"), ("/buchen", "scan", "Buchen"), ("/artikel", "box", "Artikel"), ("/bewegungen", "history", "Bewegungen"),
