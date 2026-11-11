@@ -6,7 +6,18 @@
 <h1 class="mb-1">{{ "Neue Meldung" if neu else "Meldung bearbeiten" }}</h1>
 {% if neu %}<p class="text-muted mb-4">Wird der Schicht <b>{{ slot_text }}</b> zugeordnet, mit Ihrem Namen und der Uhrzeit.</p>{% endif %}
 {% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-fehler max-w-3xl">{{ fehler }}</div>{% endif %}
-<form method="post" class="max-w-3xl space-y-5 mt-4" x-data="{still: {{ 'true' if f.get('stillstand') in ('on', True) else 'false' }}}">
+<form method="post" class="max-w-3xl space-y-5 mt-4" x-data="{still: {{ 'true' if f.get('stillstand') in ('on', True) else 'false' }}, nachtrag: {{ 'true' if f.get('nachtrag') == 'on' else 'false' }}}">
+  {% if neu %}
+  <section class="panel p-4 space-y-3" :class="nachtrag ? 'border-warn' : ''">
+    <label class="flex items-start gap-2"><input type="checkbox" name="nachtrag" x-model="nachtrag" class="mt-1" {% if f.get('nachtrag') == 'on' %}checked{% endif %}>
+      <span><b>Nachtrag</b> – das Ereignis war früher (z. B. vom Papierformular nach einem Systemausfall)<span class="block text-sm text-muted">Die Meldung kommt in die Schicht zum angegebenen Zeitpunkt und ist als „Nachtrag“ mit Ihrem Namen gekennzeichnet.</span></span></label>
+    <div x-show="nachtrag" x-cloak class="grid sm:grid-cols-3 gap-3">
+      <div><label class="label" for="zp">Datum und Uhrzeit des Ereignisses</label><input id="zp" type="datetime-local" name="zeitpunkt" value="{{ v('zeitpunkt') }}" max="{{ jetzt_iso }}" class="field" :required="nachtrag"></div>
+      <div><label class="label" for="nt">Team der Schicht</label><select id="nt" name="nachtrag_team" class="field"><option value="">–</option>{% for t in teams %}<option value="{{ t.id }}" {% if v('nachtrag_team')|string == t.id|string %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
+      <div><label class="label" for="nsf">Schichtführer (laut Papier)</label><input id="nsf" name="nachtrag_schichtfuehrer" value="{{ v('nachtrag_schichtfuehrer') }}" class="field"></div>
+    </div>
+  </section>
+  {% endif %}
   <section class="panel p-5 space-y-4">
     <div><label class="label" for="titel">Titel – was ist passiert? (Pflicht)</label><input id="titel" name="titel" value="{{ v('titel') }}" class="field" required maxlength="200" {% if neu %}autofocus{% endif %} placeholder="z. B. Pumpe P -10401 A undicht am Gleitring"></div>
     <div class="grid sm:grid-cols-2 gap-4">

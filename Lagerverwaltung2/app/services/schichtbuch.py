@@ -162,8 +162,31 @@ def schicht_holen(con: Connection, datum: date, zeit_id: int, team_id: int | Non
     return con.execute(insert(sb_schichten).values(datum=datum, zeit_id=zeit_id, team_id=team_id)).inserted_primary_key[0]
 
 
-def aktuelle_schicht_id(con: Connection, user: dict, jetzt: datetime | None = None) -> int:
+VORZEITIG = timedelta(hours=2)  # so lange vor ihrem Beginn darf die nächste Schicht anfangen
+
+
+def naechster_slot(con: Connection, datum: date, z: dict) -> tuple[date, dict]:
+    """Die Schicht, die als nächste nach (datum, z) beginnt."""
+    start = fenster(datum, z)[0]
+    kandidaten = [(fenster(d, k)[0], d, k) for d in (datum, datum + timedelta(days=1), datum + timedelta(days=2)) for k in zeiten(con)
+                  if fenster(d, k)[0] > start]
+    _, d, k = min(kandidaten, key=lambda x: x[0])
+    return d, k
+
+
+def laufender_slot(con: Connection, jetzt: datetime | None = None) -> tuple[date, dict]:
+    """Laut Uhr laufende Schicht – oder die nächste, wenn diese schon (vorzeitig) begonnen wurde."""
+    jetzt = jetzt or datetime.now()
     d, z = slot(con, jetzt)
+    nd, nz = naechster_slot(con, d, z)
+    s = schicht(con, datum=nd, zeit_id=nz["id"])
+    if s and s["begonnen_am"] and s["begonnen_am"] <= jetzt:
+        return nd, nz
+    return d, z
+
+
+def aktuelle_schicht_id(con: Connection, user: dict, jetzt: datetime | None = None) -> int:
+    d, z = laufender_slot(con, jetzt)
     t = team_von(con, user.get("id"))
     return schicht_holen(con, d, z["id"], t["id"] if t else None)
 
@@ -211,6 +234,33 @@ def letzte_schichten(con: Connection, vor: datetime, anzahl: int = 6, team_id: i
     return out
 
 
+def wieder_oeffnen_grund(con: Connection, sid: int) -> str | None:
+    """Warum sich eine beendete Schicht nicht wieder öffnen lässt – None, wenn es geht."""
+    s = schicht(con, sid)
+    if not s:
+        return "Schicht nicht gefunden."
+    if not s["beendet_am"]:
+        return "Die Schicht ist nicht beendet."
+    if con.execute(select(func.count()).select_from(sb_meldungen).where(sb_meldungen.c.uebergeben_schicht_id == sid,
+                                                                         sb_meldungen.c.uebernommen_am.isnot(None))).scalar():
+        return "Die nächste Schicht hat Übergaben dieser Schicht schon übernommen. Ergänzungen bitte direkt an den Meldungen oder als Nachtrag."
+    spaeter = [x for x in (_mit_text(r) for r in con.execute(_schicht_select().where(
+        sb_schichten.c.begonnen_am.isnot(None), sb_schichten.c.id != sid, sb_schichten.c.datum >= s["datum"] - timedelta(days=1))).mappings())
+        if x["start"] > s["start"]]
+    if spaeter:
+        return f"Die Schicht {spaeter[0]['text']} hat schon begonnen. Ergänzungen bitte direkt an den Meldungen oder als Nachtrag."
+    return None
+
+
+def wieder_oeffnen(con: Connection, sid: int, benutzer: str) -> dict:
+    """Versehentlich beendete Schicht wieder öffnen: Ihre Übergaben sind dann für die nächste Schicht unsichtbar,
+    bis sie erneut beendet wird (Auswahl und Hinweise bleiben vorbelegt)."""
+    if grund := wieder_oeffnen_grund(con, sid):
+        raise SchichtFehler(grund)
+    con.execute(update(sb_schichten).where(sb_schichten.c.id == sid).values(beendet_am=None, beendet_von=None))
+    return schicht(con, sid)
+
+
 def beenden(con: Connection, sid: int, benutzer: str, uebergaben: dict[int, str], notiz: str) -> int:
     """Schicht beenden: ausgewählte Meldungen an die nächste Schicht übergeben (mit Hinweis), Übergabenotiz speichern."""
     s = con.execute(select(sb_schichten).where(sb_schichten.c.id == sid)).mappings().first()
@@ -229,6 +279,14 @@ def beenden(con: Connection, sid: int, benutzer: str, uebergaben: dict[int, str]
             uebernommen_am=None, uebernommen_von=None, uebernommen_schicht_id=None))
         _verlauf(con, mid, sid, benutzer, "uebergabe", (text or "").strip() or None)
         n += 1
+    # beim erneuten Beenden (nach „wieder öffnen“) abgewählte Übergaben dieser Schicht zurücknehmen
+    for (mid,) in con.execute(select(sb_meldungen.c.id).where(sb_meldungen.c.uebergeben_schicht_id == sid, sb_meldungen.c.uebernommen_am.is_(None))).all():
+        if mid in uebergaben:
+            continue
+        frueher = con.execute(select(func.count()).select_from(sb_verlauf).where(sb_verlauf.c.meldung_id == mid, sb_verlauf.c.art == "uebergabe",
+                                                                                  sb_verlauf.c.schicht_id != sid)).scalar()
+        con.execute(update(sb_meldungen).where(sb_meldungen.c.id == mid).values(uebergabe=bool(frueher), uebergabe_text=None, uebergeben_schicht_id=None))
+        _verlauf(con, mid, sid, benutzer, "uebergabe_zurueck")
     con.execute(update(sb_schichten).where(sb_schichten.c.id == sid).values(
         beendet_am=jetzt, beendet_von=benutzer, uebergabe_notiz=(notiz or "").strip() or None,
         begonnen_am=s["begonnen_am"] or jetzt, begonnen_von=s["begonnen_von"] or benutzer))
@@ -299,15 +357,45 @@ def werte_aus_formular(con: Connection, f) -> tuple[dict, list[str]]:
     return w, fehler
 
 
-def anlegen(con: Connection, w: dict, status: str, benutzer: str, sid: int) -> int:
+def anlegen(con: Connection, w: dict, status: str, benutzer: str, sid: int, zeitpunkt: datetime | None = None) -> int:
+    """Meldung anlegen. ``zeitpunkt`` = Nachtrag: Das Ereignis lag in der Vergangenheit (z. B. Papierformular nach Systemausfall)."""
     jetzt = datetime.now().replace(microsecond=0)
     status = status if status in STATUS else "offen"
-    werte = {**w, "status": status, "schicht_id": sid, "erstellt_am": jetzt, "erstellt_von": benutzer}
+    wann = zeitpunkt or jetzt
+    werte = {**w, "status": status, "schicht_id": sid, "erstellt_am": wann, "erstellt_von": benutzer}
+    if zeitpunkt:
+        werte.update(nachgetragen_am=jetzt, nachgetragen_von=benutzer, geaendert_am=jetzt, geaendert_von=benutzer)
     if status == "erledigt":
-        werte.update(erledigt_am=jetzt, erledigt_von=benutzer, erledigt_schicht_id=sid)
+        werte.update(erledigt_am=wann, erledigt_von=benutzer, erledigt_schicht_id=sid)
     mid = con.execute(insert(sb_meldungen).values(**werte)).inserted_primary_key[0]
-    _verlauf(con, mid, sid, benutzer, "angelegt", None, status)
+    _verlauf(con, mid, sid, benutzer, "angelegt", f"Nachtrag zum {zeitpunkt:%d.%m.%Y %H:%M}" if zeitpunkt else None, status)
     return mid
+
+
+NACHTRAG_TAGE = 366
+
+
+def nachtrag_zeitpunkt(text: str, jetzt: datetime | None = None) -> datetime:
+    jetzt = jetzt or datetime.now()
+    try:
+        t = datetime.fromisoformat((text or "").strip()).replace(second=0, microsecond=0)
+    except ValueError:
+        raise SchichtFehler("Nachtrag: bitte Datum und Uhrzeit des Ereignisses angeben.") from None
+    if t > jetzt + timedelta(minutes=1):
+        raise SchichtFehler("Nachtrag: Der Zeitpunkt liegt in der Zukunft.")
+    if t < jetzt - timedelta(days=NACHTRAG_TAGE):
+        raise SchichtFehler("Nachtrag: höchstens ein Jahr zurück.")
+    return t
+
+
+def nachtrag_schicht(con: Connection, zeitpunkt: datetime, team_id: int | None, schichtfuehrer: str) -> int:
+    """Schicht zum nachgetragenen Zeitpunkt (bei Bedarf anlegen); Team und Schichtführer ergänzen, falls noch leer."""
+    d, z = slot(con, zeitpunkt)
+    sid = schicht_holen(con, d, z["id"], team_id)
+    s = con.execute(select(sb_schichten).where(sb_schichten.c.id == sid)).mappings().first()
+    if (schichtfuehrer or "").strip() and not s["schichtfuehrer"]:
+        con.execute(update(sb_schichten).where(sb_schichten.c.id == sid).values(schichtfuehrer=schichtfuehrer.strip()[:200]))
+    return sid
 
 
 def aendern(con: Connection, mid: int, w: dict, benutzer: str, sid: int) -> list[str]:
@@ -344,7 +432,9 @@ def ergaenzen(con: Connection, mid: int, benutzer: str, sid: int, text: str, sta
 
 
 def uebernehmen(con: Connection, mid: int, benutzer: str, sid: int, kommentar: str = "") -> bool:
-    n = con.execute(update(sb_meldungen).where(sb_meldungen.c.id == mid, sb_meldungen.c.uebergabe, sb_meldungen.c.uebernommen_am.is_(None))
+    beendet = select(sb_schichten.c.id).where(sb_schichten.c.beendet_am.isnot(None))
+    n = con.execute(update(sb_meldungen).where(sb_meldungen.c.id == mid, sb_meldungen.c.uebergabe, sb_meldungen.c.uebernommen_am.is_(None),
+                                               sb_meldungen.c.uebergeben_schicht_id.in_(beendet))
                     .values(uebernommen_am=datetime.now().replace(microsecond=0), uebernommen_von=benutzer, uebernommen_schicht_id=sid)).rowcount
     if n:
         _verlauf(con, mid, sid, benutzer, "uebernahme", (kommentar or "").strip() or None)
@@ -385,7 +475,9 @@ def offene(con: Connection) -> list[dict]:
 
 
 def offene_uebergaben(con: Connection) -> list[dict]:
-    rows = [_m(r) for r in con.execute(_meldung_select().where(sb_meldungen.c.uebergabe, sb_meldungen.c.uebernommen_am.is_(None))).mappings()]
+    beendet = select(sb_schichten.c.id).where(sb_schichten.c.beendet_am.isnot(None))  # erst nach dem Schichtende sichtbar
+    rows = [_m(r) for r in con.execute(_meldung_select().where(sb_meldungen.c.uebergabe, sb_meldungen.c.uebernommen_am.is_(None),
+                                                               sb_meldungen.c.uebergeben_schicht_id.in_(beendet))).mappings()]
     for m in rows:
         m["von"] = schicht(con, m["uebergeben_schicht_id"]) if m["uebergeben_schicht_id"] else None
     return _sortiert(rows)

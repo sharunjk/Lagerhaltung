@@ -150,9 +150,22 @@ Das Schichtbuch ersetzt die bisherige SharePoint-Liste. Jede Meldung hat dieselb
 
 Danach beginnt die nächste Schicht wieder bei 1. Wurde eine Schicht begonnen, aber nicht beendet, zeigt das Schichtbuch das an, mit *Übergabe nachholen*.
 
+- **Versehentlich beendet?** *Schicht wieder öffnen* (erscheint nach dem Beenden). Die Übergaben dieser Schicht sind dann für die nächste Schicht ausgeblendet, bis Sie erneut beenden. Beim erneuten Beenden sind Auswahl, Hinweise und Übergabenotiz vorbelegt; abgewählte Punkte werden zurückgenommen. Das geht, solange die nächste Schicht noch nicht begonnen und nichts übernommen hat.
+- **Übergabe vor der vollen Stunde:** Ist die laufende Schicht beendet oder sind es weniger als 2 Stunden bis zur nächsten, bietet das Schichtbuch *Nächste Schicht beginnen* an. Neue Meldungen gehören dann schon zur nächsten Schicht.
+- **Nachtragen** (z. B. nach einem Systemausfall vom Papierformular): *Schichtbuch → Nachtragen* bzw. bei *Neue Meldung* das Häkchen *Nachtrag*. Datum und Uhrzeit des Ereignisses, Team und Schichtführer eintragen – die Meldung kommt in die Schicht zu diesem Zeitpunkt (eine Nachtschicht nach Mitternacht gehört zum Vortag) und ist als *Nachtrag* mit Name und Erfassungszeit gekennzeichnet. Höchstens ein Jahr zurück, nicht in der Zukunft. Im Excel-Export steht als Datum der Zeitpunkt des Ereignisses.
+- **Papierformular:** *Schichtbuch → Papierformular* bzw. *Einstellungen → Notfall*. Vorab ausdrucken und bereitlegen; PDF-Fassungen liegen im Programmordner unter *docs* (*Notfall_Schichtbuch.pdf*, *Notfall_Lager.pdf*).
+
+### Instandhaltungs-App fürs Handy
+
+Eigene App mit blauem Symbol (neben der Lager-App installierbar): *Einstellungen → Handscanner / Handy → Instandhaltungs-App* zeigt die Schritte und den QR-Code (Adresse …/ih/m). Startseite: laufende Schicht, *Neue Meldung*, offene Übergaben und Meldungen, Aufträge, Wartung dieser Woche, Feld *Tag-Nr. scannen* (bei genau einem Treffer öffnet sich die Anlage). Unten die Leiste *Start · Schichtbuch · Meldung · Aufträge · Anlagen*. Ohne Verbindung zeigt die App den Hinweis aufs Papierformular und aufs spätere Nachtragen. Zugang braucht eine Rolle Instandhaltung.
+
 **Sicht für Team:** Oben rechts lässt sich die Sicht eines anderen Teams wählen, z. B. für den Schichtführer. *Alle Meldungen* sucht und filtert nach Status, Team, Ereignistyp, Zeitraum, sicherheitsrelevant, Stillstand und übergeben. *Excel* exportiert die Auswahl mit den Spalten der bisherigen SharePoint-Liste. Die Anlagenseite zeigt die Schichtbuch-Meldungen zu ihrer Tag-Nr. und hat den Knopf *Meldung*.
 
 ## Einstellungen (Administrator)
+
+**Programmname** (*Einstellungen → Allgemein*): Anzeigename bei der Anmeldung, im Fenstertitel, in der Desktop-App und als Name der Verknüpfung (z. B. „Betriebssoftware“, da Lager und Instandhaltung im selben Programm sind). Ordner, Dienst, Autostart und Sicherungen behalten ihren Namen. Die Desktop-Verknüpfung am Lager-PC bekommt den neuen Namen durch einmaliges Ausführen von *windows\VERKNUEPFUNG_ERSTELLEN.bat* (die alte „Lagerverwaltung“-Verknüpfung wird ersetzt), auf Arbeitsplatz-PCs durch das neu geladene Arbeitsplatz-Skript.
+
+**Notfall** (*Einstellungen → Notfall*): Papierformulare für Schichtbuch und Lager zum Ausdrucken und die Schritte zum Nachtragen.
 
 Benutzer und Rollen (*Nur lesen*, *Lager*, *Administrator*, *Kein Lagerzugriff*; dazu die Rolle Instandhaltung), Etikettendrucker, tägliche Meldebestands-Mail, Datensicherung (mehrere Uhrzeiten und Speicherorte, z. B. externe Festplatte; Wiederherstellen mit Vorschau), Datenübernahme aus Casper, Handscanner-Zugang mit QR-Code, Schnittstelle (API) für andere Programme. *Protokoll* zeigt jede Änderung mit Benutzer und Zeit.
 

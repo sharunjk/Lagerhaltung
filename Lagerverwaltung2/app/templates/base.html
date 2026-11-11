@@ -4,11 +4,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Lager{% endblock %} – {{ cfg.server.firmenname }} {{ "Instandhaltung" if bereich == "ih" else "Lagerverwaltung" }}</title>
+  <title>{% block title %}Lager{% endblock %} – {{ cfg.server.firmenname }} {{ "Instandhaltung" if bereich == "ih" else cfg.server.programmname }}</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23FFC72C'/><path d='M8 10v12M12 10v12M15 10v12M19 10v12M23 10v12' stroke='%2318222E' stroke-width='2'/></svg>">
   <link rel="stylesheet" href="/static/app.css?v={{ request.app.state.static_v }}">
-  <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#1C2A38">
+  {% if bereich == "ih" %}<link rel="manifest" href="/ih/manifest.webmanifest"><link rel="apple-touch-icon" href="/static/apple-touch-icon-ih.png">
+  <meta name="theme-color" content="#1F5FAE">{% else %}<link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#1C2A38">{% endif %}
   <script>try{const t=localStorage.getItem("lv-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
   <script src="/static/vendor/htmx.min.js" defer></script>
   <script src="/static/vendor/alpine.min.js" defer></script>
@@ -94,7 +95,7 @@
       </div>
     </header>
 
-    <main class="flex-1 px-4 lg:px-8 py-6 max-w-[1500px] w-full">
+    <main class="flex-1 px-4 lg:px-8 py-6 max-w-[1500px] w-full {{ 'pb-24 lg:pb-6' if ih }}">
       {% if request.app.state.neustart_noetig %}<div role="alert" class="mb-4 rounded-md border px-4 py-3 text-sm font-semibold flash-fehler">Die Programmdateien wurden aktualisiert, die Lagerverwaltung läuft aber noch mit der alten Version. Bitte neu starten – am einfachsten den Lager-PC neu starten. Bis dahin können einzelne Seiten Fehler zeigen.</div>{% endif %}
       {% for f in flashes %}
       <div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-{{ f.art }}" role="status">{{ f.text }}</div>
@@ -103,6 +104,16 @@
     </main>
   </div>
 </div>
+{% if ih %}
+{# Instandhaltungs-App: Leiste unten auf Handy und Tablet #}
+<nav class="no-print lg:hidden fixed bottom-0 inset-x-0 z-30 bg-nav text-navink border-t border-white/10 grid grid-cols-5 text-[11px]" style="padding-bottom: env(safe-area-inset-bottom)" aria-label="App-Navigation">
+  {% for href, ic, label in [("/ih/m", "home", "Start"), ("/ih/schichtbuch", "log", "Schichtbuch"), ("/ih/schichtbuch/neu", "plus", "Meldung"), ("/ih/auftraege", "clipboard", "Aufträge"), ("/ih/anlagen", "plant", "Anlagen")] %}
+  {% set an = pfad == href or (href not in ("/ih/m", "/ih/schichtbuch") and pfad.startswith(href)) or (href == "/ih/schichtbuch" and pfad.startswith("/ih/schichtbuch") and pfad != "/ih/schichtbuch/neu") %}
+  <a href="{{ href }}" class="flex flex-col items-center justify-center gap-0.5 min-h-[56px] {{ 'text-white font-semibold' if an else '' }}">{% if href == "/ih/schichtbuch/neu" %}<span class="grid place-items-center w-9 h-9 -mt-1 rounded-full bg-primary text-white">{{ icon(ic, "w-5 h-5") }}</span>{% else %}{{ icon(ic, "w-5 h-5") }}{% endif %}{{ label }}</a>
+  {% endfor %}
+</nav>
+<script>if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("/ih/sw.js", { scope: "/ih/" }).catch(() => {});</script>
+{% endif %}
 {% else %}
   {% block nologin %}{% endblock %}
 {% endif %}

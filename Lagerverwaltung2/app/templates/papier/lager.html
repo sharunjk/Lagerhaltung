@@ -1,0 +1,42 @@
+{% extends "papier/_papier.html" %}
+{% block titel %}Lager – Papierformular{% endblock %}
+{% macro kopf(seite) %}
+<div class="kopf"><div><h1>Lager – Papierformular für Entnahmen und Eingänge (Systemausfall)</h1><small>{{ cfg.server.firmenname }} · nach Wiederherstellung jede Zeile buchen und abhaken</small></div><small>Blatt ____ von ____ · Seite {{ seite }}</small></div>
+{% endmacro %}
+{% macro zeilen(n) %}
+<table>
+  <colgroup><col style="width:8%"><col style="width:5%"><col style="width:10%"><col style="width:20%"><col style="width:9%"><col style="width:6%"><col style="width:16%"><col style="width:9%"><col style="width:9%"><col style="width:8%"></colgroup>
+  <tr><th>Datum</th><th>Art A/E/U</th><th>Artikelnummer</th><th>Bezeichnung</th><th>Lagerplatz (bei U: von → nach)</th><th>Menge</th><th>Empfänger / Kostenstelle / Zweck</th><th>Auftrag A-… / Tag-Nr.</th><th>Name (Kürzel)</th><th>Gebucht ✓ (Kürzel)</th></tr>
+  {% for _ in range(n) %}<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>{% endfor %}
+</table>
+{% endmacro %}
+{% block inhalt %}
+<section class="blatt">
+  {{ kopf(1) }}
+  <div class="legende"><b>Art:</b> A = Entnahme (Ausgang), E = Eingang / Wareneingang, U = Umbuchung · Menge in der Einheit des Artikels · Artikelnummer vom Etikett abschreiben</div>
+  {{ zeilen(17) }}
+</section>
+<section class="blatt">
+  {{ kopf(2) }}
+  {{ zeilen(10) }}
+  <div class="zwei" style="margin-top:6px">
+    <div class="hinweis">
+      <h2>Nach der Wiederherstellung buchen</h2>
+      <ol style="padding-left:14px;margin:0">
+        <li>Jede Zeile im Programm buchen: <b>Buchen</b> → Entnahme, Eingang oder Umbuchung; Artikel, Lagerplatz und Menge wie auf dem Blatt.</li>
+        <li>Bei <b>Zweck</b> „Papier vom TT.MM.“ eintragen, Empfänger und Kostenstelle übernehmen. Entnahmen für einen Wartungsauftrag im Auftrag unter <i>Ersatzteile → Entnehmen</i> buchen.</li>
+        <li>Gebuchte Zeilen in der letzten Spalte abhaken (Kürzel), Blatt mit Datum abheften.</li>
+        <li>Bestand am Platz passt nicht (z. B. Teil fehlt schon)? Platz zählen: <b>Inventur</b> bzw. in der Scanner-App „Zählen“.</li>
+      </ol>
+    </div>
+    <div class="hinweis">
+      <h2>Gut zu wissen</h2>
+      <ul style="padding-left:14px;margin:0">
+        <li>Nur das WLAN gestört: Die <b>Scanner-App</b> bucht offline weiter und überträgt später selbst – dafür ist kein Papier nötig.</li>
+        <li>Der Lager-PC ist aus: Er sichert die Daten täglich automatisch. Nach dem Neustart ist alles bis zur letzten Buchung da.</li>
+        <li>Fragen: Lagerverantwortliche oder Administrator.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+{% endblock %}

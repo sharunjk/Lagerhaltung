@@ -476,10 +476,12 @@ sb_meldungen = Table(
     Column("erledigt_am", DateTime),
     Column("erledigt_von", String(100)),
     Column("erledigt_schicht_id", Integer),
-    Column("erstellt_am", DateTime, nullable=False),
+    Column("erstellt_am", DateTime, nullable=False),   # Zeitpunkt des Ereignisses (bei Nachträgen der nachgetragene Zeitpunkt)
     Column("erstellt_von", String(100)),
     Column("geaendert_am", DateTime),
     Column("geaendert_von", String(100)),
+    Column("nachgetragen_am", DateTime),               # ab 2.9.0: Nachtrag (z. B. vom Papierformular nach Systemausfall)
+    Column("nachgetragen_von", String(100)),
 )
 
 sb_verlauf = Table(

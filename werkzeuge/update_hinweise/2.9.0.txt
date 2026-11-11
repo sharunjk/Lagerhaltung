@@ -1,0 +1,20 @@
+Neu in 2.9.0:
+- Schichtbuch: Versehentlich beendete Schicht -> "Schicht wieder oeffnen" (solange die naechste Schicht noch nicht
+  begonnen hat). Beim erneuten Beenden ist alles vorbelegt.
+- Schichtbuch: "Naechste Schicht beginnen" schon vor der vollen Stunde (nach Schichtende oder bis 2 Stunden vorher).
+- Schichtbuch: "Nachtragen" - Meldungen fuer ein bestimmtes Datum und eine Uhrzeit nachtragen (z. B. vom Papier
+  nach einem Systemausfall). Gekennzeichnet als Nachtrag mit Name und Erfassungszeit.
+- Notfall: Einstellungen -> Notfall: Papierformulare fuer Schichtbuch und Lager zum Ausdrucken (bitte jetzt einige
+  ausdrucken und bereitlegen). PDF-Fassungen im Programmordner: docs\Notfall_Schichtbuch.pdf, docs\Notfall_Lager.pdf
+- Instandhaltungs-App fuers Handy: Einstellungen -> Handscanner / Handy -> Instandhaltungs-App (Anleitung + QR-Code,
+  Adresse .../ih/m). Eigenes blaues Symbol, Leiste unten, Tag-Nr. scannen.
+- Programmname: Einstellungen -> Allgemein -> Programmname (z. B. "Betriebssoftware"). Danach am Lager-PC einmal
+  windows\VERKNUEPFUNG_ERSTELLEN.bat ausfuehren, damit die Desktop-Verknuepfung den neuen Namen bekommt.
+  Ordner, Dienst und Sicherungen behalten ihren Namen.
+
+Datenbank: Beim ersten Start kommen zwei Spalten dazu (Nachtrag) - erst als Probelauf an einer Kopie, mit
+Sicherung vor_update_... vorher. Der Lagerbestand bleibt unveraendert.
+
+Enthaelt alles aus 2.8.1 (Gesamtpruefung), 2.8.0 (Schichtbuch), 2.7.x, 2.6.0, 2.5.0, 2.4.0, 2.3.1 und 2.3.0.
+Nach einem Update von vor 2.5.0 ist die Instandhaltung zunaechst ausgeschaltet (Einstellungen -> Allgemein ->
+Instandhaltung (CMMS) aktivieren).

@@ -9,6 +9,7 @@ Voraussetzungen: Python 3.12 mit `requirements-lock.txt` + `pytest httpx`, Node 
 | `demo_start.sh <name> <http-port> <https-port>` | startet die App mit erfundenen Demodaten (`demo_seed.py`) im Hintergrund; `stop_demos.sh` beendet sie |
 | `mobil.cjs <url> <ordner>` | Scanner-App 360×720: JS-Fehler, horizontales Scrollen, 44-px-Ziele, Hardware-Scan, Service Worker |
 | `offline.cjs <url> <lager.db> <ordner>` | Offline-Szenario (16 Schritte) |
+| `notfall_app.cjs <url> <ordner> [pdf-ordner]` | 2.9.0 mit Demodaten: Schicht wieder öffnen, Nachtrag, Papierformulare (auch als PDF für `docs/`), Instandhaltungs-App am Handy, Programmname |
 | `last.py <url> <lager.db> [sekunden] [real]` | Lasttest mit 10 Benutzern gegen einen laufenden Demo-Server (`[cmms] aktiv = true`); prüft Bestand = Buchungen, keine Minusbestände, Antwortzeiten |
 | `schichtbuch.cjs <url> <ordner>` | 2.8.0 mit Demodaten: Schichtbuch von Einrichten bis Übergabe, Export, Handy-Breite |
 | `ersatzteile.cjs <url> <ordner>` | 2.7.0 mit Demodaten: Ersatzteil ↔ Tag-Nr., eigene Kampagne, Auftrag mit Entnahme, Handy-Breite |

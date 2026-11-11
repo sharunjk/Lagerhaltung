@@ -1,0 +1,44 @@
+{# Gemeinsames Gerüst der Papierformulare (Notfall: System nicht erreichbar) – A4 quer, schwarz-weiß druckbar #}
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titel %}{% endblock %} – {{ cfg.server.programmname }} {{ cfg.server.firmenname }}</title>
+<style>
+  @font-face { font-family: "Barlow"; font-weight: 400; src: url(/static/fonts/barlow-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Barlow"; font-weight: 600; src: url(/static/fonts/barlow-latin-600-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Barlow Semi Condensed"; font-weight: 700; src: url(/static/fonts/barlow-semi-condensed-latin-700-normal.woff2) format("woff2"); }
+  @page { size: A4 landscape; margin: 9mm 10mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Barlow", Arial, sans-serif; font-size: 9pt; color: #000; background: #fff; }
+  .blatt { page-break-after: always; }
+  .blatt:last-of-type { page-break-after: auto; }
+  h1 { font-family: "Barlow Semi Condensed", Arial; font-size: 15pt; margin: 0; }
+  h2 { font-family: "Barlow Semi Condensed", Arial; font-size: 10.5pt; margin: 6px 0 3px; }
+  .kopf { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 3px; margin-bottom: 6px; }
+  .kopf small { font-size: 8pt; }
+  .felder { display: grid; gap: 4px 10px; margin-bottom: 6px; }
+  .feld { border-bottom: 1px solid #000; min-height: 22px; padding: 1px 2px; font-size: 8pt; }
+  .feld > span:not(.kast) { display: block; font-size: 7pt; color: #333; }
+  .feld .wahl { font-style: normal; display: inline-block; margin: 3px 10px 0 0; font-size: 8.5pt; white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th, td { border: 1px solid #000; padding: 2px 3px; vertical-align: top; }
+  th { font-size: 7.5pt; text-align: left; background: #e9e9e9; line-height: 1.1; }
+  td { height: 34px; }
+  .klein td { height: 24px; }
+  .kast { display: inline-block; width: 10px; height: 10px; border: 1px solid #000; vertical-align: -1px; margin-right: 2px; }
+  .hinweis { font-size: 7.6pt; line-height: 1.3; }
+  .legende { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 7.6pt; margin: 3px 0; }
+  .zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .leiste { position: sticky; top: 0; background: #fff8d6; border-bottom: 1px solid #c9b25a; padding: 8px 12px; font: 14px Arial; display: flex; gap: 12px; align-items: center; }
+  .leiste button { font: 600 14px Arial; padding: 6px 14px; }
+  @media print { .leiste { display: none; } }
+  @media screen { body { background: #ddd; } .blatt { background: #fff; width: 297mm; min-height: 210mm; padding: 9mm 10mm; margin: 10px auto; box-shadow: 0 1px 6px rgba(0,0,0,.25); } }
+</style>
+</head>
+<body>
+<div class="leiste"><button onclick="window.print()">Drucken</button><span>Tipp: einige Blätter <b>vorab</b> ausdrucken und bereitlegen – fällt das System aus, ist auch diese Seite nicht erreichbar. Eine PDF-Fassung liegt im Programmordner unter <i>docs</i>.</span></div>
+{% block inhalt %}{% endblock %}
+</body>
+</html>

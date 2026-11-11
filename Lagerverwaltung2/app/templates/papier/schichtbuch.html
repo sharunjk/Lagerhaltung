@@ -1,0 +1,63 @@
+{% extends "papier/_papier.html" %}
+{% block titel %}Schichtbuch – Papierformular{% endblock %}
+{% macro kopf(seite) %}
+<div class="kopf"><div><h1>Schichtbuch – Papierformular (Systemausfall)</h1><small>{{ cfg.server.firmenname }} · nach Wiederherstellung jede Zeile im Programm nachtragen: Schichtbuch → <b>Nachtragen</b></small></div><small>Blatt ____ von ____ · Seite {{ seite }}</small></div>
+{% endmacro %}
+{% macro meldungen(n) %}
+<table>
+  <colgroup><col style="width:5%"><col style="width:17%"><col style="width:7%"><col style="width:4.5%"><col style="width:9%"><col style="width:22%"><col style="width:16%"><col style="width:5.5%"><col style="width:6%"><col style="width:4%"><col style="width:4%"></colgroup>
+  <tr><th>Uhrzeit</th><th>Titel – was ist passiert?</th><th>Ereignis&shy;typ (Nr.)</th><th>Prio H/M/N</th><th>Asset (Tag-Nr.)</th><th>Beschreibung</th><th>Maßnahme</th><th>Sicher&shy;heit / Still&shy;stand (h)</th><th>Status O/B/E · Work Order</th><th>Über&shy;geben</th><th>Nach&shy;getr. ✓</th></tr>
+  {% for _ in range(n) %}<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><span class="kast"></span>S<br><span class="kast"></span>____h</td><td></td><td><span class="kast"></span></td><td><span class="kast"></span></td></tr>{% endfor %}
+</table>
+{% endmacro %}
+{% block inhalt %}
+<section class="blatt">
+  {{ kopf(1) }}
+  <div class="felder" style="grid-template-columns: 1.1fr 1.6fr 2.4fr 1.6fr 1.6fr">
+    <div class="feld"><span>Datum</span></div>
+    <div class="feld"><span>Schicht</span>{% for z in zeiten %}<i class="wahl"><span class="kast"></span>{{ z.name }} ({{ z.beginn }}–{{ z.ende }})</i>{% endfor %}</div>
+    <div class="feld"><span>Team</span>{% for t in teams %}<i class="wahl"><span class="kast"></span>{{ t.name }}</i>{% endfor %}</div>
+    <div class="feld"><span>Schichtführer</span></div>
+    <div class="feld"><span>Weitere in der Schicht</span></div>
+  </div>
+  <h2>1 · Schichtbeginn: Übergaben der vorigen Schicht gelesen</h2>
+  <table class="klein"><colgroup><col style="width:30%"><col style="width:48%"><col style="width:22%"></colgroup>
+    <tr><th>Punkt / Titel</th><th>Kommentar bei Übernahme</th><th>Übernommen von (Kürzel)</th></tr>
+    {% for _ in range(3) %}<tr><td></td><td></td><td></td></tr>{% endfor %}</table>
+  <h2>2 · Während der Schicht: Meldungen (sofort eintragen)</h2>
+  {{ meldungen(8) }}
+  <div class="legende"><b>Ereignistyp:</b>{% for t in typen %}<span>{{ loop.index }} = {{ t }}</span>{% endfor %}</div>
+  <div class="legende"><b>Prio:</b> H = hoch, M = mittel, N = niedrig · <b>Status:</b> O = offen, B = in Bearbeitung, E = erledigt · <b>S</b> = sicherheitsrelevant · Stillstand in Stunden · Work Order z. B. A-00012</div>
+</section>
+<section class="blatt">
+  {{ kopf(2) }}
+  <h2>2 · Meldungen (Fortsetzung) und Ergänzungen zu bestehenden Meldungen</h2>
+  {{ meldungen(6) }}
+  <p class="hinweis" style="margin:2px 0 0">Ergänzung zu einer Meldung, die schon im Programm steht: in „Titel“ die Nummer M-…… eintragen, in „Maßnahme“ was getan wurde, neuen Status angeben.</p>
+  <div class="zwei">
+    <div>
+      <h2>3 · Schichtende: an die nächste Schicht übergeben</h2>
+      <table class="klein"><colgroup><col style="width:32%"><col style="width:68%"></colgroup>
+        <tr><th>Punkt / Titel (oder M-Nr.)</th><th>Hinweis: Stand, was ist noch zu tun, worauf achten?</th></tr>
+        {% for _ in range(5) %}<tr><td></td><td></td></tr>{% endfor %}</table>
+      <div class="feld" style="min-height:44px;margin-top:5px"><span>Übergabenotiz allgemein (Anlagenzustand, Fahrweise, Besonderheiten)</span></div>
+      <div class="felder" style="grid-template-columns:1fr 1fr;margin-top:6px">
+        <div class="feld"><span>Übergeben (Uhrzeit, Unterschrift Schichtführer)</span></div>
+        <div class="feld"><span>Übernommen (Uhrzeit, Unterschrift nächste Schicht)</span></div>
+      </div>
+    </div>
+    <div class="hinweis">
+      <h2>Nach der Wiederherstellung nachtragen</h2>
+      <ol style="padding-left:14px;margin:0">
+        <li><b>Schichtbuch → Nachtragen</b> öffnen (oder Neue Meldung → Häkchen „Nachtrag“).</li>
+        <li><b>Datum und Uhrzeit</b> aus diesem Blatt eintragen, Team und Schichtführer wählen. Die Meldung landet automatisch in der richtigen Schicht und ist als <i>Nachtrag</i> mit Ihrem Namen gekennzeichnet.</li>
+        <li>Titel, Ereignistyp, Priorität, Asset (Tag-Nr.), Beschreibung, Maßnahme, Sicherheit/Stillstand, Status und Work Order übernehmen.</li>
+        <li>Ergänzungen zu bestehenden Meldungen: Meldung M-… öffnen → <i>Ergänzen / Status ändern</i>.</li>
+        <li>Offene Übergaben von diesem Blatt: in der laufenden Schicht <i>Schicht beenden &amp; übergeben</i> mit diesen Punkten, oder als Kommentar an der Meldung.</li>
+        <li>Nachgetragene Zeilen in der Spalte <b>Nachgetr. ✓</b> abhaken, Blatt mit Datum abheften.</li>
+      </ol>
+      <p style="margin:4px 0 0">Nur das WLAN gestört? Die Scanner-App im Lager bucht offline weiter. Dieses Blatt ist für den Fall, dass das Programm nicht erreichbar ist.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

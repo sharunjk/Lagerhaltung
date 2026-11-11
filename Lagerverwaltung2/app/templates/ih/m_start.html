@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_ih.html" import team_chip %}
+{% block title %}Instandhaltung{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto space-y-4">
+  <div>
+    <h1>Hallo {{ user.name }}</h1>
+    <p class="text-muted">{% if team %}Team {{ team_chip(team.name, team.farbe) }}{% else %}Kein Schichtteam zugeordnet{% endif %}</p>
+  </div>
+  {% if schicht %}
+  <a href="/ih/schichtbuch" class="panel p-4 block border-l-[6px] hover:border-primary" style="border-left-color: {{ team.farbe if team else '#5B6773' }}">
+    <span class="text-sm text-muted">Jetzt</span>
+    <span class="block text-lg font-semibold">{{ schicht.text }}</span>
+    <span class="text-sm">{% if schicht.beendet_am %}beendet und übergeben{% elif schicht.begonnen_am %}läuft{% if schicht.team %} · Team {{ schicht.team }}{% endif %}{% else %}noch nicht begonnen{% endif %}</span>
+  </a>
+  {% endif %}
+  {% if darf("ih.schichtbuch.schreiben") %}
+  <a href="/ih/schichtbuch/neu" class="btn btn-primary w-full h-16 text-lg">{{ icon("plus", "w-6 h-6") }}Neue Meldung</a>
+  {% endif %}
+  <div class="grid grid-cols-2 gap-3">
+    {% if uebergaben is not none %}
+    <a href="/ih/schichtbuch#uebergaben" class="panel p-4 hover:border-primary"><span class="block text-3xl font-cond font-bold {{ 'text-warn' if uebergaben }}">{{ uebergaben }}</span><span class="text-sm">offene Übergaben</span></a>
+    <a href="/ih/schichtbuch/meldungen?status=offen_alle" class="panel p-4 hover:border-primary"><span class="block text-3xl font-cond font-bold">{{ offene }}</span><span class="text-sm">offene Meldungen</span></a>
+    {% endif %}
+    <a href="/ih/auftraege" class="panel p-4 hover:border-primary"><span class="block text-3xl font-cond font-bold">{{ auftraege }}</span><span class="text-sm">Aufträge freigegeben / in Arbeit</span></a>
+    <a href="/ih/wartung/wochen" class="panel p-4 hover:border-primary"><span class="block mb-1">{{ icon("calendar", "w-7 h-7") }}</span><span class="text-sm">Wartung diese Woche</span></a>
+  </div>
+  <form action="/ih/m/suche" method="get" class="panel p-4 space-y-2">
+    <label class="label" for="m_q">Anlage: Tag-Nr. scannen oder eingeben</label>
+    <div class="flex gap-2"><input id="m_q" name="q" class="field h-12 text-lg" autocomplete="off" placeholder="z. B. P -10401 A" enterkeyhint="search"><button class="btn h-12">{{ icon("search", "w-5 h-5") }}</button></div>
+    <p class="text-xs text-muted">Am Zebra einfach die Scantaste drücken, solange das Feld aktiv ist. Bei genau einem Treffer öffnet sich die Anlage direkt.</p>
+  </form>
+  <div id="installieren" class="hidden rounded-lg border border-primary bg-primary/10 p-4">
+    <p class="font-semibold mb-2">Instandhaltung als App auf diesem Gerät installieren?</p>
+    <button type="button" class="btn btn-primary w-full h-12" onclick="ihInstallieren()">App installieren</button>
+  </div>
+  <div class="flex flex-wrap gap-2 text-sm">
+    <a href="/ih/schichtbuch/papier" class="btn btn-sm" target="_blank" rel="noopener">{{ icon("print", "w-4 h-4") }}Papierformular</a>
+    {% if "lager" in module %}<a href="/m" class="btn btn-sm">{{ icon("scan", "w-4 h-4") }}Lager-App</a>{% endif %}
+    <a href="/logout" class="btn btn-sm">{{ icon("logout", "w-4 h-4") }}Abmelden</a>
+  </div>
+</div>
+<script>
+let ihInstall = null;
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); ihInstall = e; document.getElementById("installieren").classList.remove("hidden"); });
+async function ihInstallieren() { if (!ihInstall) return; ihInstall.prompt(); await ihInstall.userChoice; ihInstall = null; document.getElementById("installieren").classList.add("hidden"); }
+</script>
+{% endblock %}

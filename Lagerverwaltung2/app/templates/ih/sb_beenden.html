@@ -16,7 +16,7 @@
         <label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" name="ueb" value="{{ m.id }}" x-model="an" class="mt-1 w-5 h-5" {% if m.vorschlag %}checked{% endif %}>
           <span class="min-w-0"><span class="font-semibold">{{ m.titel }}</span> {{ sb_chips(m, PRIO, STATUS) }}
             <span class="block text-xs text-muted">M-{{ "%05d"|format(m.id) }} · {{ m.erstellt_am|datum }} · {{ team_chip(m.team, m.team_farbe) }}{% if m.asset %} · {{ m.asset }}{% endif %}</span></span></label>
-        <textarea name="text_{{ m.id }}" rows="2" class="field mt-2" x-show="an" placeholder="Hinweis für die nächste Schicht: Stand, was ist noch zu tun, worauf achten?" aria-label="Übergabehinweis zu {{ m.titel }}"></textarea>
+        <textarea name="text_{{ m.id }}" rows="2" class="field mt-2" x-show="an" placeholder="Hinweis für die nächste Schicht: Stand, was ist noch zu tun, worauf achten?" aria-label="Übergabehinweis zu {{ m.titel }}">{{ m.text_vor or "" }}</textarea>
       </li>
     {% else %}<li class="p-4 text-sm text-muted">Keine offenen Meldungen.</li>{% endfor %}
     </ul>
@@ -27,7 +27,7 @@
   {% endif %}
   <section class="panel p-4">
     <label class="label" for="notiz">Übergabenotiz (allgemein: Anlagenzustand, Fahrweise, Besonderheiten)</label>
-    <textarea id="notiz" name="notiz" rows="4" class="field"></textarea>
+    <textarea id="notiz" name="notiz" rows="4" class="field">{{ s.uebergabe_notiz or "" }}</textarea>
   </section>
   <div class="flex gap-2"><button class="btn btn-primary btn-lg">Schicht beenden und übergeben</button><a href="/ih/schichtbuch" class="btn btn-lg">Abbrechen</a></div>
 </form>

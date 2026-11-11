@@ -207,7 +207,8 @@ def manifest(request: Request):
     from fastapi.responses import JSONResponse
     firma = request.app.state.cfg.server.firmenname
     return JSONResponse({
-        "name": f"Lagerverwaltung {firma}", "short_name": "Lagerverwaltung", "id": "/", "start_url": "/", "scope": "/",
+        "name": f"{request.app.state.cfg.server.programmname} {firma}", "short_name": request.app.state.cfg.server.programmname, "id": "/",
+        "start_url": "/", "scope": "/",
         "display": "standalone", "background_color": "#EEF1F3", "theme_color": "#1C2A38",
         "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
                   {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}],
@@ -245,6 +246,7 @@ Set-Content -Path $crt -Value $pem -Encoding ASCII
 Write-Host 'Zertifikat der Lagerverwaltung wird fuer diesen Windows-Benutzer installiert (Sicherheitsabfrage mit Ja bestaetigen) ...'
 Import-Certificate -FilePath $crt -CertStoreLocation Cert:\\CurrentUser\\Root | Out-Null
 """ if ca_pem else ""
+    name = cfg.server.programmname.replace("'", "")
     ps = f"""
 $url = '{url}'
 $ordner = Join-Path $env:LOCALAPPDATA 'Lagerverwaltung'
@@ -255,15 +257,17 @@ try {{ Invoke-WebRequest -UseBasicParsing ($url + 'static/lager.ico') -OutFile $
 $edge = @("${{env:ProgramFiles(x86)}}\\Microsoft\\Edge\\Application\\msedge.exe", "$env:ProgramFiles\\Microsoft\\Edge\\Application\\msedge.exe") | Where-Object {{ Test-Path $_ }} | Select-Object -First 1
 if (-not $edge) {{ $edge = 'msedge.exe' }}
 $sh = New-Object -ComObject WScript.Shell
+$name = '{name}'
 foreach ($d in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs'))) {{
-  $l = $sh.CreateShortcut((Join-Path $d 'Lagerverwaltung.lnk'))
+  if ($name -ne 'Lagerverwaltung') {{ Remove-Item (Join-Path $d 'Lagerverwaltung.lnk') -ErrorAction SilentlyContinue }}
+  $l = $sh.CreateShortcut((Join-Path $d ($name + '.lnk')))
   $l.TargetPath = $edge
   $l.Arguments = "--app=$url --window-size=1400,900"
   if (Test-Path $ico) {{ $l.IconLocation = $ico }}
-  $l.Description = 'Lagerverwaltung'
+  $l.Description = $name
   $l.Save()
 }}
-Write-Host 'Verknuepfung Lagerverwaltung auf dem Desktop und im Startmenue angelegt.'
+Write-Host ('Verknuepfung ' + $name + ' auf dem Desktop und im Startmenue angelegt.')
 """
     import base64
     enc = base64.b64encode(ps.encode("utf-16-le")).decode()
@@ -273,6 +277,13 @@ Write-Host 'Verknuepfung Lagerverwaltung auf dem Desktop und im Startmenue angel
            f"powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand {enc}\r\npause\r\n")
     return Response(bat.encode("cp1252"), media_type="application/octet-stream",
                     headers={"Content-Disposition": 'attachment; filename="Lagerverwaltung_Arbeitsplatz.bat"'})
+
+
+@router.get("/papier/lager")
+def papier_lager(request: Request):
+    """Papierformular für Entnahmen/Eingänge bei Systemausfall (vorab ausdrucken)."""
+    require(request)
+    return render(request, "papier/lager.html")
 
 
 @router.get("/zertifikat.crt")

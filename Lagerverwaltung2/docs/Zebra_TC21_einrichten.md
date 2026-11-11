@@ -62,6 +62,13 @@ Test: In der App *Suchen* öffnen und ein Etikett scannen – der Artikel muss e
 
 Grüne Meldung mit kurzem Ton = gebucht. Rote Meldung mit Doppelvibration = nicht gebucht (Grund steht dabei, z. B. zu wenig Bestand am Platz).
 
+## Instandhaltungs-App (Schichtbuch, Meldungen, Aufträge)
+
+Auf demselben Gerät lässt sich zusätzlich die Instandhaltungs-App installieren (blaues Symbol). Zertifikat und DataWedge-Profil aus den Schritten 1 und 3 gelten weiter.
+1. In Chrome die Adresse aus *Einstellungen → Handscanner / Handy → Instandhaltungs-App* öffnen (endet auf **/ih/m**, oder QR-Code „Instandhaltung“ scannen) und mit dem eigenen Benutzer anmelden – er braucht eine Rolle Instandhaltung.
+2. „App installieren“ tippen bzw. Chrome-Menü ⋮ → „App installieren“.
+3. Auf der Startseite in das Feld *Tag-Nr. scannen* tippen und die Scantaste drücken: Die Anlage öffnet sich direkt.
+
 ## Ohne WLAN (Offline-Modus)
 
 Fehlt an einer Stelle im Lager das WLAN, wird eine Buchung **nicht verloren**. Voraussetzung: Die App wurde wie oben über die **https**-Adresse installiert (nur dann hält Chrome die Offline-Seite vor).

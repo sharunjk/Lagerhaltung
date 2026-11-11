@@ -4,7 +4,7 @@
 {% block content %}
 <h1 class="mb-4">Einstellungen</h1>
 <div class="seg mb-6 flex-wrap">
-  {% for t, lab in [("allgemein", "Allgemein"), ("handy", "Handscanner / Handy"), ("benutzer", "Benutzer"), ("drucker", "Etikettendrucker"), ("mail", "E-Mail"), ("backup", "Datensicherung"), ("uebernahme", "Datenübernahme"), ("api", "Schnittstelle")] %}
+  {% for t, lab in [("allgemein", "Allgemein"), ("handy", "Handscanner / Handy"), ("benutzer", "Benutzer"), ("drucker", "Etikettendrucker"), ("mail", "E-Mail"), ("backup", "Datensicherung"), ("uebernahme", "Datenübernahme"), ("api", "Schnittstelle"), ("notfall", "Notfall")] %}
   <a href="?tab={{ t }}" class="{{ 'an' if tab == t }}">{{ lab }}</a>
   {% endfor %}
 </div>
@@ -13,6 +13,8 @@
 <form method="post" action="/einstellungen/allgemein" class="panel p-5 space-y-4 max-w-2xl">
   <h2>Allgemein</h2>
   <div><label class="label">Firmen- bzw. Lagername in der Kopfzeile</label><input name="firmenname" value="{{ cfg.server.firmenname }}" class="field"></div>
+  <div><label class="label">Programmname</label><input name="programmname" value="{{ cfg.server.programmname }}" class="field" maxlength="40" placeholder="Lagerverwaltung">
+    <p class="text-xs text-muted mt-1">Erscheint bei der Anmeldung, im Fenstertitel, in der Desktop-App und als Name der Verknüpfung (z. B. „Betriebssoftware“, weil Lager und Instandhaltung im selben Programm sind). Programmordner, Dienst, Autostart und Datensicherungen behalten ihren Namen – es ändert sich nur die Anzeige. Die Desktop-Verknüpfung bekommt den neuen Namen, sobald <i>windows\VERKNUEPFUNG_ERSTELLEN.bat</i> einmal ausgeführt wird (am Lager-PC) bzw. das Skript für Arbeitsplatz-PCs neu geladen wird. Eine installierte Desktop-App zeigt den neuen Namen nach Neuinstallation.</p></div>
   <div><label class="label">Standard-Einheit für neue Artikel</label><input name="standard_einheit" value="{{ cfg.lager.standard_einheit }}" class="field w-28"></div>
   <label class="flex items-start gap-2"><input type="checkbox" name="negative_bestaende_erlauben" class="mt-1" {% if cfg.lager.negative_bestaende_erlauben %}checked{% endif %}><span>Negative Bestände erlauben<span class="block text-sm text-muted">Aus: Entnahmen über den vorhandenen Bestand werden abgelehnt.</span></span></label>
   <label class="flex items-start gap-2"><input type="checkbox" name="lagerplaetze_automatisch_anlegen" class="mt-1" {% if cfg.lager.lagerplaetze_automatisch_anlegen %}checked{% endif %}><span>Unbekannte Lagerplätze beim Einbuchen automatisch anlegen<span class="block text-sm text-muted">Aus: Nur Plätze, die unter Lagerplätze angelegt sind, können bebucht werden (verhindert Tippfehler).</span></span></label>
@@ -48,13 +50,52 @@
     <p class="text-sm text-muted">Zertifikat nicht installierbar (z. B. gesperrtes Firmengerät)? Dann bitte die IT, das Zertifikat über die Geräteverwaltung zu verteilen. Es gilt nur für interne Adressen dieses PCs und kann keine anderen Webseiten beglaubigen.{% if cfg.server.http_nur_lokal %} Unverschlüsseltes http ist aus Sicherheitsgründen nur am Lager-PC selbst erreichbar.{% endif %}</p>
     <p class="text-sm">Adressen dieses PCs: {% for a in adressen %}<b>{{ a }}</b>{% if not loop.last %}, {% endif %}{% endfor %} (PC-Name {{ hostname }}). Damit sich die Adresse nicht ändert, sollte die IT dem PC eine feste IP geben.</p>
   </section>
-  <section class="panel p-5 self-start">
-    <h2 class="mb-3">QR-Code: App öffnen</h2>
+  {% if cfg.cmms.aktiv %}
+  {% set ih_url = basis ~ "/ih/m" %}
+  <section class="panel p-5 space-y-4 xl:col-start-1">
+    <h2>Instandhaltungs-App fürs Handy</h2>
+    <p class="text-sm">Eine eigene App mit blauem Symbol für Schichtbuch, Meldungen, Aufträge und Anlagen – für Operator, Techniker und Schichtführer. Sie läuft über denselben Lager-PC und dieselbe Anmeldung; auf einem Gerät können Lager-App und Instandhaltungs-App nebeneinander installiert sein.</p>
+    <ol class="text-sm space-y-3 list-decimal pl-5">
+      <li><b>Zertifikat</b> wie oben in Schritt 1 installieren (nur einmal je Gerät; schon erledigt, wenn die Lager-App läuft).</li>
+      <li><b>App öffnen:</b> In Chrome <b>{{ ih_url }}</b> aufrufen (oder QR-Code „Instandhaltung“ rechts scannen) und mit dem eigenen Benutzer anmelden.</li>
+      <li><b>Installieren:</b> „App installieren“ auf der Startseite tippen bzw. Chrome-Menü ⋮ → „App installieren“ / „Zum Startbildschirm hinzufügen“. iPhone: Safari → Teilen → „Zum Home-Bildschirm“.</li>
+      <li><b>Bedienen:</b> Unten die Leiste <i>Start · Schichtbuch · Meldung · Aufträge · Anlagen</i>. Auf der Startseite Tag-Nr. scannen oder eingeben → die Anlage öffnet sich direkt (Ersatzteile, Wartung, Meldungen).</li>
+      <li><b>Zebra-Scantaste:</b> funktioniert mit dem DataWedge-Profil von oben (Chrome zugeordnet) auch in der Instandhaltungs-App.</li>
+    </ol>
+    <p class="text-sm text-muted">Zugang braucht eine <b>Rolle Instandhaltung</b> (Reiter <i>Benutzer</i>). Ohne Verbindung zeigt die App den Hinweis aufs Papierformular (Reiter <i>Notfall</i>).</p>
+  </section>
+  {% endif %}
+  <section class="panel p-5 self-start xl:row-start-1 xl:col-start-2 {{ 'xl:row-span-2' if cfg.cmms.aktiv }}">
+    {% if cfg.cmms.aktiv %}
+    <h2 class="mb-3">QR-Code: Instandhaltung</h2>
+    <div class="bg-white p-4 inline-block rounded border border-line"><svg viewBox="0 0 40 40" width="200" height="200">{{ qr(basis ~ "/ih/m")|safe }}</svg></div>
+    <p class="text-sm text-muted mt-2 break-all">{{ basis }}/ih/m</p>
+    {% endif %}
+    <h2 class="mb-3 {{ 'mt-5' if cfg.cmms.aktiv }}">QR-Code: Lager-App öffnen</h2>
     <div class="bg-white p-4 inline-block rounded border border-line"><svg viewBox="0 0 40 40" width="220" height="220">{{ qr(app_url)|safe }}</svg></div>
     <p class="text-sm text-muted mt-2 break-all">{{ app_url }}</p>
     <h2 class="mt-5 mb-3">QR-Code: Zertifikat</h2>
     <div class="bg-white p-4 inline-block rounded border border-line"><svg viewBox="0 0 40 40" width="160" height="160">{{ qr(zert_url)|safe }}</svg></div>
     <p class="text-sm text-muted mt-2"><a class="text-primary" href="/zertifikat.crt">Zertifikat herunterladen</a></p>
+  </section>
+</div>
+{% elif tab == "notfall" %}
+<div class="grid xl:grid-cols-2 gap-6 max-w-6xl">
+  <section class="panel p-5 space-y-3">
+    <h2>Papierformulare für den Systemausfall</h2>
+    <p class="text-sm">Ist das Programm nicht erreichbar (Lager-PC aus, Netzwerkstörung), dokumentieren die Schichten auf Papier und tragen später nach. <b>Wichtig:</b> Die Formulare jetzt ausdrucken und bereitlegen (Schichtleitung, Lager) – im Ernstfall ist auch diese Seite nicht erreichbar. Die PDF-Fassungen liegen zusätzlich im Programmordner unter <i>docs</i>.</p>
+    <div class="flex flex-wrap gap-2">
+      {% if cfg.cmms.aktiv %}<a class="btn btn-primary" href="/ih/schichtbuch/papier" target="_blank" rel="noopener">{{ icon("print", "w-4 h-4") }}Schichtbuch-Formular öffnen</a>{% endif %}
+      <a class="btn {{ 'btn-primary' if not cfg.cmms.aktiv }}" href="/papier/lager" target="_blank" rel="noopener">{{ icon("print", "w-4 h-4") }}Lager-Formular öffnen</a>
+    </div>
+    <p class="text-xs text-muted">Das Schichtbuch-Formular enthält Ihre Teams, Schichtzeiten und Ereignistypen (immer aktuell, wenn Sie es hier öffnen). Drucken im Browser, auch „Als PDF speichern“ geht.</p>
+  </section>
+  <section class="panel p-5 space-y-2 text-sm">
+    <h2>Nach der Wiederherstellung nachtragen</h2>
+    {% if cfg.cmms.aktiv %}<p><b>Schichtbuch:</b> <i>Instandhaltung → Schichtbuch → Nachtragen</i>. Datum und Uhrzeit vom Blatt eintragen, Team und Schichtführer wählen – die Meldung kommt in die richtige Schicht und ist als „Nachtrag“ mit Name und Erfassungszeit gekennzeichnet. Ergänzungen zu bestehenden Meldungen direkt an der Meldung.</p>{% endif %}
+    <p><b>Lager:</b> jede Zeile normal buchen (Buchen → Entnahme/Eingang/Umbuchung), bei <i>Zweck</i> „Papier vom TT.MM.“. Entnahmen für Wartungsaufträge im Auftrag unter <i>Ersatzteile</i>. Stimmt ein Platz nicht, zählen (Inventur).</p>
+    <p><b>Nur WLAN gestört?</b> Die Scanner-App bucht offline weiter und überträgt selbst; Papier ist dann nicht nötig.</p>
+    <p><b>Lager-PC defekt?</b> Letzte Datensicherung auf einem anderen PC wiederherstellen (Installationsanleitung, Abschnitt „Lager-PC defekt – Umzug auf einen neuen PC“).</p>
   </section>
 </div>
 {% elif tab == "benutzer" %}

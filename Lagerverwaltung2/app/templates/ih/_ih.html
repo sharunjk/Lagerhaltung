@@ -24,6 +24,7 @@ background-color:{{ f[0] }};color:{{ f[1] }}
 {%- if status %}<span class="status {{ {'offen': 'st-melden', 'in_arbeit': 'text-primary', 'erledigt': 'st-ok'}.get(m.status, '') }}">{{ STATUS.get(m.status, m.status) }}</span>{% endif -%}
 {%- if m.prioritaet == "hoch" %}<span class="status st-kritisch">Prio hoch</span>{% elif m.prioritaet == "niedrig" %}<span class="status text-muted">Prio niedrig</span>{% endif -%}
 {%- if m.sicherheitsrelevant %}<span class="status st-kritisch">Sicherheit</span>{% endif -%}
+{%- if m.nachgetragen_am %}<span class="status text-muted" title="nachgetragen {{ m.nachgetragen_am|datum }} von {{ m.nachgetragen_von }}">Nachtrag</span>{% endif -%}
 {%- if m.stillstand %}<span class="status st-melden">Stillstand{% if m.stillstand_h %} {{ m.stillstand_h|num }} h{% endif %}</span>{% endif -%}
 </span>
 {%- endmacro %}

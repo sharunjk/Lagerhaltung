@@ -464,6 +464,19 @@ Nach beiden Läufen: Bestand = Summe aller Buchungen je Artikel und Platz, keine
 
 Prüfung: 181 Tests grün (2 übersprungen), 17 Browserprüfungen ohne Fehler, Rollenmatrix 184 Routen ohne Serverfehler.
 
+## Nachtrag: Schicht wieder öffnen, Nachträge, Notfall, Instandhaltungs-App, Programmname 2.9.0
+
+| Änderung | Umsetzung | Beleg |
+|---|---|---|
+| Schicht wieder öffnen | nach versehentlichem Beenden; Übergaben ausgeblendet bis zum erneuten Beenden, Vorbelegung, Rücknahme abgewählter Punkte; gesperrt, sobald die Folgeschicht begonnen oder übernommen hat; Übernahme nur aus beendeten Schichten | `test_schicht_wieder_oeffnen_und_erneut_beenden` |
+| Nächste Schicht vorzeitig | nach Schichtende oder bis 2 h vor Beginn; Meldungen gehören dann zur neuen Schicht; vorher abgelehnt | `test_naechste_schicht_vorzeitig_beginnen` |
+| Nachtrag | Zeitpunkt Pflicht, nicht in der Zukunft, höchstens 1 Jahr; richtige Schicht (Nacht nach Mitternacht = Vortag), Team und Schichtführer ergänzt, Kennzeichnung mit Name/Erfassungszeit, Export mit Ereigniszeit; Migration 4 | `test_meldung_nachtragen`, `test_migration_4_von_2_8` |
+| Papierformulare | Schichtbuch (Teams, Zeiten, Ereignistypen aus den Einstellungen) und Lager, A4 quer, Anleitung zum Nachtragen; Reiter *Notfall*; PDFs in `docs/` | `test_papierformulare` |
+| Instandhaltungs-App | Startseite, Leiste unten, Manifest Scope /ih/, Service Worker mit Offline-Hinweis, Tag-Nr.-Suche, Anleitung mit QR-Code | `test_instandhaltungs_app`, `test_rechte_neue_routen_290` |
+| Programmname | Einstellung mit Prüfung auf unzulässige Zeichen; Anmeldung, Titel, Desktop-Manifest, Arbeitsplatz-Skript ersetzt die alte Verknüpfung | `test_programmname` |
+
+Prüfung: 189 Tests grün (2 übersprungen). Browserprüfung `werkzeuge/pruefung/notfall_app.cjs` 23/23 (Beenden/Wiederöffnen/erneut Beenden, Nachtrag, Papierformulare als PDF, Einstellungen, Programmname, App am Handy: Startseite, Leiste, Service Worker, 5 Seiten ohne seitliches Scrollen, Offline-Hinweis). Regression: `schichtbuch`, `ersatzteile`, `cmms`, `wartung`, `mobil`, `offline`, `pc`, `anlegen`, `profil`, `sicherung` ohne Fehler. Update von 2.8.1 nachgestellt (Probelauf, Sicherung, Migration 4, Bestand unverändert). `windows/verknuepfung.ps1` konnte hier nicht unter Windows ausgeführt werden (kein PowerShell vorhanden) – bitte nach dem Ändern des Programmnamens einmal am Lager-PC prüfen.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

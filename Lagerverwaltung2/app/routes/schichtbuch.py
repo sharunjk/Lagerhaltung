@@ -52,9 +52,14 @@ def dashboard(request: Request, team: str = ""):
         teams = sb.teams(con)
         mein_team = sb.team_von(con, me["id"])
         sicht = next((t for t in teams if team.isdigit() and t["id"] == int(team)), None) or mein_team
-        d, z = sb.slot(con, jetzt)
+        d, z = sb.laufender_slot(con, jetzt)
         akt = sb.schicht(con, datum=d, zeit_id=z["id"])
         beginn, schluss = sb.fenster(d, z)
+        nd, nz = sb.naechster_slot(con, d, z)
+        n_beginn = sb.fenster(nd, nz)[0]
+        naechste = sb.schicht(con, datum=nd, zeit_id=nz["id"])
+        vorzeitig = (not naechste or not naechste["begonnen_am"]) and (bool(akt and akt["beendet_am"]) or jetzt >= n_beginn - sb.VORZEITIG)
+        oeffnen_grund = sb.wieder_oeffnen_grund(con, akt["id"]) if akt and akt["beendet_am"] else None
         uebergaben = sb.offene_uebergaben(con)
         ueb_ids = {m["id"] for m in uebergaben}
         offene = [m for m in sb.offene(con) if m["id"] not in ueb_ids]
@@ -68,7 +73,8 @@ def dashboard(request: Request, team: str = ""):
     return render(request, "ih/schichtbuch.html", teams=teams, mein_team=mein_team, sicht=sicht, akt=akt, slot_text=sb.bezeichnung(d, z),
                   slot_zeit=z, beginn=beginn, schluss=schluss, uebergaben=uebergaben, offene=offene, diese=diese, letzte=letzte,
                   team_letzte=team_letzte[0] if team_letzte else None, seit=seit, seit_ab=seit_ab, haengend=haengend,
-                  auftraege=auftraege, STATUS=sb.STATUS, PRIO=sb.PRIO, jetzt=jetzt)
+                  auftraege=auftraege, STATUS=sb.STATUS, PRIO=sb.PRIO, jetzt=jetzt, naechste_text=sb.bezeichnung(nd, nz), n_beginn=n_beginn,
+                  vorzeitig=vorzeitig, oeffnen_grund=oeffnen_grund)
 
 
 @router.post("/beginnen")
@@ -77,7 +83,13 @@ async def beginnen(request: Request):
     f = await request.form()
     with db.schreiben() as con:
         sb.sicherstellen(con)
-        d, z = sb.slot(con)
+        d, z = sb.laufender_slot(con)
+        if f.get("naechste") == "1":  # nächste Schicht vorzeitig beginnen (Übergabe vor der vollen Stunde)
+            akt = sb.schicht(con, datum=d, zeit_id=z["id"])
+            d, z = sb.naechster_slot(con, d, z)
+            if not (akt and akt["beendet_am"]) and datetime.now() < sb.fenster(d, z)[0] - sb.VORZEITIG:
+                flash(request, f"Die Schicht {sb.bezeichnung(d, z)} kann frühestens 2 Stunden vor ihrem Beginn starten.", "fehler")
+                return RedirectResponse("/ih/schichtbuch", status_code=303)
         tid = int(f["team_id"]) if (f.get("team_id") or "").isdigit() and con.execute(
             select(sb_teams.c.id).where(sb_teams.c.id == int(f["team_id"]))).scalar() else None
         sid = sb.beginnen(con, d, z["id"], tid, f.get("schichtfuehrer") or me["name"], me["username"])
@@ -86,21 +98,50 @@ async def beginnen(request: Request):
     return RedirectResponse("/ih/schichtbuch#uebergaben", status_code=303)
 
 
+@router.get("/papier")
+def papier(request: Request):
+    """Papierformular fürs Schichtbuch bei Systemausfall (vorab ausdrucken; Nachtrag über „Nachtragen“)."""
+    require_recht(request, "ih.schichtbuch.ansehen")
+    _grunddaten()
+    with db.engine().connect() as con:
+        return render(request, "papier/schichtbuch.html", teams=sb.teams(con), zeiten=sb.zeiten(con), typen=sb.ereignistypen(con))
+
+
+@router.post("/wieder-oeffnen")
+async def wieder_oeffnen(request: Request):
+    """Versehentlich beendete Schicht wieder öffnen (solange die nächste Schicht noch nicht begonnen und nichts übernommen hat)."""
+    me = require_recht(request, "ih.schichtbuch.schreiben")
+    f = await request.form()
+    sid = int(f["schicht_id"]) if (f.get("schicht_id") or "").isdigit() else 0
+    try:
+        with db.schreiben() as con:
+            s = sb.wieder_oeffnen(con, sid, me["username"])
+            audit(con, me["username"], "Schicht wieder geöffnet", s["text"], {"schicht_id": sid})
+    except sb.SchichtFehler as e:
+        flash(request, str(e), "fehler")
+        return RedirectResponse("/ih/schichtbuch", status_code=303)
+    flash(request, f"Schicht {s['text']} ist wieder offen. Ihre Übergaben sieht die nächste Schicht erst nach dem erneuten Beenden.")
+    return RedirectResponse("/ih/schichtbuch", status_code=303)
+
+
 # ------------------------------------------------------------------ Meldungen
 def _form_ctx(con, f: dict | None = None, **extra) -> dict:
-    return dict(typen=sb.ereignistypen(con), tags=_tags(con), PRIO=sb.PRIO, STATUS=sb.STATUS, f=f or {}, **extra)
+    return dict(typen=sb.ereignistypen(con), tags=_tags(con), PRIO=sb.PRIO, STATUS=sb.STATUS, f=f or {}, teams=sb.teams(con),
+                jetzt_iso=datetime.now().strftime("%Y-%m-%dT%H:%M"), **extra)
 
 
 @router.get("/neu")
-def neu_form(request: Request, platz: str = ""):
-    require_recht(request, "ih.schichtbuch.schreiben")
+def neu_form(request: Request, platz: str = "", nachtrag: int = 0):
+    me = require_recht(request, "ih.schichtbuch.schreiben")
     _grunddaten()
     with db.engine().connect() as con:
-        vor = {}
+        t = sb.team_von(con, me["id"])
+        vor = {"nachtrag": "on" if nachtrag else "", "nachtrag_team": t["id"] if t else ""}
         if platz.isdigit():
             code = con.execute(select(ih_plaetze.c.code).where(ih_plaetze.c.id == int(platz))).scalar()
-            vor = {"asset": code} if code else {}
-        d, z = sb.slot(con)
+            if code:
+                vor["asset"] = code
+        d, z = sb.laufender_slot(con)
         return render(request, "ih/sb_meldung_form.html", neu=True, slot_text=sb.bezeichnung(d, z), **_form_ctx(con, vor))
 
 
@@ -111,14 +152,26 @@ async def neu(request: Request):
     with db.schreiben() as con:
         sb.sicherstellen(con)
         w, fehler = sb.werte_aus_formular(con, f)
+        zeitpunkt = None
+        if f.get("nachtrag") == "on":
+            try:
+                zeitpunkt = sb.nachtrag_zeitpunkt(f.get("zeitpunkt") or "")
+            except sb.SchichtFehler as e:
+                fehler.append(str(e))
         if fehler:
-            d, z = sb.slot(con)
+            d, z = sb.laufender_slot(con)
             return render(request, "ih/sb_meldung_form.html", neu=True, slot_text=sb.bezeichnung(d, z), fehler=" ".join(fehler),
                           **_form_ctx(con, dict(f)))
-        sid = sb.aktuelle_schicht_id(con, me)
-        mid = sb.anlegen(con, w, f.get("status") or "offen", me["username"], sid)
-        audit(con, me["username"], "Schichtbuch: Meldung angelegt", f"M-{mid:05d}", {"titel": w["titel"], "asset": w["asset"]})
-    flash(request, f"Meldung M-{mid:05d} gespeichert.")
+        if zeitpunkt:
+            tid = int(f["nachtrag_team"]) if (f.get("nachtrag_team") or "").isdigit() and con.execute(
+                select(sb_teams.c.id).where(sb_teams.c.id == int(f["nachtrag_team"]))).scalar() else None
+            sid = sb.nachtrag_schicht(con, zeitpunkt, tid, f.get("nachtrag_schichtfuehrer") or "")
+        else:
+            sid = sb.aktuelle_schicht_id(con, me)
+        mid = sb.anlegen(con, w, f.get("status") or "offen", me["username"], sid, zeitpunkt)
+        audit(con, me["username"], "Schichtbuch: Meldung nachgetragen" if zeitpunkt else "Schichtbuch: Meldung angelegt", f"M-{mid:05d}",
+              {"titel": w["titel"], "asset": w["asset"], "zeitpunkt": zeitpunkt.isoformat(" ") if zeitpunkt else None})
+    flash(request, f"Meldung M-{mid:05d} " + (f"nachgetragen ({zeitpunkt:%d.%m.%Y %H:%M})." if zeitpunkt else "gespeichert."))
     return RedirectResponse("/ih/schichtbuch" if f.get("weiter") == "dashboard" else f"/ih/schichtbuch/meldung/{mid}", status_code=303)
 
 
@@ -212,8 +265,9 @@ def beenden_form(request: Request, schicht: str = ""):
             return RedirectResponse("/ih/schichtbuch", status_code=303)
         offene = sb.offene(con)
         for m in offene:
-            m["vorschlag"] = (m["schicht_id"] == sid or m["uebernommen_schicht_id"] == sid or m["prioritaet"] == "hoch"
-                              or m["sicherheitsrelevant"] or m["stillstand"])
+            m["vorschlag"] = (m["schicht_id"] == sid or m["uebernommen_schicht_id"] == sid or m["uebergeben_schicht_id"] == sid
+                              or m["prioritaet"] == "hoch" or m["sicherheitsrelevant"] or m["stillstand"])
+            m["text_vor"] = m["uebergabe_text"] if m["uebergeben_schicht_id"] == sid else ""
         erledigt = [m for m in sb.der_schicht(con, sid) if m["status"] == "erledigt"]
     return render(request, "ih/sb_beenden.html", s=s, offene=offene, erledigt=erledigt, STATUS=sb.STATUS, PRIO=sb.PRIO)
 
