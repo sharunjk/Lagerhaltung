@@ -418,6 +418,10 @@ Prüfung: 160 Tests grün (2 übersprungen, wie in 2.5.0). Browserprüfung `werk
 
 Prüfung: 168 Tests grün (2 übersprungen). Neue Browserprüfung `werkzeuge/pruefung/ersatzteile.cjs` mit Demodaten 19/19 (Auswahlliste, Chips, Anlage mit Bestand, eigene Kampagne von der Anlage aus, Bauteil ergänzen, Pflichtfeld, Auftrag, Entnahme mit Kosten, Buchung im Lager, Handy-Breite 390 px ohne seitliches Scrollen, keine JS-Fehler). `wartung.cjs` (19/19, echte Dateien, nur lokal), `cmms.cjs` und `pc.cjs` laufen unverändert.
 
+## Nachtrag: Kalender 2.7.1
+
+Kalenderwochen in der Kopfzeile stehen alle auf einer Höhe (Jahreszahl in eigener Zeile), dünne Linien je Kalenderwoche, kräftigere Linie am Jahreswechsel. Farben der Maßnahmen wie im Instandhaltungsplan (aus den Zellfarben der Excel-Datei übernommen: S #BDD7EE, W #FFE699, F #F8CBAD, Za/Zv #E4D5F0, Zi #D9C2EC, Zf #CDB0E4, B #EDEDED, weitere Pflichtprüfungen #F4EEFA, Symbolfarbe je Maßnahme), in Kalender, Wartungsplan, Aufträgen und an der Anlage. Überfällig = rot umrandet, abgeschlossen = blass mit ✓. Geprüft im Browser bei 13, 52 und 156 Wochen (alle KW-Zahlen auf einer Höhe, keine JS-Fehler), hell und dunkel; `wartung.cjs` 19/19.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

@@ -103,7 +103,9 @@ def kalender(request: Request, ab: str = "", wochen: int = 26):
     last = w.wochenlast(kampagnen, liste)
     return render(request, "ih/kalender.html", wochen=liste, kampagnen=kampagnen, belegt=belegt, mass=mass, last=last,
                   anzahl=wochen, vor=(liste[0] + timedelta(weeks=wochen)).isoformat(), zurueck=(liste[0] - timedelta(weeks=wochen)).isoformat(),
-                  diese=w.montag(date.today()))
+                  diese=w.montag(date.today()), STATUS=w.STATUS,
+                  farben_codes=[m for m in ("S", "W", "F", "Za", "Zi", "Zf", "Zv", "B") if any(k["massnahme"] == m for k in kampagnen)],
+                  weitere_pflicht=any(k["massnahme"].startswith("Z") and k["massnahme"] not in ("Za", "Zi", "Zf", "Zv") for k in kampagnen))
 
 
 @router.get("/wartung/wochen")

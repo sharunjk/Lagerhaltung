@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon %}
-{% from "ih/_ih.html" import mass_symbol %}
+{% from "ih/_ih.html" import mass_stil, mass_symbol %}
 {% block title %}Wartungskalender{% endblock %}
 {% block content %}
+{%- macro trenn(wo) -%}{{ 'border-l border-muted/50' if wo.isocalendar()[1] == 1 else 'border-l border-line/70' }}{%- endmacro -%}
 <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
   <div><h1>Wartungskalender</h1><p class="text-muted">{{ wochen[0]|datum(False) }} bis {{ (wochen[-1])|datum(False) }} · jede Zeile eine Kampagne, Balken = Wochen, in denen sie läuft, Symbol = Startwoche.</p></div>
   <div class="flex flex-wrap gap-2 items-center">
@@ -21,11 +22,11 @@
     <thead>
       <tr class="border-b border-line">
         <th class="sticky left-0 z-10 bg-surface text-left px-3 py-2 min-w-[15rem]">Kampagne</th>
-        {% for wo in wochen %}{% set jahr, nr, _ = wo.isocalendar() %}<th class="px-0.5 py-2 font-medium text-center min-w-[1.9rem] {{ 'bg-primary/10 text-primary' if wo == diese else 'text-muted' }} {{ 'border-l border-line' if nr == 1 }}" title="KW {{ nr }}/{{ jahr }} ab {{ wo|datum(False) }}">{% if nr == 1 or loop.first %}<span class="block text-[10px]">{{ jahr }}</span>{% endif %}{{ nr }}</th>{% endfor %}
+        {% for wo in wochen %}{% set jahr, nr, _ = wo.isocalendar() %}<th class="px-0.5 py-1.5 font-medium text-center align-bottom min-w-[1.9rem] {{ 'bg-primary/10 text-primary' if wo == diese else 'text-muted' }} {{ trenn(wo) }}" title="KW {{ nr }}/{{ jahr }} ab {{ wo|datum(False) }}"><span class="block h-3.5 leading-[0.875rem] text-[10px]">{% if nr == 1 or loop.first %}{{ jahr }}{% endif %}</span><span class="block tabular-nums">{{ nr }}</span></th>{% endfor %}
       </tr>
       <tr class="border-b border-line bg-soft">
         <th class="sticky left-0 z-10 bg-soft text-left px-3 py-1.5 font-medium">Techniker-Tage je Woche</th>
-        {% for wo in wochen %}{% set t = last[wo] %}<td class="text-center tabular-nums py-1.5 {{ 'font-semibold text-warn' if t > 5 }}">{{ (t|round(1)|num) if t else "" }}</td>{% endfor %}
+        {% for wo in wochen %}{% set t = last[wo] %}<td class="text-center tabular-nums py-1.5 {{ trenn(wo) }} {{ 'font-semibold text-warn' if t > 5 }}">{{ (t|round(1)|num) if t else "" }}</td>{% endfor %}
       </tr>
     </thead>
     <tbody>
@@ -36,15 +37,19 @@
         {% for wo in wochen %}
           {% set z = belegt[k.id].get(wo) %}
           {% if z %}{% set art, termin, st, ueber = z %}
-          {% set farbe = 'bg-ok/30' if st == 'abgeschlossen' else ('bg-crit/25' if ueber else ('bg-wein/25' if k.massnahme.startswith('Z') else 'bg-primary/25')) %}
-          <td class="p-0 {{ 'border-l border-line' if wo.isocalendar()[1] == 1 }}"><span class="block h-7 leading-7 text-center {{ farbe }} {{ 'rounded-l font-semibold' if art == 'start' }}" title="{{ m.name if m else k.massnahme }} {{ k.gegenstand or k.bauteilklasse }} – Termin {{ termin|datum(False) }}{% if st %} – Auftrag: {{ st }}{% endif %}">{{ (m.symbol if m else k.massnahme[:1]) if art == 'start' else '' }}</span></td>
-          {% else %}<td class="{{ 'border-l border-line' if wo.isocalendar()[1] == 1 }}"></td>{% endif %}
+          {% set fertig = st == 'abgeschlossen' %}
+          <td class="p-0 {{ trenn(wo) }}"><span class="block h-7 leading-7 text-center {{ 'rounded-l font-semibold' if art == 'start' }} {{ 'opacity-40' if fertig }} {{ 'ring-2 ring-inset ring-crit' if ueber }}" style="{{ mass_stil(k.massnahme) }}" title="{{ m.name if m else k.massnahme }} {{ k.gegenstand or k.bauteilklasse }} – Termin {{ termin|datum(False) }}{% if ueber %} – überfällig{% endif %}{% if st %} – Auftrag: {{ STATUS.get(st, st) }}{% endif %}">{% if art == 'start' %}{{ "✓" if fertig else (m.symbol if m and m.symbol else k.massnahme[:1]) }}{% elif loop.first %}<span class="opacity-50">{{ m.symbol if m and m.symbol else k.massnahme[:1] }}</span>{% endif %}</span></td>
+          {% else %}<td class="{{ trenn(wo) }} {{ 'bg-primary/5' if wo == diese }}"></td>{% endif %}
         {% endfor %}
       </tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
-<p class="text-xs text-muted mt-2"><span class="inline-block w-3 h-3 align-middle bg-primary/25"></span> eigene Maßnahme · <span class="inline-block w-3 h-3 align-middle bg-wein/25"></span> Pflichtprüfung (extern) · <span class="inline-block w-3 h-3 align-middle bg-ok/30"></span> abgeschlossen · <span class="inline-block w-3 h-3 align-middle bg-crit/25"></span> überfällig. Techniker-Tage: Aufwand je Kampagne gleichmäßig auf ihre Dauer verteilt (über 5 hervorgehoben).</p>
+<p class="text-xs text-muted mt-2 flex flex-wrap gap-x-3 gap-y-1 items-center">{% for code in farben_codes %}{% set mm = mass.get(code) %}<span class="inline-flex items-center gap-1"><span class="inline-grid place-items-center w-4 h-4 rounded-sm text-[10px]" style="{{ mass_stil(code) }}">{{ mm.symbol if mm and mm.symbol else code[:1] }}</span>{{ mm.name if mm else code }}</span>{% endfor %}
+  {% if weitere_pflicht %}<span class="inline-flex items-center gap-1"><span class="inline-grid place-items-center w-4 h-4 rounded-sm text-[10px]" style="{{ mass_stil('ZE') }}">◆</span>weitere Pflichtprüfungen</span>{% endif %}
+  <span class="inline-flex items-center gap-1"><span class="inline-block w-4 h-4 rounded-sm ring-2 ring-inset ring-crit" style="{{ mass_stil('W') }}"></span>überfällig</span>
+  <span class="inline-flex items-center gap-1"><span class="inline-grid place-items-center w-4 h-4 rounded-sm opacity-40 text-[10px]" style="{{ mass_stil('W') }}">✓</span>abgeschlossen</span></p>
+<p class="text-xs text-muted mt-1">Farben wie im Instandhaltungsplan. Techniker-Tage: Aufwand je Kampagne gleichmäßig auf ihre Dauer verteilt (über 5 hervorgehoben).</p>
 {% endif %}
 {% endblock %}

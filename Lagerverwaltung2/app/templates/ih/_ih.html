@@ -5,6 +5,13 @@
 {% macro status_chip(status, STATUS) -%}
 <span class="status {{ {'angelegt': 'text-muted', 'freigegeben': 'text-primary', 'in_arbeit': 'st-melden', 'erledigt': 'text-primary', 'abgeschlossen': 'st-ok', 'storniert': 'text-muted'}.get(status, '') }}">{{ STATUS.get(status, status) }}</span>
 {%- endmacro %}
+{# Farben wie im Instandhaltungsplan (Excel): Hintergrund und Symbolfarbe je Maßnahme #}
+{% macro mass_stil(code) -%}
+{%- set f = {"S": ("#BDD7EE", "#1F4E79"), "W": ("#FFE699", "#7F6000"), "F": ("#F8CBAD", "#843C0C"), "Za": ("#E4D5F0", "#4C2A70"),
+             "Zi": ("#D9C2EC", "#4C2A70"), "Zf": ("#CDB0E4", "#4C2A70"), "Zv": ("#E4D5F0", "#4C2A70"), "B": ("#EDEDED", "#595959")}.get(code)
+          or (("#F4EEFA", "#4C2A70") if (code or "").startswith("Z") else ("#EDEDED", "#595959")) -%}
+background-color:{{ f[0] }};color:{{ f[1] }}
+{%- endmacro %}
 {% macro mass_symbol(m, code) -%}
-<span class="inline-grid place-items-center w-7 h-7 rounded {{ 'bg-wein text-white' if code.startswith('Z') else 'bg-primary/10 text-primary' }} font-semibold text-sm" title="{{ m.name if m else code }}">{{ (m.symbol if m and m.symbol else "") or code[:1] }}</span>
+<span class="inline-grid place-items-center w-7 h-7 rounded font-semibold text-sm shrink-0" style="{{ mass_stil(code) }}" title="{{ m.name if m else code }}">{{ (m.symbol if m and m.symbol else "") or code[:1] }}</span>
 {%- endmacro %}

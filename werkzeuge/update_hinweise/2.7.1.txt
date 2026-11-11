@@ -1,0 +1,14 @@
+Neu in 2.7.1 - Wartungskalender:
+- Die Kalenderwochen in der Kopfzeile stehen alle auf einer Hoehe.
+- Duenne Linien trennen die Kalenderwochen, eine kraeftigere Linie den Jahreswechsel.
+- Farben wie im Instandhaltungsplan: Sichtpruefung hellblau, Wartung gelb, Funktionspruefung orange,
+  Pflichtpruefungen lila (auch die Symbole im Wartungsplan, in Auftraegen und an der Anlage).
+  Ueberfaellig = rot umrandet, abgeschlossen = blass mit Haken.
+
+Enthaelt alles aus 2.7.0 (Rhythmus je Kampagne, eigene Wartungen, Ersatzteile je Tag-Nr., Entnahme fuer Auftraege).
+Wer von 2.6.0 oder aelter kommt: Beim ersten Start ergaenzt die Lagerverwaltung die Datenbank - erst als Probelauf
+an einer Kopie, mit Sicherung vor_update_... vorher. Der Lagerbestand bleibt unveraendert.
+
+Kommen Sie von einer aelteren Version, ist auch alles aus 2.6.0, 2.5.0, 2.4.0, 2.3.1 und 2.3.0 enthalten. Nach einem
+Update von vor 2.5.0 ist die Instandhaltung zunaechst ausgeschaltet (Einstellungen -> Allgemein -> Instandhaltung
+(CMMS) aktivieren).
