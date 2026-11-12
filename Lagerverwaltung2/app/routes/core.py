@@ -206,12 +206,13 @@ def manifest(request: Request):
     """Desktop-App: in Edge/Chrome über „App installieren“ als eigenes Fenster mit Startmenü-Eintrag."""
     from fastapi.responses import JSONResponse
     firma = request.app.state.cfg.server.firmenname
+    ci = request.app.state.cfg.server.design == "ci"
     return JSONResponse({
         "name": f"{request.app.state.cfg.server.programmname} {firma}", "short_name": request.app.state.cfg.server.programmname, "id": "/",
         "start_url": "/", "scope": "/",
-        "display": "standalone", "background_color": "#EEF1F3", "theme_color": "#1C2A38",
-        "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
-                  {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}],
+        "display": "standalone", "background_color": "#EEF1F3", "theme_color": "#263B49" if ci else "#1C2A38",
+        "icons": [{"src": f"/static/{'icon-ci' if ci else 'icon'}-192.png", "sizes": "192x192", "type": "image/png"},
+                  {"src": f"/static/{'icon-ci' if ci else 'icon'}-512.png", "sizes": "512x512", "type": "image/png"}],
         "shortcuts": [{"name": "Buchen", "url": "/buchen"}, {"name": "Artikel", "url": "/artikel"}, {"name": "Bewegungen", "url": "/bewegungen"}],
     }, media_type="application/manifest+json")
 

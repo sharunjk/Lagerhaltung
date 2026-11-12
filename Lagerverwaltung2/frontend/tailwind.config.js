@@ -12,7 +12,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ["Barlow", "Segoe UI", "Arial", "sans-serif"],
-        cond: ["Barlow Semi Condensed", "Barlow", "Arial Narrow", "sans-serif"],
+        cond: ["var(--font-cond)", "Barlow", "Arial Narrow", "sans-serif"],
       },
     },
   },

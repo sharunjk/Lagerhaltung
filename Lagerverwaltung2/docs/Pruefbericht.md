@@ -489,6 +489,10 @@ Prüfung: 189 Tests grün (2 übersprungen). Browserprüfung `werkzeuge/pruefung
 
 Prüfung: 193 Tests grün (2 übersprungen). Browserprüfung `werkzeuge/pruefung/umzug.cjs` mit echtem Server: Paket über die Einstellungen erstellt, alter PC „nur lesen“ (PC 423, Scanner-App mit Hinweis). Paket entpackt, Server im neuen Ordner gestartet: Anmeldung, Schichtbuch-Meldung, Programmname und Instandhaltung übernommen, Buchung gespeichert (alte Datenbank 45, neue 46 Buchungen), Zertifikat identisch, keine JS-Fehler (13/13). `UMZUG_ABSCHLIESSEN_als_Admin.bat` konnte hier nicht unter Windows ausgeführt werden. Es ruft nur die bewährten Skripte für Verknüpfung, Dienst und Firewall auf.
 
+## Nachtrag: Design Corporate Identity 2.11.0
+
+Umschalter *Einstellungen → Allgemein → Design* (Standard / Corporate Identity). Kontraste nachgerechnet (WCAG): Text Navy auf Weiß 11,6:1, auf Hintergrund 9,9:1; Grau #626467 5,9:1 bzw. 5,1:1; Rot als Link 6,0:1, Weiß auf rotem Knopf 6,0:1; Kritisch #931017 9,0:1; Info #495964 7,3:1; Menü #cccbcb auf Navy 7,2:1; Feldrahmen #808287 3,9:1. Dunkel: Text 12,0:1, Grau 6,2:1, Links 4,9:1, Kritisch 6,9:1. Tests `tests/test_design.py` (Standard unverändert, Umschalten und zurück, Logo/Favicon/App-Symbole je Bereich, Stylesheet). Browser: Seiten in CI hell und dunkel (Anmeldung, Lager, Artikel, Buchen, Schichtbuch, Meldung, Einstellungen, Scanner-App, Instandhaltungs-App) ohne JS-Fehler; Regression im Standard-Design (`pc`, `mobil`, `offline`, `notfall_app`, `schichtbuch`, `ersatzteile`, `wartung`) ohne Fehler. 196 Tests grün (2 übersprungen).
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

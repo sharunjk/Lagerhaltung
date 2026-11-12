@@ -129,7 +129,7 @@ async def allgemein(request: Request):
         if any(c in name for c in '\\/:*?"<>|'):
             flash(request, 'Programmname: bitte ohne die Zeichen \\ / : * ? " < > | (wird auch als Name der Verknüpfung verwendet).', "fehler")
             return RedirectResponse("/einstellungen?tab=allgemein", status_code=303)
-        _cfg_update(request, "server", {"firmenname": (f.get("firmenname") or "").strip() or "Lager", "programmname": name,
+        _cfg_update(request, "server", {"firmenname": (f.get("firmenname") or "").strip() or "Lager", "programmname": name, "design": "ci" if f.get("design") == "ci" else "standard",
                                         "port": int(f.get("port") or 8080), "https_port": int(f.get("https_port") or 0)})
     except ValueError:
         flash(request, "Ungültige Zahl.", "fehler")

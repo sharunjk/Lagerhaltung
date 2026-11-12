@@ -13,6 +13,20 @@
 <form method="post" action="/einstellungen/allgemein" class="panel p-5 space-y-4 max-w-2xl">
   <h2>Allgemein</h2>
   <div><label class="label">Firmen- bzw. Lagername in der Kopfzeile</label><input name="firmenname" value="{{ cfg.server.firmenname }}" class="field"></div>
+  <fieldset><legend class="label">Design</legend>
+    <div class="grid sm:grid-cols-2 gap-3">
+      {% for wert, titel, text, farben in [("standard", "Standard", "Bisheriges Design: Blau, gelbe Regaletiketten, Barlow Semi Condensed.", ["#1C2A38", "#1F5FAE", "#FFC72C", "#EEF1F3"]),
+                                            ("ci", "Corporate Identity", "Firmenfarben Rot/Navy/Grau, Schrift Barlow Regular und Bold, eigenes Logo für Lager und Instandhaltung.", ["#263B49", "#C51620", "#626467", "#ECEDEB"])] %}
+      <label class="flex gap-3 rounded-md border border-line p-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:ring-2 has-[:checked]:ring-primary/25">
+        <input type="radio" name="design" value="{{ wert }}" class="mt-1" {% if cfg.server.design == wert or (wert == "standard" and cfg.server.design != "ci") %}checked{% endif %}>
+        <span><span class="flex items-center gap-2 font-semibold">{% if wert == "ci" %}<img src="/static/logo-ci.svg" alt="" class="w-6 h-6">{% endif %}{{ titel }}</span>
+          <span class="flex gap-1 my-1.5">{% for f in farben %}<span class="w-6 h-4 rounded-sm border border-line" style="background-color: {{ f }}"></span>{% endfor %}</span>
+          <span class="block text-xs text-muted">{{ text }}</span></span>
+      </label>
+      {% endfor %}
+    </div>
+    <p class="text-xs text-muted mt-1">Gilt für alle Benutzer, PC und Handy-Apps; Hell/Dunkel wählt jeder selbst. Installierte Apps zeigen ein neues Symbol erst nach Neuinstallation.</p>
+  </fieldset>
   <div><label class="label">Programmname</label><input name="programmname" value="{{ cfg.server.programmname }}" class="field" maxlength="40" placeholder="Lagerverwaltung">
     <p class="text-xs text-muted mt-1">Erscheint bei der Anmeldung, im Fenstertitel, in der Desktop-App und als Name der Verknüpfung (z. B. „Betriebssoftware“, weil Lager und Instandhaltung im selben Programm sind). Programmordner, Dienst, Autostart und Datensicherungen behalten ihren Namen – es ändert sich nur die Anzeige. Die Desktop-Verknüpfung bekommt den neuen Namen, sobald <i>windows\VERKNUEPFUNG_ERSTELLEN.bat</i> einmal ausgeführt wird (am Lager-PC) bzw. das Skript für Arbeitsplatz-PCs neu geladen wird. Eine installierte Desktop-App zeigt den neuen Namen nach Neuinstallation.</p></div>
   <div><label class="label">Standard-Einheit für neue Artikel</label><input name="standard_einheit" value="{{ cfg.lager.standard_einheit }}" class="field w-28"></div>

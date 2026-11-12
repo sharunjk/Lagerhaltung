@@ -1,15 +1,15 @@
 {% from "_macros.html" import icon %}
 <!doctype html>
-<html lang="de">
+{% set ci = cfg.server.design == "ci" %}<html lang="de" class="{{ 'ci' if ci }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1C2A38">
+  <meta name="theme-color" content="{{ '#263B49' if ci else '#1C2A38' }}">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/m/manifest.webmanifest">
-  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="apple-touch-icon" href="/static/{{ 'apple-touch-icon-ci.png' if ci else 'apple-touch-icon.png' }}">
   <title>{% block title %}Scanner{% endblock %} – Lager</title>
-  <link rel="icon" href="/static/icon.svg">
+  <link rel="icon" href="/static/{{ 'logo-ci.svg' if ci else 'icon.svg' }}">
   <link rel="stylesheet" href="/static/app.css?v={{ request.app.state.static_v }}">
   <script>try{const t=localStorage.getItem("lv-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
   <script src="/static/vendor/zxing.min.js" defer></script>
@@ -41,10 +41,10 @@ document.addEventListener("submit", function(e){
     main p a:not(.hidden),main div>a.text-sm:not(.hidden){display:inline-flex;align-items:center;min-height:44px}</style>
 </head>
 <body class="min-h-screen" data-https-port="{{ cfg.server.https_port or '' }}">
-<header class="sticky top-0 z-20 bg-nav text-white">
+<header class="sticky top-0 z-20 bg-nav text-white ci-kopf">
   <div class="flex items-center gap-3 px-4 h-14">
     {% if pfad not in ("/m", "/m/") %}<a href="/m" onclick="event.preventDefault(); lvZurueck('/m')" class="grid place-items-center -ml-2 text-white" aria-label="Zurück">{{ icon("back", "w-6 h-6") }}</a>{% endif %}
-    <a href="/m" class="grid place-items-center w-9 h-9 rounded bg-tag text-tagink" aria-label="Start">{{ icon("scan", "w-6 h-6") }}</a>
+    {% if ci %}<a href="/m" aria-label="Start"><img src="/static/logo-ci.svg" alt="" class="w-9 h-9"></a>{% else %}<a href="/m" class="grid place-items-center w-9 h-9 rounded bg-tag text-tagink" aria-label="Start">{{ icon("scan", "w-6 h-6") }}</a>{% endif %}
     <div class="flex-1 min-w-0"><div class="font-cond font-bold text-lg leading-tight truncate">{% block kopf %}Lager{% endblock %}</div><div class="text-xs text-navink truncate">{{ user.name }}</div></div>
     <a id="offline-badge" href="/m/offline" class="hidden rounded-full px-2.5 py-1 text-xs font-bold text-white bg-warn"></a>
   </div>

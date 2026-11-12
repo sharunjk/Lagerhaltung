@@ -1,6 +1,7 @@
 @font-face { font-family: "Barlow"; font-weight: 400; font-display: swap; src: url("/static/fonts/barlow-latin-400-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow"; font-weight: 500; font-display: swap; src: url("/static/fonts/barlow-latin-500-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow"; font-weight: 600; font-display: swap; src: url("/static/fonts/barlow-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 700; font-display: swap; src: url("/static/fonts/barlow-latin-700-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow Semi Condensed"; font-weight: 500; font-display: swap; src: url("/static/fonts/barlow-semi-condensed-latin-500-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow Semi Condensed"; font-weight: 600; font-display: swap; src: url("/static/fonts/barlow-semi-condensed-latin-600-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow Semi Condensed"; font-weight: 700; font-display: swap; src: url("/static/fonts/barlow-semi-condensed-latin-700-normal.woff2") format("woff2"); }
@@ -16,6 +17,7 @@
     --primary: 31 95 175; --ok: 30 122 90; --warn: 176 104 0; --crit: 192 53 43; --soft: 246 248 249; --onprimary: 255 255 255;
     /* Weinrot für Lagerplätze mit Nachbestellbedarf (Firmenfarbe; hier anpassen) */
     --wein: 128 22 50; --weinink: 255 255 255; --weintext: 128 22 50;
+    --font-cond: "Barlow Semi Condensed";
     color-scheme: light;
   }
   .dark {
@@ -24,6 +26,24 @@
     --primary: 96 150 222; --ok: 72 180 140; --warn: 230 160 60; --crit: 236 100 88; --soft: 31 43 54; --onprimary: 10 18 28;
     --wein: 150 32 64; --weinink: 255 255 255; --weintext: 240 130 158;
     color-scheme: dark;
+  }
+  /* ------------------------------------------------------------------ Corporate Identity (Einstellungen → Allgemein → Design)
+     Farben: #c51620 Rot · #931017 Dunkelrot · #263b49 Navy · #495964 Schiefer · #626467 / #808287 Grau · #cccbcb / #ecedeb Hellgrau · #ffffff
+     Schrift: Barlow Regular (400) und Barlow Bold (700). Alle Textfarben ≥ 4,5:1 (WCAG AA), Feldrahmen ≥ 3:1. */
+  .ci {
+    --bg: 236 237 235; --surface: 255 255 255; --ink: 38 59 73; --muted: 98 100 103; --line: 204 203 203;
+    --nav: 38 59 73; --navink: 204 203 203; --tag: 255 199 44; --tagink: 24 24 20;
+    --primary: 197 22 32; --ok: 30 122 90; --warn: 154 91 0; --crit: 147 16 23; --soft: 245 245 244; --onprimary: 255 255 255;
+    --wein: 147 16 23; --weinink: 255 255 255; --weintext: 147 16 23;
+    --info: 73 89 100; --feldrahmen: 128 130 135; --akzent: 197 22 32;
+    --font-cond: "Barlow";
+  }
+  .ci.dark {
+    --bg: 22 33 42; --surface: 30 45 56; --ink: 236 237 235; --muted: 168 172 176; --line: 60 78 92;
+    --nav: 15 24 31; --navink: 204 203 203; --tag: 245 190 40; --tagink: 20 20 16;
+    --primary: 242 112 117; --ok: 72 180 140; --warn: 230 160 60; --crit: 255 154 143; --soft: 37 54 66; --onprimary: 16 25 32;
+    --wein: 147 16 23; --weinink: 255 255 255; --weintext: 255 154 143;
+    --info: 169 188 203; --feldrahmen: 110 128 142; --akzent: 197 22 32;
   }
   html { font-size: 15.5px; }
   body { @apply bg-bg text-ink font-sans antialiased; font-feature-settings: "tnum" 1; }
@@ -66,6 +86,35 @@
   .seg .an, .seg input:checked + span { @apply bg-ink text-surface; }
   .kbd { @apply inline-block rounded border border-line bg-soft px-1.5 text-xs text-muted font-sans; }
 }
+
+/* ------------------------------------------------------------------ CI-Modus: Barlow Regular/Bold, klare Kanten, rote Akzente */
+.ci body { font-feature-settings: "tnum" 1; letter-spacing: 0.003em; }
+.ci h1, .ci h2, .ci h3 { font-weight: 700; letter-spacing: 0; }
+.ci h1 { font-size: 1.85rem; }
+.ci .font-semibold, .ci .font-bold { font-weight: 700; }
+.ci .font-medium { font-weight: 400; }
+.ci .panel { border-radius: 6px; }
+.ci .btn { border-radius: 4px; font-weight: 700; }
+.ci .btn-primary:hover { filter: none; background-color: rgb(147 16 23); border-color: rgb(147 16 23); }
+/* Dunkel: Knöpfe bleiben CI-Rot mit weißer Schrift (6,0:1); nur Links/Text nutzen das aufgehellte Rot (4,9:1 auf Fläche) */
+.ci.dark .btn-primary, .ci.dark .bg-primary { background-color: rgb(197 22 32); border-color: rgb(197 22 32); color: #fff; }
+.ci.dark .btn-primary:hover { background-color: rgb(218 40 50); border-color: rgb(218 40 50); }
+.ci .field { border-color: rgb(var(--feldrahmen)); border-radius: 4px; }
+.ci .label { font-weight: 700; color: rgb(var(--ink)); font-size: 0.82rem; }
+.ci .tbl th { font-family: "Barlow", sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.74rem; color: rgb(var(--muted)); }
+.ci .tbl thead th { background: rgb(var(--soft)); }
+/* Status: Info in Schiefer (Rot ist für Aktionen reserviert), Kritisch als gefüllter Hinweis – klar von Links unterscheidbar */
+.ci .status.text-primary { color: rgb(var(--info)); }
+.ci .st-kritisch { background: rgb(var(--crit) / 0.1); border-radius: 999px; padding: 0 0.5rem 0 0.4rem; }
+.ci .seg .an, .ci .seg input:checked + span { background: rgb(38 59 73); color: #fff; }
+.ci.dark .seg .an, .ci.dark .seg input:checked + span { background: rgb(var(--ink)); color: rgb(var(--surface)); }
+/* Seitenleiste: aktiver Eintrag mit rotem Balken */
+.ci .navlink { border-radius: 4px; position: relative; }
+.ci .navlink.aktiv { background: rgb(255 255 255 / 0.08); }
+.ci .navlink.aktiv::before { content: ""; position: absolute; left: -0.75rem; top: 0.35rem; bottom: 0.35rem; width: 4px; border-radius: 0 3px 3px 0; background: rgb(var(--akzent)); }
+.ci .ci-kopf { border-top: 4px solid rgb(var(--akzent)); }
+.ci input[type=checkbox], .ci input[type=radio] { accent-color: rgb(var(--akzent)); }
+.ci a:not(.btn):not(.navlink):focus-visible { outline-color: rgb(var(--akzent)); }
 
 [x-cloak] { display: none !important; }
 

@@ -1,6 +1,20 @@
 {% extends "base.html" %}
 {% block nologin %}
 <div class="min-h-screen grid lg:grid-cols-[1fr_minmax(420px,520px)]">
+  {% if cfg.server.design == "ci" %}
+  <div class="hidden lg:flex flex-col justify-between bg-nav text-navink p-12 border-t-[6px] border-[rgb(var(--akzent))] relative overflow-hidden">
+    <div class="flex items-center gap-4">
+      <img src="/static/logo-ci.svg" alt="" class="w-14 h-14">
+      <span class="leading-tight"><span class="block text-white text-2xl font-bold">{{ cfg.server.programmname }}</span><span class="block text-sm tracking-[0.18em] uppercase">{{ cfg.server.firmenname }}</span></span>
+    </div>
+    <div class="relative z-10">
+      <p class="text-white text-5xl font-bold leading-[1.08] max-w-lg">Lager und Instandhaltung.<br><span class="text-[rgb(255_120_125)]">Ein System.</span></p>
+      <p class="mt-5 max-w-md">Ersatzteile finden und buchen, Anlagen warten, Schichten übergeben – mit Scanner, am PC und am Handy.</p>
+    </div>
+    <img src="/static/logo-ci.svg" alt="" aria-hidden="true" class="absolute -right-24 -bottom-24 w-[26rem] opacity-[0.07] pointer-events-none">
+    <p class="text-xs relative z-10">{{ cfg.server.firmenname }} · Version {{ request.app.state.version }}</p>
+  </div>
+  {% else %}
   <div class="hidden lg:flex flex-col justify-between bg-nav text-navink p-12">
     <div class="flex items-center gap-3">
       <span class="bintag text-lg px-2">C2-R7-1</span><span class="font-cond text-white text-xl font-semibold">{{ cfg.server.firmenname }}</span>
@@ -11,8 +25,10 @@
     </div>
     <svg viewBox="0 0 400 60" class="w-80 opacity-40" aria-hidden="true">{% for i in range(0, 60) %}<rect x="{{ i * 6.6 }}" y="0" width="{{ [1.2, 2.6, 1.2, 3.8, 1.2, 2][i % 6] }}" height="60" fill="currentColor"/>{% endfor %}</svg>
   </div>
+  {% endif %}
   <div class="flex items-center justify-center p-6">
     <div class="w-full max-w-sm">
+      {% if cfg.server.design == "ci" %}<img src="/static/logo-ci.svg" alt="" class="w-14 h-14 mb-5 lg:hidden">{% endif %}
       {% for f in flashes %}<div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-{{ f.art }}">{{ f.text }}</div>{% endfor %}
       {% block form %}{% endblock %}
     </div>

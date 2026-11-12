@@ -19,6 +19,7 @@ class ServerCfg:
     http_nur_lokal: bool = True  # HTTP (unverschlüsselt) nur für den Browser auf diesem PC; alle anderen Geräte über HTTPS
     secret_key: str = ""
     firmenname: str = "CAPHENIA"
+    design: str = "standard"  # "standard" oder "ci" (Corporate Identity: Farben und Schrift nach Firmen-Richtlinie, eigenes Logo)
     programmname: str = "Lagerverwaltung"  # Anzeigename (Anmeldung, Desktop-App, Verknüpfung) – Ordner, Dienst, Dateien bleiben unverändert
 
 

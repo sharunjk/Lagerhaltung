@@ -1,0 +1,13 @@
+Neu in 2.11.0 - Design nach Corporate Identity:
+- Einstellungen -> Allgemein -> Design: "Standard" (wie bisher) oder "Corporate Identity".
+- Corporate Identity: Firmenfarben (Rot, Navy, Grautoene), Schrift Barlow Regular und Bold, neues Logo
+  (Zahnrad = Instandhaltung, Lagerkarton = Lager), eigene Symbole fuer Lager-App und Instandhaltungs-App.
+- Gilt fuer PC, Scanner-App und Instandhaltungs-App, hell und dunkel. Alle Texte gut lesbar (Kontrast mind. 4,5:1).
+- Installierte Apps zeigen das neue Symbol erst nach Neuinstallation (ansonsten aendert sich nur das Aussehen).
+
+Datenbank: keine Aenderung gegenueber 2.10.0.
+
+Enthaelt alles aus 2.10.0 (Umzugspaket), 2.9.0, 2.8.x, 2.7.x, 2.6.0, 2.5.0, 2.4.0, 2.3.1 und 2.3.0. Wer von 2.8.x oder
+aelter kommt: Die Datenbank wird beim ersten Start erst als Probelauf an einer Kopie ergaenzt, mit Sicherung
+vor_update_... vorher. Nach einem Update von vor 2.5.0 ist die Instandhaltung zunaechst ausgeschaltet
+(Einstellungen -> Allgemein -> Instandhaltung (CMMS) aktivieren).

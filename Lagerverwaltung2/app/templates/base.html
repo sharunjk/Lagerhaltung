@@ -1,15 +1,15 @@
 {% from "_macros.html" import icon %}
 <!doctype html>
-<html lang="de">
+{% set ci = cfg.server.design == "ci" %}<html lang="de" class="{{ 'ci' if ci }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Lager{% endblock %} – {{ cfg.server.firmenname }} {{ "Instandhaltung" if bereich == "ih" else cfg.server.programmname }}</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23FFC72C'/><path d='M8 10v12M12 10v12M15 10v12M19 10v12M23 10v12' stroke='%2318222E' stroke-width='2'/></svg>">
+  {% if ci %}<link rel="icon" href="/static/{{ 'logo-ci-ih.svg' if bereich == 'ih' else 'logo-ci.svg' }}">{% else %}<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23FFC72C'/><path d='M8 10v12M12 10v12M15 10v12M19 10v12M23 10v12' stroke='%2318222E' stroke-width='2'/></svg>">{% endif %}
   <link rel="stylesheet" href="/static/app.css?v={{ request.app.state.static_v }}">
-  {% if bereich == "ih" %}<link rel="manifest" href="/ih/manifest.webmanifest"><link rel="apple-touch-icon" href="/static/apple-touch-icon-ih.png">
-  <meta name="theme-color" content="#1F5FAE">{% else %}<link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#1C2A38">{% endif %}
+  {% if bereich == "ih" %}<link rel="manifest" href="/ih/manifest.webmanifest"><link rel="apple-touch-icon" href="/static/{{ 'apple-touch-icon-ci-ih.png' if ci else 'apple-touch-icon-ih.png' }}">
+  <meta name="theme-color" content="{{ '#263B49' if ci else '#1F5FAE' }}">{% else %}<link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="{{ '#263B49' if ci else '#1C2A38' }}">{% endif %}
   <script>try{const t=localStorage.getItem("lv-theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
   <script src="/static/vendor/htmx.min.js" defer></script>
   <script src="/static/vendor/alpine.min.js" defer></script>
@@ -22,7 +22,7 @@
   <aside class="no-print hidden lg:flex w-60 shrink-0 flex-col bg-nav text-navink sticky top-0 h-screen">
     {% set ih = bereich == "ih" %}
     <a href="{{ '/ih' if ih else '/' }}" class="flex items-center gap-3 px-5 h-16 border-b border-white/10">
-      <span class="grid place-items-center w-9 h-9 rounded {{ 'bg-primary text-white' if ih else 'bg-tag text-tagink' }}">{{ icon("wrench" if ih else "scan", "w-6 h-6") }}</span>
+      {% if ci %}<img src="/static/logo-ci.svg" alt="" class="w-10 h-10 shrink-0">{% else %}<span class="grid place-items-center w-9 h-9 rounded {{ 'bg-primary text-white' if ih else 'bg-tag text-tagink' }}">{{ icon("wrench" if ih else "scan", "w-6 h-6") }}</span>{% endif %}
       <span class="leading-tight"><span class="block font-cond font-bold text-white text-lg">{{ "Instandhaltung" if ih else "Lagerverwaltung" }}</span><span class="block text-xs">{{ cfg.server.firmenname }}</span></span>
     </a>
     {% if module|length > 1 %}
@@ -61,7 +61,7 @@
   </aside>
 
   <div class="flex-1 min-w-0 flex flex-col">
-    <header class="no-print sticky top-0 z-20 bg-bg/95 backdrop-blur border-b border-line">
+    <header class="no-print sticky top-0 z-20 bg-bg/95 backdrop-blur border-b border-line ci-kopf">
       <div class="flex items-center gap-3 px-4 lg:px-8 h-16">
         <details class="lg:hidden relative">
           <summary class="btn list-none">Menü</summary>

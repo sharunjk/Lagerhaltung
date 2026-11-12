@@ -68,12 +68,13 @@ def _letzte(request: Request) -> dict | None:
 @router.get("/manifest.webmanifest")
 def manifest(request: Request):
     firma = request.app.state.cfg.server.firmenname
+    v = "icon-ci" if request.app.state.cfg.server.design == "ci" else "icon"
     return JSONResponse({
         "name": f"Lager {firma}", "short_name": "Lager", "id": "/m", "start_url": "/m", "scope": "/m",
-        "display": "standalone", "orientation": "portrait", "background_color": "#EEF1F3", "theme_color": "#1C2A38",
-        "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
-                  {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
-                  {"src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}],
+        "display": "standalone", "orientation": "portrait", "background_color": "#EEF1F3", "theme_color": "#263B49" if v == "icon-ci" else "#1C2A38",
+        "icons": [{"src": f"/static/{v}-192.png", "sizes": "192x192", "type": "image/png"},
+                  {"src": f"/static/{v}-512.png", "sizes": "512x512", "type": "image/png"},
+                  {"src": f"/static/{v}-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}],
         "shortcuts": [{"name": "Entnahme", "url": "/m/buchen?typ=ausgang"}, {"name": "Eingang", "url": "/m/buchen?typ=eingang"},
                       {"name": "Offline erfassen", "url": "/m/offline"}],
     }, media_type="application/manifest+json")

@@ -52,12 +52,13 @@ def suche(request: Request, q: str = ""):
 @router.get("/manifest.webmanifest")
 def manifest(request: Request):
     firma = request.app.state.cfg.server.firmenname
+    v = "icon-ci-ih" if request.app.state.cfg.server.design == "ci" else "icon-ih"
     return JSONResponse({
         "name": f"Instandhaltung {firma}", "short_name": "Instandhaltung", "id": "/ih/m", "start_url": "/ih/m", "scope": "/ih/",
-        "display": "standalone", "orientation": "portrait", "background_color": "#EEF1F3", "theme_color": "#1F5FAE",
-        "icons": [{"src": "/static/icon-ih-192.png", "sizes": "192x192", "type": "image/png"},
-                  {"src": "/static/icon-ih-512.png", "sizes": "512x512", "type": "image/png"},
-                  {"src": "/static/icon-ih-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}],
+        "display": "standalone", "orientation": "portrait", "background_color": "#EEF1F3", "theme_color": "#263B49" if v == "icon-ci-ih" else "#1F5FAE",
+        "icons": [{"src": f"/static/{v}-192.png", "sizes": "192x192", "type": "image/png"},
+                  {"src": f"/static/{v}-512.png", "sizes": "512x512", "type": "image/png"},
+                  {"src": f"/static/{v}-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}],
         "shortcuts": [{"name": "Neue Meldung", "url": "/ih/schichtbuch/neu"}, {"name": "Schichtbuch", "url": "/ih/schichtbuch"},
                       {"name": "Aufträge", "url": "/ih/auftraege"}],
     }, media_type="application/manifest+json")
