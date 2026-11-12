@@ -1,0 +1,17 @@
+Neu in 2.10.0 - Umzugspaket:
+- Einstellungen -> Datensicherung -> "Umzug auf einen neuen PC": Ein Knopf (mit Ihrem Passwort) erstellt eine
+  ZIP-Datei mit dem ganzen System: Programm mit Python, Datenbank, Fotos/Dokumente, alle Einstellungen (Drucker,
+  E-Mail, Speicherorte, Programmname ...) und Zertifikate - auf Wunsch auch die Sicherungen.
+- Danach steht dieses System auf "nur lesen", damit keine Buchung verloren geht (aufhebbar, falls der Umzug
+  abgebrochen wird).
+- Neuer PC: ZIP nach C:\ entpacken, dann windows\UMZUG_ABSCHLIESSEN_als_Admin.bat als Administrator ausfuehren
+  (Verknuepfung, Start beim Hochfahren, Firewall). Anleitung im Paket: UMZUG_LIESMICH.txt.
+- Handscanner und Handys muessen das Zertifikat nicht neu installieren. Am besten bekommt der neue PC die
+  IP-Adresse des alten.
+
+Datenbank: keine Aenderung gegenueber 2.9.0.
+
+Enthaelt alles aus 2.9.0 (Schicht wieder oeffnen, Nachtraege, Notfall-Formulare, Instandhaltungs-App, Programmname),
+2.8.x, 2.7.x, 2.6.0, 2.5.0, 2.4.0, 2.3.1 und 2.3.0. Wer von 2.8.x oder aelter kommt: Die Datenbank wird beim ersten
+Start erst als Probelauf an einer Kopie ergaenzt, mit Sicherung vor_update_... vorher. Nach einem Update von vor 2.5.0
+ist die Instandhaltung zunaechst ausgeschaltet (Einstellungen -> Allgemein -> Instandhaltung (CMMS) aktivieren).

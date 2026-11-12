@@ -477,6 +477,18 @@ Prüfung: 181 Tests grün (2 übersprungen), 17 Browserprüfungen ohne Fehler, R
 
 Prüfung: 189 Tests grün (2 übersprungen). Browserprüfung `werkzeuge/pruefung/notfall_app.cjs` 23/23 (Beenden/Wiederöffnen/erneut Beenden, Nachtrag, Papierformulare als PDF, Einstellungen, Programmname, App am Handy: Startseite, Leiste, Service Worker, 5 Seiten ohne seitliches Scrollen, Offline-Hinweis). Regression: `schichtbuch`, `ersatzteile`, `cmms`, `wartung`, `mobil`, `offline`, `pc`, `anlegen`, `profil`, `sicherung` ohne Fehler. Update von 2.8.1 nachgestellt (Probelauf, Sicherung, Migration 4, Bestand unverändert). `windows/verknuepfung.ps1` konnte hier nicht unter Windows ausgeführt werden (kein PowerShell vorhanden) – bitte nach dem Ändern des Programmnamens einmal am Lager-PC prüfen.
 
+## Nachtrag: Umzugspaket 2.10.0
+
+| Prüfung | Ergebnis | Beleg |
+|---|---|---|
+| Nur mit Admin-Passwort und Bestätigung; Lager-Rolle gesperrt | falsches Passwort und fehlende Bestätigung: kein Paket, keine Sperre | `test_umzugspaket_inhalt_und_sperre` |
+| Inhalt | Programm, `daten/lager.db` (stimmige Kopie ohne Sperre), Anhänge, Zertifikate, `.secret_key`, `config.toml` mit laufenden Einstellungen und relativen Datenpfaden, Anleitung; ohne Caches, Logs, Testsystem, Sicherungen (außer auf Wunsch) | dieselbe, `test_umzugspaket_mit_sicherungen_und_fehlerfall` |
+| Nur lesen danach | Buchen am PC, Scanner-Sync, API, Schichtbuch: 423, Bestand unverändert; Lesen und Anmelden gehen; gilt nach Neustart; zweites Paket möglich; Aufheben nur mit Passwort | `test_umzugspaket_inhalt_und_sperre` |
+| Fehler beim Packen | keine halbe Datei, Sperre zurückgenommen, Buchen geht weiter | `test_umzugspaket_mit_sicherungen_und_fehlerfall` |
+| Entpacken und Starten | neuer Ordner: Anmeldung mit alten Passwörtern, Daten und Fotos da, nicht gesperrt, Buchen geht, Zertifikat identisch | `test_entpacken_und_starten_auf_neuem_pc` |
+
+Prüfung: 193 Tests grün (2 übersprungen). Browserprüfung `werkzeuge/pruefung/umzug.cjs` mit echtem Server: Paket über die Einstellungen erstellt, alter PC „nur lesen“ (PC 423, Scanner-App mit Hinweis). Paket entpackt, Server im neuen Ordner gestartet: Anmeldung, Schichtbuch-Meldung, Programmname und Instandhaltung übernommen, Buchung gespeichert (alte Datenbank 45, neue 46 Buchungen), Zertifikat identisch, keine JS-Fehler (13/13). `UMZUG_ABSCHLIESSEN_als_Admin.bat` konnte hier nicht unter Windows ausgeführt werden. Es ruft nur die bewährten Skripte für Verknüpfung, Dienst und Firewall auf.
+
 ## Anhang B – Neue Tests (`tests/test_pruefung.py`)
 
 | Test | sichert ab |

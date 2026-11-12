@@ -1,10 +1,10 @@
-# Lagerverwaltung 2.9.0 – Installation
+# Lagerverwaltung 2.10.0 – Installation
 
 Eigenständige Lagerverwaltung mit eigener Datenbank. Sie braucht weder Casper noch MySQL noch den MIS Communicator. Die bisherigen Daten werden einmalig aus einem HeidiSQL-Export übernommen. Dauer: etwa 20 Minuten.
 
 ## Was Sie brauchen
 
-- Das Paket `Lagerverwaltung_v2.9.0.zip`
+- Das Paket `Lagerverwaltung_v2.10.0.zip`
 - Die Datei **python-3.12.10-embed-amd64.zip** von python.org (*Downloads → Windows → Python 3.12.10 → „Windows embeddable package (64-bit)“*). Keine Installation, keine Adminrechte nötig.
 - Den SQL-Export der Casper-Datenbank (HeidiSQL → Rechtsklick auf `daten` → *Datenbank als SQL exportieren*, Daten: „Einfügen“). Frisch exportieren, damit die letzten Buchungen enthalten sind.
 - Für Handscanner/Smartphones und andere PCs: einmalig Adminrechte für die Firewall-Freigabe (IT)
@@ -102,9 +102,24 @@ Die Lagerverwaltung muss dafür nicht beendet werden. Handscanner sollten ihre o
 
 **Von Hand** (falls die Lagerverwaltung nicht mehr startet): Lagerverwaltung beenden (`windows\4_AUTOSTART_AUS.bat`, beim Dienst mit Rechtsklick *Als Administrator ausführen*). Dann in `C:\Lagerverwaltung2\daten` die Dateien `lager.db-wal` und `lager.db-shm` löschen, `lager.db` und den Ordner `anhaenge` aus der ZIP nach `daten` kopieren und wieder starten. Dieselben Schritte stehen in jeder Sicherung in `LIESMICH.txt`.
 
+### Geplanter Umzug auf einen neuen PC (Umzugspaket)
+
+Der alte PC läuft noch: Das **Umzugspaket** nimmt alles in einer Datei mit – Programm mit Python, Datenbank, Fotos und Dokumente, alle Einstellungen aus `config.toml` (Drucker, E-Mail, Speicherorte, Programmname, Instandhaltung an/aus) und die Zertifikate. Handscanner und Handys müssen das Zertifikat nicht neu installieren.
+
+1. Am alten PC, am besten am Schichtende: *Einstellungen → Datensicherung → Umzug auf einen neuen PC*. USB-Stick oder externe Festplatte als Ziel wählen, bestätigen, das eigene Passwort eingeben → *Umzugspaket erstellen*. Danach steht der alte PC auf **„nur lesen“**. Scanner-Apps behalten offline erfasste Buchungen und übertragen sie später an den neuen PC.
+2. Die Datei `Umzugspaket_….zip` auf den neuen PC kopieren. Rechtsklick → *Alle extrahieren …* → Ziel `C:\`. Es entsteht `C:\Lagerverwaltung2`; einen vorhandenen Ordner gleichen Namens vorher umbenennen.
+3. Rechtsklick auf `C:\Lagerverwaltung2\windows\UMZUG_ABSCHLIESSEN_als_Admin.bat` → *Als Administrator ausführen*. Es prüft das Programm und richtet Desktop-Verknüpfung, Start beim Hochfahren und Firewall-Freigabe ein. Danach läuft das Programm.
+4. Über das Desktop-Symbol öffnen und mit den bisherigen Benutzern anmelden. *Einstellungen → Datensicherung*: Speicherorte prüfen und *Jetzt sichern*. Den Etikettendrucker in Windows einrichten und ein Testetikett drucken.
+5. Den alten PC ausschalten. Die IT sollte dem neuen PC die IP-Adresse des alten geben, dann laufen Handscanner, Handys und Büro-PCs ohne Änderung weiter. Bei einer anderen Adresse die Apps einmal über die neue Adresse öffnen und neu installieren (*Einstellungen → Handscanner / Handy*).
+6. Das Umzugspaket danach löschen. Es ist vertraulich, denn es enthält alle Daten, Passwort-Hashes und Zertifikatsschlüssel.
+
+Umzug abgebrochen? Am alten PC unter *Einstellungen → Datensicherung → „Nur lesen“ aufheben* (Passwort). Ein schon erstelltes Paket ist danach veraltet.
+
 ### Lager-PC defekt – Umzug auf einen neuen PC
 
-1. Auf dem neuen PC die Lagerverwaltung nach Abschnitt 1 einrichten. Dafür das **vollständige** Paket `Lagerverwaltung_v2.9.0.zip` nehmen, nicht ein Update-Paket. Die Datenübernahme aus Casper entfällt.
+Der alte PC startet nicht mehr: Umzug aus der letzten Datensicherung.
+
+1. Auf dem neuen PC die Lagerverwaltung nach Abschnitt 1 einrichten. Dafür das **vollständige** Paket `Lagerverwaltung_v2.10.0.zip` nehmen, nicht ein Update-Paket. Die Datenübernahme aus Casper entfällt.
 2. Einen vorläufigen Administrator anlegen, anmelden.
 3. Externe Festplatte anschließen → *Einstellungen → Datensicherung → Sicherung auswählen …* → neueste Sicherung → *Wiederherstellen*. Danach gelten die Benutzer aus der Sicherung, der vorläufige Administrator ist weg.
 4. Speicherorte, Drucker und E-Mail neu einstellen. Diese Einstellungen stehen in `config.toml` und sind nicht Teil der Sicherung. Firewall-Freigabe und Dienst wie bei der Ersteinrichtung.

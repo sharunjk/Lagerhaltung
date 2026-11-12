@@ -4,11 +4,12 @@ from __future__ import annotations
 import logging
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -17,7 +18,7 @@ from .config import load_config
 from .services.betrieb import Zeitplaner
 from .web import Anmeldesperre, Forbidden, LoginRequired, render
 
-VERSION = "2.9.0"
+VERSION = "2.10.0"
 log = logging.getLogger("lagerverwaltung")
 
 
@@ -73,6 +74,10 @@ def server_plan(cfg, https_bereit: bool) -> list[dict]:
     return plan
 
 
+# Während der Umzugs-Sperre noch erlaubt: anmelden, abmelden, Sperre aufheben
+UMZUG_ERLAUBT = {"/login", "/m/login", "/logout", "/einstellungen/umzug", "/einstellungen/umzug/aufheben"}
+
+
 def create_app(cfg=None, start_scheduler: bool = True) -> FastAPI:
     cfg = cfg or load_config()
     from .migrationen import vor_start
@@ -99,6 +104,10 @@ def create_app(cfg=None, start_scheduler: bool = True) -> FastAPI:
     app.state.neustart_noetig = False
     app.state.anmeldesperre = Anmeldesperre()
     app.state.vor_update = vor_update
+    from .services.umzug import sperre_lesen
+    with db.engine().connect() as con:
+        app.state.umzug_sperre = sperre_lesen(con)  # Umzugspaket erstellt: dieses System nur noch lesen
+    app.state.umzug_geprueft = time.monotonic()
 
     @app.middleware("http")
     async def same_origin_check(request: Request, call_next):
@@ -111,6 +120,22 @@ def create_app(cfg=None, start_scheduler: bool = True) -> FastAPI:
             src = request.headers.get("origin") or request.headers.get("referer")
             if src and urlparse(src).netloc != request.headers.get("host"):
                 return PlainTextResponse("Anfrage von fremder Seite abgelehnt.", status_code=403)
+        schreibt = request.method in ("POST", "PUT", "PATCH", "DELETE")
+        if schreibt or time.monotonic() - app.state.umzug_geprueft > 15:  # Sperre aus der Datenbank (gilt für alle Instanzen)
+            from .services.umzug import sperre_lesen
+            with db.engine().connect() as con:
+                app.state.umzug_sperre = sperre_lesen(con)
+            app.state.umzug_geprueft = time.monotonic()
+        sperre = app.state.umzug_sperre
+        if sperre and schreibt and request.url.path not in UMZUG_ERLAUBT:
+            text = (f"Nur lesen: Am {datetime.fromisoformat(sperre['am']):%d.%m.%Y um %H:%M} wurde ein Umzugspaket erstellt. "
+                    "Seitdem wird hier nichts mehr gespeichert – bitte auf dem neuen PC arbeiten.")
+            if request.url.path.startswith(("/api/", "/m/sync")) or "application/json" in (request.headers.get("accept") or ""):
+                return JSONResponse({"fehler": text}, status_code=423)  # Scanner-App behält Offline-Buchungen und versucht es später
+            antwort = render(request, "fehler.html", titel="Nur lesen – Umzug",
+                             text=text + " Wurde der Umzug abgebrochen, hebt ein Administrator die Sperre unter Einstellungen → Datensicherung auf.")
+            antwort.status_code = 423
+            return antwort
         return await call_next(request)
 
     app.add_middleware(SitzungJeProtokoll, secret_key=cfg.server.secret_key, session_cookie="lager_session",

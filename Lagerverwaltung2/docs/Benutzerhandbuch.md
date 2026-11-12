@@ -165,6 +165,8 @@ Eigene App mit blauem Symbol (neben der Lager-App installierbar): *Einstellungen
 
 **Programmname** (*Einstellungen → Allgemein*): Anzeigename bei der Anmeldung, im Fenstertitel, in der Desktop-App und als Name der Verknüpfung (z. B. „Betriebssoftware“, da Lager und Instandhaltung im selben Programm sind). Ordner, Dienst, Autostart und Sicherungen behalten ihren Namen. Die Desktop-Verknüpfung am Lager-PC bekommt den neuen Namen durch einmaliges Ausführen von *windows\VERKNUEPFUNG_ERSTELLEN.bat* (die alte „Lagerverwaltung“-Verknüpfung wird ersetzt), auf Arbeitsplatz-PCs durch das neu geladene Arbeitsplatz-Skript.
 
+**Umzug auf einen neuen PC** (*Einstellungen → Datensicherung → Umzug auf einen neuen PC*): Ein Knopf erstellt nach Eingabe des eigenen Passworts eine ZIP-Datei mit dem ganzen System: Programm, Daten, Fotos und Dokumente, Einstellungen und Zertifikate, auf Wunsch auch die Sicherungen. Danach steht dieses System auf „nur lesen“, damit keine Buchung verloren geht. Auf dem neuen PC nach `C:\` entpacken und `windows\UMZUG_ABSCHLIESSEN_als_Admin.bat` als Administrator ausführen. Die Schritte stehen im Paket in `UMZUG_LIESMICH.txt` und in der Installationsanleitung.
+
 **Notfall** (*Einstellungen → Notfall*): Papierformulare für Schichtbuch und Lager zum Ausdrucken und die Schritte zum Nachtragen.
 
 Benutzer und Rollen (*Nur lesen*, *Lager*, *Administrator*, *Kein Lagerzugriff*; dazu die Rolle Instandhaltung), Etikettendrucker, tägliche Meldebestands-Mail, Datensicherung (mehrere Uhrzeiten und Speicherorte, z. B. externe Festplatte; Wiederherstellen mit Vorschau), Datenübernahme aus Casper, Handscanner-Zugang mit QR-Code, Schnittstelle (API) für andere Programme. *Protokoll* zeigt jede Änderung mit Benutzer und Zeit.

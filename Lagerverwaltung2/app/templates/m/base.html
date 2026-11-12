@@ -53,7 +53,7 @@ document.addEventListener("submit", function(e){
 {% for f in flashes %}
 <div data-flash="{{ f.art }}" class="px-4 py-4 text-base font-semibold {{ 'bg-ok text-white' if f.art == 'ok' else 'bg-crit text-white' }}" role="status">{{ f.text }}</div>
 {% endfor %}
-<main class="px-4 py-4 max-w-xl mx-auto">{% block content %}{% endblock %}</main>
+<main class="px-4 py-4 max-w-xl mx-auto">{% set umzug = request.app.state.umzug_sperre %}{% if umzug %}<div role="alert" class="mb-3 rounded-md border border-warn bg-warn/10 px-3 py-2 text-sm font-semibold">Nur lesen: Umzug auf einen neuen PC ({{ umzug.am[8:10] }}.{{ umzug.am[5:7] }}. {{ umzug.am[11:16] }} Uhr). Buchungen werden hier nicht mehr gespeichert.</div>{% endif %}{% block content %}{% endblock %}</main>
 
 <nav class="fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line grid grid-cols-5" style="padding-bottom: env(safe-area-inset-bottom)">
   {% for href, ic, lab in [("/m", "home", "Start"), ("/m/buchen?typ=ausgang", "scan", "Entnahme"), ("/m/suche", "search", "Suchen"), ("/m/rueckgabe", "history", "Rückgabe"), ("/m/profil", "user", "Profil")] %}

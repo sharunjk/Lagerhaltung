@@ -40,4 +40,4 @@ if errorlevel 1 (
 call "%~dp0FIREWALL_FREIGEBEN_als_Admin.bat" nopause
 schtasks /Run /TN "Lagerverwaltung" >nul
 echo Aufgabe "Lagerverwaltung" angelegt (Konto NETZWERKDIENST, Start beim Hochfahren) und gestartet.
-pause
+if not "%1"=="nopause" pause

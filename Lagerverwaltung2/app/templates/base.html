@@ -96,6 +96,8 @@
     </header>
 
     <main class="flex-1 px-4 lg:px-8 py-6 max-w-[1500px] w-full {{ 'pb-24 lg:pb-6' if ih }}">
+      {% set umzug = request.app.state.umzug_sperre %}
+      {% if umzug %}<div role="alert" class="mb-4 rounded-md border border-warn bg-warn/10 px-4 py-3 text-sm font-semibold">Nur lesen: Am {{ umzug.am[8:10] }}.{{ umzug.am[5:7] }}.{{ umzug.am[:4] }} um {{ umzug.am[11:16] }} Uhr wurde ein Umzugspaket erstellt. Dieses System speichert nichts mehr – bitte auf dem neuen PC arbeiten.{% if user.rolle == "admin" %} <a class="underline" href="/einstellungen?tab=backup#umzug">Umzug abgebrochen?</a>{% endif %}</div>{% endif %}
       {% if request.app.state.neustart_noetig %}<div role="alert" class="mb-4 rounded-md border px-4 py-3 text-sm font-semibold flash-fehler">Die Programmdateien wurden aktualisiert, die Lagerverwaltung läuft aber noch mit der alten Version. Bitte neu starten – am einfachsten den Lager-PC neu starten. Bis dahin können einzelne Seiten Fehler zeigen.</div>{% endif %}
       {% for f in flashes %}
       <div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-{{ f.art }}" role="status">{{ f.text }}</div>

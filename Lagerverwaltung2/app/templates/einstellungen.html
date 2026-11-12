@@ -361,6 +361,38 @@ function lvSicherung(start) {
   };
 }
 </script>
+<section id="umzug" class="panel p-5 mt-6 max-w-6xl space-y-3">
+  <h2>Umzug auf einen neuen PC</h2>
+  {% set sp = request.app.state.umzug_sperre %}
+  {% if sp %}
+  <div class="rounded-md border border-warn bg-warn/10 p-3 text-sm space-y-1">
+    <p><b>Nur lesen:</b> Umzugspaket erstellt am {{ sp.am[8:10] }}.{{ sp.am[5:7] }}.{{ sp.am[:4] }} {{ sp.am[11:16] }} Uhr von {{ sp.von }}{% if sp.groesse %} ({{ groesse(sp.groesse) }}){% endif %}.</p>
+    <p class="break-all">Datei: <b>{{ sp.datei }}</b></p>
+    <p>Seitdem speichert dieses System nichts mehr. Auf dem neuen PC: ZIP-Datei nach C:\ entpacken, dann <i>windows\UMZUG_ABSCHLIESSEN_als_Admin.bat</i> als Administrator ausführen (Anleitung liegt im Paket: <i>UMZUG_LIESMICH.txt</i>).</p>
+  </div>
+  <form method="post" action="/einstellungen/umzug/aufheben" class="flex flex-wrap gap-2 items-end" onsubmit="return confirm('Umzug abgebrochen und hier weiterarbeiten? Das erstellte Umzugspaket ist danach veraltet.')">
+    <div><label class="label" for="u_pw2">Ihr Passwort</label><input id="u_pw2" name="passwort" type="password" required class="field w-56" autocomplete="current-password"></div>
+    <button class="btn">„Nur lesen“ aufheben (Umzug abgebrochen)</button>
+  </form>
+  {% else %}
+  <p class="text-sm">Erstellt <b>eine ZIP-Datei mit dem ganzen System</b>: Programm (mit Python), Datenbank, Fotos und Dokumente, Einstellungen (Drucker, E-Mail, Speicherorte, Programmname …) und Zertifikate – Handscanner müssen nichts neu installieren. Auf dem neuen PC nur entpacken und ein Skript ausführen.</p>
+  <ul class="text-sm list-disc pl-5 space-y-1">
+    <li><b>Danach steht dieses System auf „nur lesen“</b>, damit keine Buchung verloren geht, die nach dem Paket gemacht würde. Aufheben geht hier, falls der Umzug abgebrochen wird.</li>
+    <li>Am besten am Ende einer Schicht erstellen, wenn niemand bucht. Dauert je nach Datenmenge ein bis wenige Minuten.</li>
+    <li>Die Datei ist <b>vertraulich</b> (alle Daten, Passwort-Hashes, Zertifikatsschlüssel): sicher aufbewahren und nach dem Umzug löschen.</li>
+    <li>Damit Handscanner und Handys ohne Änderung weiterlaufen, sollte die IT dem neuen PC die IP-Adresse des alten geben.</li>
+  </ul>
+  <form method="post" action="/einstellungen/umzug" class="grid sm:grid-cols-2 gap-3 items-end max-w-3xl" x-data="{laeuft: false}" @submit="laeuft = true">
+    <div class="sm:col-span-2"><label class="label" for="u_ordner">Speichern in (z. B. USB-Stick oder externe Festplatte)</label>
+      <input id="u_ordner" name="ordner" list="u_ziele" value="{{ umzug_ziele[0] if umzug_ziele else '' }}" class="field" required>
+      <datalist id="u_ziele">{% for z in umzug_ziele %}<option value="{{ z }}">{% endfor %}</datalist></div>
+    <label class="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" name="mit_backups" class="mt-1"><span>Vorhandene Datensicherungen mitnehmen<span class="block text-muted">Meist nicht nötig – sie liegen ohnehin auf dem Sicherungsziel. Macht die Datei deutlich größer.</span></span></label>
+    <label class="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" name="bestaetigt" class="mt-1" required><span>Mir ist klar, dass dieses System danach nur noch gelesen werden kann.</span></label>
+    <div><label class="label" for="u_pw">Ihr Passwort</label><input id="u_pw" name="passwort" type="password" required class="field" autocomplete="current-password"></div>
+    <div><button class="btn btn-primary" :disabled="laeuft"><span x-show="!laeuft">Umzugspaket erstellen</span><span x-show="laeuft" x-cloak>Wird erstellt … bitte warten</span></button></div>
+  </form>
+  {% endif %}
+</section>
 {% elif tab == "uebernahme" %}
 <div class="grid xl:grid-cols-2 gap-6 max-w-6xl">
   <form method="post" action="/einstellungen/uebernahme" enctype="multipart/form-data" class="panel p-5 space-y-3" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Übernahme läuft …'">

@@ -102,7 +102,8 @@ def einstellungen(request: Request, tab: str = "allgemein"):
     return render(request, "einstellungen.html", tab=tab, users=nutzer, sich=sich, groesse=sicherung.groesse_text,
                   drucker_liste=labels.windows_drucker() if tab == "drucker" else [], svg=svg, hat_daten=hat_daten,
                   adressen=[a for a in lokale_adressen() if a != "127.0.0.1"], hostname=socket.gethostname(),
-                  uebernahme=json.loads(bericht) if bericht else None)
+                  uebernahme=json.loads(bericht) if bericht else None,
+                  umzug_ziele=([str(z.pfad) for z in sicherung.ziele(cfg)] + [d["pfad"] for d in sicherung.laufwerke()]) if tab == "backup" else [])
 
 
 def _cfg_update(request, section: str, werte: dict):
@@ -322,6 +323,60 @@ def wiederherstellen_seite(request: Request, quelle: str = "", hochgeladen: str 
     aktuell["anhaenge"] = sum(1 for f in anh.rglob("*") if f.is_file()) if anh.exists() else 0
     return render(request, "backup_wiederherstellen.html", info=info, fehler=fehler, quelle=quelle, aktuell=aktuell,
                   anzeigename=hochgeladen or (p.name if p else ""), groesse=sicherung.groesse_text)
+
+
+def _passwort_ok(request: Request, me: dict, passwort: str) -> str | None:
+    """Admin-Passwort erneut prüfen (mit Sperre nach Fehlversuchen). Gibt eine Fehlermeldung zurück oder None."""
+    sperre, ip = request.app.state.anmeldesperre, (request.client.host if request.client else "?")
+    if sperre.sperre_sekunden(ip, me["username"]):
+        return "Zu viele Fehlversuche. Bitte später erneut versuchen."
+    with db.engine().connect() as con:
+        u = con.execute(select(users).where(users.c.id == me["id"])).mappings().first()
+    if not u or not betrieb.check_pw(passwort, u["pw_hash"] or ""):
+        sperre.fehlschlag(ip, me["username"])
+        return "Passwort ist falsch."
+    return None
+
+
+@router.post("/einstellungen/umzug")
+def umzug_erstellen(request: Request, passwort: str = Form(""), ordner: str = Form(""), mit_backups: str = Form(""), bestaetigt: str = Form("")):
+    """Umzugspaket: ganzes System in einer ZIP-Datei; danach steht dieses System auf „nur lesen“."""
+    me = require(request, "admin")
+    from ..services import umzug
+    cfg = request.app.state.cfg
+    zurueck_url = "/einstellungen?tab=backup#umzug"
+    if fehler := _passwort_ok(request, me, passwort):
+        flash(request, fehler, "fehler")
+        return RedirectResponse(zurueck_url, status_code=303)
+    if bestaetigt != "on":
+        flash(request, "Bitte bestätigen, dass dieses System danach nur noch gelesen werden kann.", "fehler")
+        return RedirectResponse(zurueck_url, status_code=303)
+    try:
+        sicherung.ziel_pruefen(cfg, ordner)
+        info = umzug.erstellen(cfg, db.engine(), cfg.path(ordner.strip()), me["username"], mit_backups == "on", request.app.state)
+    except (ValueError, OSError, umzug.UmzugFehler) as e:
+        flash(request, f"Umzugspaket nicht erstellt: {e}", "fehler")
+        return RedirectResponse(zurueck_url, status_code=303)
+    with db.schreiben() as con:
+        audit(con, me["username"], "Umzugspaket erstellt", Path(info["datei"]).name, {"groesse": info["groesse"], "mit_backups": mit_backups == "on"})
+    flash(request, f"Umzugspaket erstellt: {info['datei']} ({sicherung.groesse_text(info['groesse'])}). Dieses System steht jetzt auf „nur lesen“.")
+    return RedirectResponse(zurueck_url, status_code=303)
+
+
+@router.post("/einstellungen/umzug/aufheben")
+def umzug_aufheben(request: Request, passwort: str = Form("")):
+    """Umzug abgebrochen: „nur lesen“ wieder aufheben."""
+    me = require(request, "admin")
+    from ..services import umzug
+    if fehler := _passwort_ok(request, me, passwort):
+        flash(request, fehler, "fehler")
+        return RedirectResponse("/einstellungen?tab=backup#umzug", status_code=303)
+    umzug.sperre_setzen(db.engine(), None)
+    request.app.state.umzug_sperre = None
+    with db.schreiben() as con:
+        audit(con, me["username"], "Umzugs-Sperre aufgehoben", "Umzug")
+    flash(request, "„Nur lesen“ aufgehoben – dieses System speichert wieder. Ein bereits erstelltes Umzugspaket ist damit veraltet.")
+    return RedirectResponse("/einstellungen?tab=backup#umzug", status_code=303)
 
 
 @router.post("/einstellungen/backup-wiederherstellen")
