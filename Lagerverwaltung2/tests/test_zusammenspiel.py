@@ -225,3 +225,44 @@ def test_parallel_auftraege_anlegen_und_status(env):
     # Verlauf passt zum Endzustand
     assert anzahl(eng, f"SELECT nach FROM ih_statuslog WHERE auftrag_id={aid} ORDER BY id DESC LIMIT 1") == \
         anzahl(eng, f"SELECT status FROM ih_auftraege WHERE id={aid}")
+
+
+def test_datensicherung_enthaelt_instandhaltung_und_schichtbuch(env, tmp_path):
+    """Die Sicherung enthält alle Daten der Instandhaltung (Anlagen, Wartung, Aufträge, Nachweise, Schichtbuch).
+    Eine Änderung nur in der Instandhaltung löst eine neue Sicherung aus; Wiederherstellen bringt alles zurück."""
+    import sqlite3
+    import zipfile
+    from pathlib import Path
+
+    from app import db
+    from app.services import sicherung
+    cfg, eng, admin, s = _grund(env)
+    admin.post(f"/ih/auftraege/{s}/dokument", files={"datei": ("pruefbericht.pdf", b"%PDF-1.4 Testnachweis", "application/pdf")})
+    admin.post("/ih/schichtbuch/neu", data={"titel": "Leckage am Flansch", "asset": "P -10401 A"})
+    erste = sicherung.sichern(cfg, eng, erzwingen=True)[0].datei
+    # nur eine Ergänzung im Schichtbuch -> neue Sicherung (nicht „unverändert“)
+    mid = anzahl(eng, "SELECT id FROM sb_meldungen")
+    admin.post(f"/ih/schichtbuch/meldung/{mid}/ergaenzen", data={"text": "Flansch nachgezogen", "status": "erledigt"})
+    e = sicherung.sichern(cfg, eng)[0]
+    assert e.ok and not e.unveraendert and e.datei != erste
+    auspack = tmp_path / "auspacken"
+    with zipfile.ZipFile(e.datei) as z:
+        namen = z.namelist()
+        z.extract("lager.db", auspack)
+    assert any(n.startswith("anhaenge/ih_") for n in namen), namen  # Nachweis des Auftrags
+    k = sqlite3.connect(auspack / "lager.db")
+    zahlen = {t: k.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in (
+        "ih_plaetze", "ih_kampagnen", "ih_auftraege", "ih_auftrag_positionen", "ih_dokumente", "ih_stueckliste",
+        "sb_teams", "sb_zeiten", "sb_schichten", "sb_meldungen", "sb_verlauf", "benutzer_rollen")}
+    assert all(zahlen.values()), zahlen
+    assert k.execute("SELECT status FROM sb_meldungen").fetchone()[0] == "erledigt"
+    k.close()
+    # Wiederherstellen: Instandhaltung kommt vollständig zurück
+    db.engine().dispose()
+    Path(cfg.path(cfg.daten.datenbank)).unlink()
+    for endung in ("-wal", "-shm"):
+        Path(str(cfg.path(cfg.daten.datenbank)) + endung).unlink(missing_ok=True)
+    (auspack / "lager.db").replace(cfg.path(cfg.daten.datenbank))
+    eng2 = db.init_engine(cfg.db_url)
+    assert anzahl(eng2, "SELECT count(*) FROM sb_meldungen") == 1 and anzahl(eng2, "SELECT count(*) FROM ih_stueckliste") == 2
+    assert "Leckage am Flansch" in client(cfg, "admin").get(f"/ih/schichtbuch/meldung/{mid}").text
