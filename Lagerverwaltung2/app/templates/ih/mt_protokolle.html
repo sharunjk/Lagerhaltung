@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_mt.html" import reiter with context %}
+{% block title %}Montageprotokolle{% endblock %}
+{% block content %}
+{{ reiter("protokolle") }}
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div><h1>Montageprotokolle</h1><p class="text-muted">{{ rows|length }}{% if rows|length >= 500 %}+ (die neuesten 500; Export enthält alle){% endif %} Protokolle{% if stutzen %} zu {{ stutzen.label }}{% endif %}</p></div>
+  <div class="flex flex-wrap gap-2">
+    {% if darf("ih.montage.erfassen") %}<a href="/ih/montage/protokolle/neu{% if stutzen %}?stutzen={{ stutzen.id }}{% endif %}" class="btn btn-primary">{{ icon("plus", "w-4 h-4") }}Neues Montageprotokoll</a>{% endif %}
+    <a href="/ih/montage/protokolle/blanko" class="btn" target="_blank">{{ icon("print", "w-4 h-4") }}Leeres Blatt</a>
+    <a href="/ih/montage/protokolle/export.xlsx?{{ request.url.query }}" class="btn">{{ icon("download", "w-4 h-4") }}Excel</a>
+  </div>
+</div>
+<form method="get" class="panel p-4 mb-4 grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+  {% if stutzen %}<input type="hidden" name="stutzen" value="{{ stutzen.id }}">{% endif %}
+  <div class="sm:col-span-2"><label class="label" for="q">Suche</label><input id="q" name="q" value="{{ q }}" class="field" placeholder="Nummer, Stutzen, Anlage, Monteur, Arbeitsauftrag …"></div>
+  <div><label class="label" for="st">Status</label><select id="st" name="status" class="field"><option value="">alle</option>{% for k, lab in STATUS.items() %}<option value="{{ k }}" {% if status == k %}selected{% endif %}>{{ lab }}</option>{% endfor %}</select></div>
+  <div><label class="label" for="von">Von</label><input id="von" type="date" name="von" value="{{ von }}" class="field"></div>
+  <div><label class="label" for="bis">Bis</label><input id="bis" type="date" name="bis" value="{{ bis }}" class="field"></div>
+  <div class="flex gap-2 lg:col-span-5"><button class="btn btn-primary">Filtern</button>{% if q or status or stutzen or von or bis %}<a href="/ih/montage/protokolle" class="btn">Zurücksetzen</a>{% endif %}</div>
+</form>
+<div class="panel overflow-x-auto">
+  <table class="tbl">
+    <thead><tr><th>Nummer</th><th>Datum</th><th>Stutzen</th><th>Anlage / Reaktor</th><th>Monteur / Prüfer</th><th>Arbeitsauftrag</th><th>Stand</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="whitespace-nowrap"><a class="font-semibold text-primary hover:underline" href="/ih/montage/protokolle/{{ r.id }}">{{ r.nummer }}</a></td>
+        <td class="whitespace-nowrap text-sm">{{ r.datum|datum(False) if r.datum else "" }}</td>
+        <td><span class="font-semibold">{{ r.stutzen or "" }}</span><span class="block text-xs text-muted">{{ r.stutzen_bez or "" }}</span></td>
+        <td class="text-sm">{{ r.anlage or "" }}</td>
+        <td class="text-sm">{{ r.monteur or "" }}<span class="block text-xs text-muted">{{ r.pruefer or "" }}</span></td>
+        <td class="text-sm">{{ r.arbeitsauftrag or "" }}</td>
+        <td class="text-xs whitespace-nowrap">{% if r.status == "entwurf" %}
+          {% if r.schrauben_anzahl %}{% if r.ist_fehlt %}<span class="text-warn">{{ r.ist_fehlt }} von {{ r.schrauben_anzahl }} Ist-Drehmomenten offen</span>{% else %}Drehmomente erfasst{% endif %}
+          <span class="block text-muted">Reihenfolge {{ r.folge }}/{{ r.schrauben_anzahl }}</span>{% else %}<span class="text-muted">vorbereitet</span>{% endif %}
+          {% else %}{% if r.lecktest %}Lecktest {{ LECKTEST[r.lecktest] }}{% endif %}{% endif %}</td>
+        <td><span class="status {{ 'st-ok' if r.status == 'abgeschlossen' else 'st-melden' }}">{{ STATUS[r.status] }}</span></td>
+        <td class="text-right whitespace-nowrap"><a href="/ih/montage/protokolle/{{ r.id }}/druck" class="btn btn-sm" target="_blank" title="Drucken">{{ icon("print", "w-4 h-4") }}</a>
+          <a href="/ih/montage/protokolle/{{ r.id }}/excel" class="btn btn-sm" title="Excel">{{ icon("download", "w-4 h-4") }}</a></td>
+      </tr>
+    {% else %}<tr><td colspan="9" class="py-6 text-center text-muted">Keine Montageprotokolle in dieser Auswahl.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

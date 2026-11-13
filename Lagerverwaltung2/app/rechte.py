@@ -28,6 +28,10 @@ RECHTE: dict[str, set[str]] = {
     "ih.schichtbuch.ansehen": set(IH_ROLLEN),          # Schichtbuch, Übergaben und Meldungen lesen
     "ih.schichtbuch.schreiben": {"operator", "techniker", "schichtfuehrer", "ingenieur", "manager"},  # Meldungen, Schicht beginnen/übergeben
     "ih.schichtbuch.einrichten": {"schichtfuehrer", "manager"},  # Teams, Schichtzeiten, Ereignistypen, Zuordnung der Benutzer
+    "ih.montage.ansehen": set(IH_ROLLEN),              # Stutzenübersicht und Montageprotokolle ansehen, drucken
+    "ih.montage.erfassen": {"operator", "techniker", "schichtfuehrer", "ingenieur", "manager"},  # Protokolle anlegen, ausfüllen, abschließen
+    "ih.montage.korrigieren": _PFLEGE,                 # abgeschlossene Protokolle nachträglich ändern (mit Grund, wird protokolliert)
+    "ih.montage.stutzen": {"schichtfuehrer", "ingenieur", "manager"},  # Stutzenübersicht pflegen und importieren
 }
 
 

@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_mt.html" import reiter with context %}
+{% block title %}{{ "Montageprotokoll " ~ p.nummer if p.id else "Neues Montageprotokoll" }}{% endblock %}
+{% block content %}
+{{ reiter("neu" if not p.id else "protokolle") }}
+{% set korr = korrektur is defined and korrektur %}
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div>{% if p.id %}<a href="/ih/montage/protokolle" class="text-sm text-muted hover:text-ink">Montageprotokolle</a>{% endif %}
+    <h1 class="mt-1">{{ ("Montageprotokoll " ~ p.nummer) if p.id else "Neues Montageprotokoll" }}</h1>
+    <p class="text-muted text-sm">{% if korr %}<b class="text-crit">Korrektur eines abgeschlossenen Protokolls</b> – nur mit Grund, jede Änderung wird festgehalten.
+      {% else %}Vor der Montage Kopf und Dichtungen ausfüllen und <b>zwischenspeichern</b>; nach der Montage Drehmomente und Reihenfolge nachtragen und abschließen.{% endif %}</p></div>
+  {% if p.id %}<div class="flex flex-wrap gap-2">
+    <a href="/ih/montage/protokolle/{{ p.id }}/druck" target="_blank" class="btn" onclick="if (window.mtDirty && !confirm('Es gibt ungespeicherte Änderungen. Gedruckt wird der zuletzt gespeicherte Stand. Trotzdem öffnen?')) return false">{{ icon("print", "w-4 h-4") }}Drucken</a>
+    <a href="/ih/montage/protokolle/{{ p.id }}/excel" class="btn">{{ icon("download", "w-4 h-4") }}Excel</a></div>{% endif %}
+</div>
+{% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-fehler" role="alert">{{ fehler }}</div>{% endif %}
+
+<form method="post" action="{{ '/ih/montage/protokolle/' ~ p.id if p.id else '/ih/montage/protokolle/neu' }}" id="mtform" class="space-y-6"
+      x-data="mtFormular()" @input="dirty = true; window.mtDirty = true" @submit="window.mtDirty = false">
+  <input type="hidden" name="stutzen_id" :value="stutzenId">
+  <input type="hidden" name="stutzen" :value="kuerzel">
+  <input type="hidden" name="reihenfolge" :value="JSON.stringify(folge)">
+  <input type="hidden" name="schrauben_anzahl" :value="n || ''">
+  <input type="hidden" name="stand" value="{{ p.geaendert_am.isoformat() if p.geaendert_am else '' }}">
+
+  {% if fehlende %}
+  <div class="rounded-md border border-warn bg-warn/10 px-4 py-3 text-sm" role="alert">
+    <p class="font-semibold">Gespeichert, aber noch nicht abgeschlossen. Es fehlt:</p>
+    <ul class="list-disc pl-6 mt-1">{% for f in fehlende %}<li>{{ f }}</li>{% endfor %}</ul>
+    <label class="flex items-center gap-2 mt-2 font-semibold"><input type="checkbox" name="trotzdem" value="1"> Trotzdem abschließen (z. B. Lecktest erst später – kann ein Ingenieur ergänzen)</label>
+  </div>
+  {% endif %}
+
+  {# ---------------- Kopf ---------------- #}
+  <section class="panel p-5">
+    <h2 class="mb-4">Kopf</h2>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="sm:col-span-2 lg:col-span-1"><label class="label" for="stz">Stutzen</label>
+        <input id="stz" x-model="stutzenText" @change="stutzenGewaehlt()" list="stutzen_liste" class="field font-semibold" autocomplete="off" placeholder="Stutzen suchen, z. B. RL 1" required>
+        <p class="text-xs mt-1" :class="stutzenId ? 'text-muted' : 'text-warn'" x-text="stutzenId ? 'Soll-Werte aus der Stutzenübersicht vorbelegt.' : (stutzenText ? 'Nicht in der Stutzenübersicht – Werte von Hand eintragen.' : 'Aus der Liste wählen: Dichtungen, Schrauben und Drehmoment werden vorbelegt.')"></p>
+        <p class="text-xs text-warn font-semibold mt-1" x-show="ungeklaert" x-cloak>Achtung: In der Stutzenübersicht ist ein Soll-Wert mit „?“ markiert – bitte prüfen.</p></div>
+      <div><label class="label" for="an">Anlage / Reaktor</label><input id="an" name="anlage" x-model="anlage" class="field" maxlength="200"></div>
+      <div><label class="label" for="dt">Datum</label><input id="dt" type="date" name="datum" value="{{ p.datum.isoformat() if p.datum else '' }}" class="field"></div>
+      <div><label class="label" for="mo">Monteur</label><input id="mo" name="monteur" value="{{ p.monteur or '' }}" class="field" maxlength="200" list="namen"></div>
+      <div><label class="label" for="pr">Prüfer</label><input id="pr" name="pruefer" value="{{ p.pruefer or '' }}" class="field" maxlength="200" list="namen"></div>
+      <div><label class="label" for="aa">Arbeitsauftrag</label><input id="aa" name="arbeitsauftrag" value="{{ p.arbeitsauftrag or '' }}" class="field" maxlength="200"></div>
+      <div class="sm:col-span-2 lg:col-span-2"><label class="label" for="re">Reinigung</label><input id="re" name="reinigung" value="{{ p.reinigung or '' }}" class="field" maxlength="300" placeholder="z. B. Dichtflächen gereinigt und geprüft"></div>
+      <div><label class="label" for="sm">Schmiermittel</label><input id="sm" name="schmiermittel" x-model="schmiermittel" class="field" maxlength="200"></div>
+    </div>
+  </section>
+
+  {# ---------------- Skizze + Dichtungen ---------------- #}
+  <div class="grid xl:grid-cols-[400px_minmax(0,1fr)] gap-6">
+    <section class="panel p-5">
+      <div class="flex items-end justify-between gap-3 mb-3">
+        <h2>Skizze / Reihenfolge</h2>
+        <div class="w-28"><label class="label" for="n">Anzahl Schrauben</label><input id="n" type="number" min="1" max="{{ MAX }}" :value="n" @change="setN($event.target.value)" class="field text-center text-lg font-semibold"></div>
+      </div>
+      <template x-if="n > 0"><div>
+        <div class="bg-white rounded border border-line p-2 select-none cursor-pointer" x-html="svg()" @click="lochKlick($event)" role="group" aria-label="Schraubenlöcher in Anziehreihenfolge anklicken"></div>
+        <p class="text-sm mt-2" x-show="folge.length < n">Löcher in der Reihenfolge anklicken, in der angezogen wurde. Nächster Klick = <b class="text-crit" x-text="'Schraube ' + (folge.length + 1)"></b> von <span x-text="n"></span>.</p>
+        <p class="text-sm mt-2 font-semibold text-ok" x-show="folge.length === n && n > 0">Alle <span x-text="n"></span> Schrauben nummeriert.</p>
+        <p class="text-xs text-crit mt-1" x-text="meldung" x-show="meldung"></p>
+        <div class="flex gap-2 mt-2"><button type="button" class="btn btn-sm" @click="folge.pop(); dirty = true" :disabled="!folge.length">Letzte zurücknehmen</button>
+          <button type="button" class="btn btn-sm" @click="if (confirm('Reihenfolge ganz zurücksetzen?')) { folge = []; dirty = true }" :disabled="!folge.length">Zurücksetzen</button></div>
+      </div></template>
+      <p class="text-sm text-muted" x-show="!n">Anzahl Schrauben eintragen – dann entsteht der Flansch mit genau so vielen Löchern und die Schraubentabelle mit genau so vielen Zeilen.</p>
+    </section>
+
+    <section class="panel p-5 min-w-0">
+      <h2 class="mb-3">Dichtungen</h2>
+      <div class="overflow-x-auto">
+      <table class="tbl text-sm min-w-[640px]">
+        <thead><tr><th>Pos.</th><th>Einbauort</th><th>Dichtungsart</th><th>Artikel-Nr.</th><th>Nenn D. [mm]</th><th>Ist-Dicke [mm]</th><th class="text-center">Alt</th><th class="text-center">Neu</th></tr></thead>
+        <tbody>
+          <template x-for="(d, i) in dicht" :key="i"><tr>
+            <td class="font-semibold whitespace-nowrap" x-text="'Dichtung ' + (i + 1)"></td>
+            <td><input :name="'d' + i + '_einbauort'" x-model="d.einbauort" class="field py-1 px-2 text-sm" maxlength="200"></td>
+            <td><input :name="'d' + i + '_dichtungsart'" x-model="d.dichtungsart" class="field py-1 px-2 text-sm" maxlength="200"></td>
+            <td><input :name="'d' + i + '_artikel_nr'" x-model="d.artikel_nr" class="field py-1 px-2 text-xs" maxlength="200"></td>
+            <td><input :name="'d' + i + '_nenndicke'" x-model="d.nenndicke" inputmode="decimal" class="field py-1 px-2 text-sm w-20"></td>
+            <td><input :name="'d' + i + '_ist_dicke'" x-model="d.ist_dicke" inputmode="decimal" class="field py-1 px-2 text-sm w-20 font-semibold"></td>
+            <td class="text-center"><input type="checkbox" class="w-5 h-5" :checked="d.alt_neu === 'alt'" @change="d.alt_neu = $event.target.checked ? 'alt' : ''" :aria-label="'Dichtung ' + (i + 1) + ' alt'"></td>
+            <td class="text-center"><input type="checkbox" class="w-5 h-5" :checked="d.alt_neu === 'neu'" @change="d.alt_neu = $event.target.checked ? 'neu' : ''" :aria-label="'Dichtung ' + (i + 1) + ' neu'">
+              <input type="hidden" :name="'d' + i + '_alt_neu'" :value="d.alt_neu"></td>
+          </tr></template>
+        </tbody>
+      </table>
+      </div>
+      <div class="mt-3"><label class="label" for="bd">Bemerkung Dichtungen</label><textarea id="bd" name="bemerkung_dichtungen" rows="3" class="field">{{ p.bemerkung_dichtungen or '' }}</textarea></div>
+    </section>
+  </div>
+
+  {# ---------------- Schrauben ---------------- #}
+  <section class="panel p-5" x-show="n > 0">
+    <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
+      <div><h2>Schrauben – Positionen 1 bis <span x-text="n"></span></h2>
+        <p class="text-sm text-muted">Pos. = Reihenfolge des Anziehens (Nummer in der Skizze). <b>#</b> = gleicher Wert wie eine Zeile darüber; „#↓“ füllt die leeren Felder der Spalte mit #.</p></div>
+      <div class="flex flex-wrap gap-2 text-sm"><span class="self-center text-muted">Alle Schrauben:</span>
+        <button type="button" class="btn btn-sm" @click="schr.forEach(z => z.alt_neu = 'neu'); dirty = true">Neu</button>
+        <button type="button" class="btn btn-sm" @click="schr.forEach(z => z.alt_neu = 'alt'); dirty = true">Alt</button></div>
+    </div>
+    <div class="overflow-x-auto">
+    <table class="tbl text-sm min-w-[1100px]">
+      <thead><tr>
+        <th class="w-12 text-right">Pos.</th><th class="w-36">Kennzeichnung</th>
+        {% for f, lab, w in [("typ", "Typ / Norm", "w-28"), ("groesse", "Größe / Gewinde", "w-24"), ("laenge_soll", "Länge-Soll [mm]", "w-20"), ("laenge_ist", "Länge-Ist [mm]", "w-20"),
+                             ("werkstoff", "Werkstoff / Klasse", "w-28"), ("soll_nm", "Soll [Nm]", "w-20"), ("ist_nm", "Ist [Nm]", "w-20")] %}
+        <th class="{{ w }}"><span class="block">{{ lab }}</span><button type="button" class="text-xs text-primary font-semibold" @click="nachUnten('{{ f }}')" title="Leere Felder darunter mit # füllen">#↓</button></th>
+        {% endfor %}
+        <th class="text-center w-10">Alt</th><th class="text-center w-10">Neu</th><th>Bemerkung</th></tr></thead>
+      <tbody>
+        <template x-for="(z, i) in schr" :key="i"><tr @mouseenter="hl = i" @mouseleave="hl = -1" :class="hl === i ? 'bg-soft' : ''">
+          <td class="text-right font-semibold" x-text="i + 1"></td>
+          <td class="whitespace-nowrap text-xs" x-text="kennz(i)"></td>
+          {% for f in ["typ", "groesse", "laenge_soll", "laenge_ist", "werkstoff", "soll_nm", "ist_nm"] %}
+          <td><input :name="'s' + i + '_{{ f }}'" x-model="z.{{ f }}" class="field py-1 px-2 text-sm {{ 'font-semibold' if f == 'ist_nm' }}" maxlength="200" {% if f in ("laenge_ist", "ist_nm") %}inputmode="decimal"{% endif %}
+                     :class="z.{{ f }} === '#' ? 'text-muted text-center' : ''" :title="z.{{ f }} === '#' ? 'wie oben: ' + wert(i, '{{ f }}') : ''" :aria-label="'Pos. ' + (i + 1) + ' {{ f }}'"></td>
+          {% endfor %}
+          <td class="text-center"><input type="checkbox" class="w-5 h-5" :checked="z.alt_neu === 'alt'" @change="z.alt_neu = $event.target.checked ? 'alt' : ''" :aria-label="'Pos. ' + (i + 1) + ' alt'"></td>
+          <td class="text-center"><input type="checkbox" class="w-5 h-5" :checked="z.alt_neu === 'neu'" @change="z.alt_neu = $event.target.checked ? 'neu' : ''" :aria-label="'Pos. ' + (i + 1) + ' neu'">
+            <input type="hidden" :name="'s' + i + '_alt_neu'" :value="z.alt_neu"></td>
+          <td><input :name="'s' + i + '_bemerkung'" x-model="z.bemerkung" class="field py-1 px-2 text-xs" maxlength="200"></td>
+        </tr></template>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  {# ---------------- Abschluss ---------------- #}
+  <section class="panel p-5">
+    <h2 class="mb-4">Abschluss</h2>
+    <div><label class="label" for="bm">Allgemeine Bemerkungen</label><textarea id="bm" name="bemerkungen" rows="3" class="field">{{ p.bemerkungen or '' }}</textarea></div>
+    <div class="grid sm:grid-cols-3 gap-4 mt-4">
+      <fieldset><legend class="label">Montage abgeschlossen</legend><div class="flex gap-4">
+        {% for k, lab in [("ja", "Ja"), ("nein", "Nein"), ("", "offen")] %}<label class="flex items-center gap-1.5"><input type="radio" name="montage_abgeschlossen" value="{{ k }}" {% if (p.montage_abgeschlossen or "") == k %}checked{% endif %}> {{ lab }}</label>{% endfor %}</div></fieldset>
+      <fieldset><legend class="label">Lecktest</legend><div class="flex flex-wrap gap-4">
+        {% for k, lab in LECKTEST.items() %}<label class="flex items-center gap-1.5"><input type="radio" name="lecktest" value="{{ k }}" {% if p.lecktest == k %}checked{% endif %}> {{ lab }}</label>{% endfor %}</div></fieldset>
+      <div x-data='{ z: {{ (p.abschluss_zeit or "")|tojson }} }'><label class="label" for="az">Datum / Uhrzeit</label><div class="flex gap-2"><input id="az" name="abschluss_zeit" x-model="z" class="field" maxlength="40">
+        <button type="button" class="btn btn-sm" @click="const d = new Date(); z = d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'}) + ' ' + d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})">Jetzt</button></div></div>
+    </div>
+  </section>
+
+  {% if korr %}
+  <section class="panel p-5 border-l-4 border-l-crit"><label class="label" for="gr">Grund der Änderung (Pflicht)</label><input id="gr" name="grund" value="{{ grund or '' }}" required class="field" maxlength="1000" placeholder="z. B. Ist-Drehmoment Pos. 3 falsch abgelesen"></section>
+  {% endif %}
+
+  <div class="flex flex-wrap gap-2 sticky bottom-16 lg:bottom-0 bg-bg/95 py-3 z-10 border-t border-line">
+    {% if korr %}
+    <button class="btn btn-primary btn-lg" name="aktion" value="speichern">Änderung speichern</button>
+    <a href="/ih/montage/protokolle/{{ p.id }}" class="btn btn-lg">Abbrechen</a>
+    {% else %}
+    <button class="btn btn-primary btn-lg" name="aktion" value="speichern">Zwischenspeichern</button>
+    <button class="btn btn-lg" name="aktion" value="abschliessen" onclick="return confirm('Protokoll abschließen? Danach ändern nur noch Instandhaltungsingenieur oder -manager.')">Abschließen</button>
+    {% if p.id %}<a href="/ih/montage/protokolle/{{ p.id }}/druck" target="_blank" class="btn btn-lg" onclick="if (window.mtDirty && !confirm('Ungespeicherte Änderungen werden nicht gedruckt. Erst „Zwischenspeichern“. Trotzdem öffnen?')) return false">{{ icon("print", "w-4 h-4") }}Drucken</a>{% endif %}
+    {% endif %}
+  </div>
+  <datalist id="stutzen_liste">{% for s in stutzen_daten %}<option value="{{ s.label }}">{% endfor %}</datalist>
+  <datalist id="namen">{% if ich %}<option value="{{ ich }}">{% endif %}</datalist>
+</form>
+
+{% if p.id and p.status == "entwurf" %}
+<form method="post" action="/ih/montage/protokolle/{{ p.id }}/loeschen" class="mt-6" onsubmit="return confirm('Entwurf {{ p.nummer }} endgültig löschen?')"><button class="btn btn-sm btn-danger">Entwurf löschen</button></form>
+{% endif %}
+{% if p.verlauf %}<div class="mt-6 max-w-2xl">{% include "ih/_mt_verlauf.html" %}</div>{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MT_STUTZEN = {{ stutzen_daten|tojson }};
+const MT_DITTO = {{ DITTO_FELDER|tojson }};
+const MT_SOLL = ["typ", "groesse", "laenge_soll", "werkstoff", "soll_nm"];
+const MT_MAX = {{ MAX }};
+function mtLeer() { return {typ: "", groesse: "", laenge_soll: "", laenge_ist: "", werkstoff: "", soll_nm: "", ist_nm: "", alt_neu: "", bemerkung: ""}; }
+function mtFormular() {
+  const st = MT_STUTZEN.find(s => s.id === {{ (p.stutzen_id or 0)|tojson }});
+  return {
+    stutzenId: st ? st.id : "", stutzenText: {{ (p.stutzen_bez or p.stutzen or "")|tojson }}, kuerzel: {{ (p.stutzen or "")|tojson }},
+    ungeklaert: st ? st.ungeklaert : false,
+    anlage: {{ (p.anlage or "")|tojson }}, schmiermittel: {{ (p.schmiermittel or "")|tojson }},
+    n: {{ (p.schrauben_anzahl or 0)|tojson }}, folge: {{ (p.reihenfolge or [])|tojson }},
+    dicht: {{ p.dichtungen|tojson }}, schr: {{ p.schrauben_anzeige|tojson }},
+    hl: -1, meldung: "", dirty: false,
+    init() { window.addEventListener("beforeunload", e => { if (window.mtDirty) { e.preventDefault(); e.returnValue = ""; } }); },
+    wert(i, f) { let v = this.schr[i][f]; while (v === "#" && i > 0) { i--; v = this.schr[i][f]; } return v === "#" ? "" : (v || ""); },
+    kennz(i) { const k = (this.kuerzel || "").replace(/\s+/g, ""); const ist = this.wert(i, "ist_nm"); return (k ? k + "-" : "") + (i + 1) + (ist ? "-" + ist + " Nm" : ""); },
+    nachUnten(f) { for (let i = 1; i < this.schr.length; i++) if (!this.schr[i][f]) this.schr[i][f] = "#"; this.dirty = window.mtDirty = true; },
+    setN(wert) {
+      let n = parseInt(wert, 10); if (!(n >= 1)) n = 0; n = Math.min(n, MT_MAX);
+      if (n < this.schr.length && this.schr.slice(n).some(z => z.ist_nm || z.laenge_ist || z.bemerkung)
+          && !confirm("Die Zeilen ab Pos. " + (n + 1) + " enthalten Werte und werden entfernt. Fortfahren?")) { document.getElementById("n").value = this.n; return; }
+      while (this.schr.length < n) {
+        const z = mtLeer(); const erste = this.schr[0];
+        if (erste) MT_SOLL.forEach(f => { if (erste[f]) z[f] = "#"; });
+        this.schr.push(z);
+      }
+      this.schr.length = n; this.n = n; this.folge = this.folge.filter(x => x <= n); this.dirty = window.mtDirty = true;
+    },
+    stutzenGewaehlt() {
+      const s = MT_STUTZEN.find(x => x.label === this.stutzenText.trim());
+      if (!s) { this.stutzenId = ""; this.ungeklaert = false; this.kuerzel = this.stutzenText.trim().split(" – ")[0]; return; }
+      if (s.id === this.stutzenId) return;
+      const hatWerte = this.schr.some(z => z.ist_nm) || this.dicht.some(d => d.ist_dicke);
+      if (hatWerte && !confirm("Soll-Werte von " + s.label + " übernehmen? Eingetragene Soll-Werte werden ersetzt, Ist-Werte bleiben.")) return;
+      this.stutzenId = s.id; this.kuerzel = s.kuerzel; this.ungeklaert = s.ungeklaert;
+      s.dichtungen.forEach((d, i) => { Object.assign(this.dicht[i], {einbauort: d.einbauort, dichtungsart: d.dichtungsart, artikel_nr: d.artikel_nr, nenndicke: d.nenndicke}); });
+      if (!this.anlage) this.anlage = s.anlage;
+      if (!this.schmiermittel) this.schmiermittel = s.schmiermittel;
+      if (s.n) { this.setN(s.n); this.$nextTick(() => { const f = document.getElementById("n"); if (f) f.value = s.n; }); }
+      this.schr.forEach((z, i) => MT_SOLL.forEach(f => { z[f] = i === 0 ? (s.schraube[f] || "") : (s.schraube[f] ? "#" : ""); }));
+      this.dirty = window.mtDirty = true;
+    },
+    lochKlick(e) {
+      const el = e.target.closest("[data-loch]"); if (!el) return;
+      const loch = +el.dataset.loch; this.meldung = "";
+      const idx = this.folge.indexOf(loch);
+      if (idx >= 0) {
+        if (idx === this.folge.length - 1) this.folge.pop();
+        else this.meldung = "Dieses Loch hat schon Nr. " + (idx + 1) + ". Zurücknehmen geht nur rückwärts (letzte Nummer zuerst).";
+      } else if (this.folge.length < this.n) this.folge.push(loch);
+      this.dirty = window.mtDirty = true;
+    },
+    svg() {
+      // gleiche Geometrie wie services/montage.py skizze(): Loch 1 oben, im Uhrzeigersinn
+      const n = this.n, G = 300, ra = G * 0.45, c = G / 2, rk = ra * 0.875;
+      const rl = Math.min(ra * 0.11, rk * Math.sin(Math.PI / n) * 0.55), aussen = n > 24;
+      const schrift = Math.max(aussen ? Math.min(G * 0.032, ra * 0.6 * Math.PI / n * 1.6) : Math.min(rl * 1.15, G * 0.05), 3.2);
+      const pos = {}; this.folge.forEach((l, i) => pos[l] = i + 1);
+      const hlLoch = this.hl >= 0 ? this.folge[this.hl] : null;
+      let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${G} ${G}" width="100%"><circle cx="${c}" cy="${c}" r="${ra}" fill="#fff" stroke="#1B2A36" stroke-width="2.2"/>`
+            + `<circle cx="${c}" cy="${c}" r="${ra * 0.74}" fill="#F2F2F2" stroke="#1B2A36" stroke-width="0.9"/>`;
+      const naechstes = this.folge.length < n;
+      if (naechstes) s += `<text x="${c}" y="${c}" font-family="Arial" font-size="13" fill="#5B6773" text-anchor="middle" dominant-baseline="central">nächste: ${this.folge.length + 1}</text>`;
+      for (let i = 0; i < n; i++) {
+        const w = -Math.PI / 2 + 2 * Math.PI * i / n, x = c + rk * Math.cos(w), y = c + rk * Math.sin(w), loch = i + 1, p = pos[loch];
+        const tx = aussen ? c + ra * 1.09 * Math.cos(w) : x, ty = aussen ? c + ra * 1.09 * Math.sin(w) : y;
+        s += `<g data-loch="${loch}"><circle cx="${x}" cy="${y}" r="${Math.max(rl * 1.6, 9)}" fill="transparent"/>`
+           + `<circle cx="${x}" cy="${y}" r="${rl}" fill="${loch === hlLoch ? '#FFD84D' : (p ? '#FDE7E7' : '#fff')}" stroke="${p ? '#C00000' : '#1B2A36'}" stroke-width="${p ? 1.4 : 1}"/>`;
+        if (p) s += `<text x="${tx}" y="${ty}" font-family="Arial" font-weight="700" font-size="${schrift}" fill="#C00000" text-anchor="middle" dominant-baseline="central">${p}</text>`;
+        s += `</g>`;
+      }
+      return s + `</svg>`;
+    },
+  };
+}
+</script>
+{% endblock %}

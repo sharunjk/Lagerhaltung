@@ -110,6 +110,11 @@ def artikel_detail(con: Connection, nr: str) -> dict | None:
     d["bild"] = next((x for x in d["anhaenge"] if x["ist_bild"]), None)
     d["bestellungen"] = [dict(x) for x in con.execute(select(bestellungen).where(and_(
         bestellungen.c.artikel_id == d["id"], bestellungen.c.status.in_(["offen", "bestellt", "teilgeliefert"])))).mappings()]
+    from . import sets  # ab 2.12.0: Set-Inhalt, fehlende Teile, „Enthalten in Set …“
+    d["set_inhalt"] = sets.inhalt(con, d["id"]) if d.get("ist_set") else []
+    d["fehlteile"] = sets.offene_fehlteile(con, d["id"]) if d.get("ist_set") else []
+    d["set_warnung"] = sets.warnung(d["fehlteile"])
+    d["in_sets"] = sets.in_sets(con, d["id"])
     return d
 
 

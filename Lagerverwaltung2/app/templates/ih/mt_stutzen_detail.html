@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_mt.html" import reiter with context %}
+{% block title %}Stutzen {{ s.kuerzel }}{% endblock %}
+{% block content %}
+{{ reiter("stutzen") }}
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div>
+    <a href="/ih/montage/stutzen" class="text-sm text-muted hover:text-ink">Stutzenübersicht</a>
+    <h1 class="mt-1 flex flex-wrap items-baseline gap-x-3"><span>{{ s.kuerzel }}</span><span class="font-sans font-medium text-xl text-muted">{{ s.bezeichnung or "" }}</span></h1>
+    <div class="mt-1 flex flex-wrap gap-2 items-center text-sm">{% if s.gruppe %}<span class="text-muted">Gruppe {{ s.gruppe }}</span>{% endif %}
+      {% if not s.aktiv %}<span class="status text-muted">Archiviert</span>{% endif %}{% if s.ungeklaert %}<span class="status st-melden">Wert ungeklärt („?“)</span>{% endif %}
+      {% if tag %}<a href="/ih/anlagen/{{ tag.id }}" class="rounded-full border border-line px-3 py-0.5 font-semibold hover:border-primary" title="{{ tag.bezeichnung or '' }}">{{ tag.code }}</a>{% endif %}</div>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    {% if darf("ih.montage.erfassen") and s.aktiv %}<a href="/ih/montage/protokolle/neu?stutzen={{ s.id }}" class="btn btn-primary">{{ icon("plus", "w-4 h-4") }}Montageprotokoll</a>{% endif %}
+    <a href="/ih/montage/protokolle/blanko?stutzen={{ s.id }}" class="btn" target="_blank">{{ icon("print", "w-4 h-4") }}Leeres Blatt drucken</a>
+    {% if darf("ih.montage.stutzen") %}<a href="/ih/montage/stutzen/{{ s.id }}/bearbeiten" class="btn">{{ icon("edit", "w-4 h-4") }}Bearbeiten</a>
+    <a href="/ih/montage/stutzen/neu?kopie={{ s.id }}" class="btn" title="Als Vorlage für einen neuen Stutzen">{{ icon("copy", "w-4 h-4") }}Kopieren</a>{% endif %}
+  </div>
+</div>
+<div class="grid xl:grid-cols-[1fr_340px] gap-6">
+  <div class="space-y-6 min-w-0">
+    <section class="panel">
+      <div class="px-4 py-3 border-b border-line"><h2>Schrauben (Soll)</h2></div>
+      <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-3 p-4 text-sm">
+        {% for lab, val in [("Anzahl Schrauben", s.schrauben_anzahl), ("Größe / Gewinde", s.gewinde), ("Länge-Soll [mm]", s.schraube_laenge), ("Soll-Drehmoment [Nm]", s.drehmoment),
+                            ("Typ / Norm", s.schraube_typ), ("Werkstoff / Klasse", s.schraube_werkstoff), ("Schmiermittel", s.schmiermittel), ("Anlage / Reaktor", s.anlage)] %}
+        <div><dt class="text-muted">{{ lab }}</dt><dd class="font-semibold text-base {{ 'text-warn' if val and '?' in val|string }}">{{ val if val not in (None, "") else "–" }}</dd></div>
+        {% endfor %}
+      </dl>
+      {% if s.bemerkung %}<p class="px-4 pb-4 text-sm whitespace-pre-line">{{ s.bemerkung }}</p>{% endif %}
+    </section>
+    <section class="panel">
+      <div class="px-4 py-3 border-b border-line"><h2>Dichtungen</h2></div>
+      <div class="overflow-x-auto"><table class="tbl">
+        <thead><tr><th>Pos.</th><th>Dichtungsart</th><th>Durchmesser</th><th>Artikel-Nr.</th><th class="num">Nenndicke [mm]</th><th>Einbauort</th><th>Lager</th></tr></thead>
+        <tbody>{% for d in s.dichtungen %}<tr><td>{{ d.pos }}</td><td class="font-semibold">{{ d.dichtungsart or "" }}</td><td>{{ d.durchmesser or "" }}</td><td class="text-sm">{{ d.artikel_nr or "" }}</td>
+          <td class="num">{{ d.nenndicke|num if d.nenndicke is not none else "" }}</td><td>{{ d.einbauort or "" }}</td>
+          <td class="text-sm">{% if d.lager_nr %}{% if "lager" in module %}<a class="text-primary hover:underline" href="/artikel/{{ d.lager_nr|urlq }}">{{ d.lager_nr }}</a>{% else %}{{ d.lager_nr }}{% endif %} <span class="{{ 'text-crit font-semibold' if not d.bestand }}">({{ d.bestand|num }} auf Lager)</span>{% else %}<span class="text-muted">–</span>{% endif %}</td></tr>
+        {% else %}<tr><td colspan="7" class="text-muted py-4">Keine Dichtungen eingetragen.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </section>
+    <section class="panel">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-line"><h2>Montageprotokolle zu diesem Stutzen</h2><a href="/ih/montage/protokolle?stutzen={{ s.id }}" class="text-sm font-semibold text-primary">Alle</a></div>
+      <ul class="divide-y divide-line text-sm">
+        {% for r in prot %}<li class="flex flex-wrap gap-x-4 px-4 py-2.5"><a class="font-semibold text-primary hover:underline" href="/ih/montage/protokolle/{{ r.id }}">{{ r.nummer }}</a><span>{{ r.datum|datum(False) if r.datum else "" }}</span><span>{{ r.monteur or "" }}</span><span class="ml-auto status {{ 'st-ok' if r.status == 'abgeschlossen' else 'st-melden' }}">{{ STATUS[r.status] }}</span></li>
+        {% else %}<li class="px-4 py-4 text-muted">Noch kein Protokoll.</li>{% endfor %}
+      </ul>
+    </section>
+  </div>
+  <aside class="space-y-6">
+    <section class="panel p-4"><h2 class="mb-2">Skizze</h2>
+      {% if s.schrauben_anzahl %}<div class="bg-white rounded p-2 flex justify-center">{{ svg|safe }}</div><p class="text-xs text-muted mt-2">{{ s.schrauben_anzahl }} Schrauben, Loch 1 oben, im Uhrzeigersinn.</p>
+      {% else %}<p class="text-sm text-muted">Anzahl Schrauben fehlt – unter „Bearbeiten“ eintragen, dann entsteht die Skizze.</p>{% endif %}
+    </section>
+    {% if darf("ih.montage.stutzen") %}
+    <form method="post" action="/ih/montage/stutzen/{{ s.id }}/archivieren"><input type="hidden" name="aktiv" value="{{ 0 if s.aktiv else 1 }}">
+      <button class="btn w-full" {% if s.aktiv %}onclick="return confirm('Stutzen archivieren? Er verschwindet aus der Übersicht, die Protokolle bleiben erhalten.')"{% endif %}>{{ "Stutzen archivieren" if s.aktiv else "Stutzen wieder aktivieren" }}</button></form>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

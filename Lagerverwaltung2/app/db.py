@@ -65,6 +65,7 @@ artikel = Table(
     Column("verwendung", Text),            # Anlage / Equipment / Tag-Nummer
     Column("notiz", Text),
     Column("aktiv", Boolean, nullable=False, default=True),  # archivierte Artikel bleiben für die Historie erhalten
+    Column("ist_set", Boolean),  # ab 2.12.0: Set aus mehreren Artikeln (Inhalt in artikel_set_inhalt)
     Column("erstellt_am", DateTime, server_default=func.current_timestamp()),
     Column("geaendert_am", DateTime, server_default=func.current_timestamp()),
 )
@@ -494,6 +495,117 @@ sb_verlauf = Table(
     Column("art", String(20), nullable=False),    # angelegt | ergaenzung | status | uebergabe | uebernahme | geaendert
     Column("text", Text),
     Column("status", String(20)),
+)
+
+# ------------------------------------------------------------------ Sets (ab 2.12.0)
+artikel_set_inhalt = Table(
+    "artikel_set_inhalt", md,  # Inhalt eines Sets: jedes Teil mit eigener Artikelnummer und Menge je Set
+    Column("id", Integer, primary_key=True),
+    Column("set_id", Integer, ForeignKey("artikel.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("teil_id", Integer, ForeignKey("artikel.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("menge", Float, nullable=False, default=1),
+    Column("reihenfolge", Integer, nullable=False, default=0),
+    UniqueConstraint("set_id", "teil_id"),
+)
+
+set_fehlteile = Table(
+    "set_fehlteile", md,  # einzeln aus einem Set entnommene Teile: das Set ist unvollständig, bis erledigt
+    Column("id", Integer, primary_key=True),
+    Column("set_id", Integer, ForeignKey("artikel.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("teil_id", Integer, ForeignKey("artikel.id", ondelete="SET NULL")),
+    Column("teil_nr", String(60), nullable=False),          # Momentaufnahme (bleibt lesbar, auch wenn das Teil gelöscht wird)
+    Column("teil_bezeichnung", String(300)),
+    Column("menge", Float, nullable=False),
+    Column("lagerplatz", String(60)),                        # wo das unvollständige Set liegt
+    Column("empfaenger", String(200)),
+    Column("zweck", String(300)),
+    Column("entnommen_am", DateTime, nullable=False),
+    Column("entnommen_von", String(100)),
+    Column("erledigt_am", DateTime),
+    Column("erledigt_von", String(100)),
+    Column("erledigt_art", String(20)),                      # nachgelegt | aus_lager | set_entnommen | kein_bestand
+)
+
+# ------------------------------------------------------------------ Montageunterstützung (ab 2.12.0)
+mt_stutzen = Table(
+    "mt_stutzen", md,  # Stutzenübersicht: Soll-Werte je Stutzen/Flansch
+    Column("id", Integer, primary_key=True),
+    Column("gruppe", String(100)),                 # z. B. Reaktor, WHRU Stutzen, Verlängerung 1, Torch
+    Column("kuerzel", String(40), nullable=False), # Stutzen, z. B. RL 1, RO, WR
+    Column("bezeichnung", String(200)),            # z. B. Laser-Stutzen
+    Column("anlage", String(200)),                 # Vorschlag für „Anlage / Reaktor“ im Protokoll
+    Column("platz_id", Integer, ForeignKey("ih_plaetze.id", ondelete="SET NULL")),
+    Column("schrauben_anzahl", Integer),
+    Column("gewinde", String(40)),                 # Größe / Gewinde, z. B. M20
+    Column("schraube_typ", String(100)),           # Typ / Norm
+    Column("schraube_laenge", String(40)),         # Länge-Soll [mm] (Text: auch „265?“)
+    Column("schraube_werkstoff", String(100)),     # Werkstoff / Klasse
+    Column("drehmoment", String(40)),              # Soll [Nm] (Text: auch Spannen wie „35-47“)
+    Column("schmiermittel", String(200)),
+    Column("bemerkung", Text),
+    Column("reihenfolge", Integer, nullable=False, default=0),
+    Column("aktiv", Boolean, nullable=False, default=True),
+    Column("erstellt_am", DateTime, server_default=func.current_timestamp()),
+    Column("erstellt_von", String(100)),
+    Column("geaendert_am", DateTime),
+    Column("geaendert_von", String(100)),
+)
+
+mt_stutzen_dichtungen = Table(
+    "mt_stutzen_dichtungen", md,  # bis zu 3 Dichtungen je Stutzen (Dichtung 1–3 im Protokoll)
+    Column("id", Integer, primary_key=True),
+    Column("stutzen_id", Integer, ForeignKey("mt_stutzen.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("pos", Integer, nullable=False),
+    Column("einbauort", String(100)),
+    Column("dichtungsart", String(100)),           # z. B. MCR, KPD, VOR, Dichtscheibe
+    Column("durchmesser", String(60)),             # z. B. Ø110MM, DN40, 1 Zoll
+    Column("artikel_nr", String(200)),             # Bezeichnung/Bestellnummer der Dichtung (Spalte „Auftragsnummer“)
+    Column("artikel_id", Integer, ForeignKey("artikel.id", ondelete="SET NULL")),  # Lagerartikel (optional)
+    Column("nenndicke", Float),                    # Nenn-/Neudicke [mm]
+    Column("menge", Float),
+)
+
+mt_protokolle = Table(
+    "mt_protokolle", md,  # Montageprotokoll Reaktorstutzen / Dichtungen / Schrauben
+    Column("id", Integer, primary_key=True),
+    Column("nummer", String(30), nullable=False, unique=True),     # MP-2026-0001
+    Column("status", String(20), nullable=False, default="entwurf"),  # entwurf | abgeschlossen
+    Column("stutzen_id", Integer, ForeignKey("mt_stutzen.id", ondelete="SET NULL"), index=True),
+    Column("stutzen", String(40)),                 # Kürzel (Momentaufnahme)
+    Column("stutzen_bez", String(300)),
+    Column("anlage", String(200)),
+    Column("datum", Date),
+    Column("monteur", String(200)),
+    Column("pruefer", String(200)),
+    Column("arbeitsauftrag", String(200)),
+    Column("reinigung", String(300)),
+    Column("schmiermittel", String(200)),
+    Column("schrauben_anzahl", Integer),
+    Column("dichtungen", Text),                    # JSON: Liste mit 3 Einträgen
+    Column("schrauben", Text),                     # JSON: Liste je Schraubenposition (Pos. = Reihenfolge des Anziehens)
+    Column("reihenfolge", Text),                   # JSON: Loch-Nummer (1..n, im Uhrzeigersinn ab oben) je Pos.
+    Column("bemerkung_dichtungen", Text),
+    Column("bemerkungen", Text),
+    Column("montage_abgeschlossen", String(10)),   # ja | nein
+    Column("lecktest", String(10)),                # bestanden | offen | nb
+    Column("abschluss_zeit", String(40)),          # Feld „Datum / Uhrzeit“
+    Column("erstellt_am", DateTime, nullable=False),
+    Column("erstellt_von", String(100)),
+    Column("geaendert_am", DateTime),
+    Column("geaendert_von", String(100)),
+    Column("abgeschlossen_am", DateTime),
+    Column("abgeschlossen_von", String(100)),
+)
+
+mt_verlauf = Table(
+    "mt_verlauf", md,  # Wer hat wann was am Protokoll gemacht (Änderungen an abgeschlossenen Protokollen mit Alt → Neu)
+    Column("id", Integer, primary_key=True),
+    Column("protokoll_id", Integer, ForeignKey("mt_protokolle.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("zeit", DateTime, nullable=False),
+    Column("benutzer", String(100)),
+    Column("art", String(20), nullable=False),     # angelegt | gespeichert | abgeschlossen | korrigiert | geoeffnet
+    Column("grund", Text),
+    Column("aenderungen", Text),                   # JSON: [[Feld, alt, neu], ...]
 )
 
 _engine: Engine | None = None

@@ -31,7 +31,9 @@
     <nav class="flex-1 overflow-y-auto p-3 space-y-0.5">
       {% if ih %}
       {% set nav = [("/ih", "home", "Übersicht"), ("/ih/schichtbuch", "log", "Schichtbuch"), ("/ih/wartung", "wrench", "Wartungsplan"), ("/ih/wartung/kalender", "calendar", "Kalender"),
-                    ("/ih/auftraege", "clipboard", "Aufträge"), ("/ih/anlagen", "plant", "Anlagen")] + ([("/ih/import", "upload", "Asset-Import")] if darf("ih.import") else []) %}
+                    ("/ih/auftraege", "clipboard", "Aufträge"), ("/ih/anlagen", "plant", "Anlagen")]
+                   + ([("/ih/montage", "flansch", "Montageunterstützung")] if darf("ih.montage.ansehen") else [])
+                   + ([("/ih/import", "upload", "Asset-Import")] if darf("ih.import") else []) %}
       {% else %}
       {% set nav = [("/", "home", "Übersicht"), ("/buchen", "scan", "Buchen"), ("/artikel", "box", "Artikel"), ("/bewegungen", "history", "Bewegungen"),
                     ("/lagerplaetze", "shelf", "Lagerplätze"), ("/nachbestellung", "cart", "Nachbestellung"), ("/bestellungen", "cart", "Bestellungen"),
@@ -39,7 +41,11 @@
                     ("/inventur", "clipboard", "Inventur"), ("/auswertungen", "chart", "Auswertungen"), ("/lieferanten", "truck", "Lieferanten")] %}
       {% endif %}
       {% for href, ic, label in nav %}
-      <a href="{{ href }}" class="navlink {% if pfad == href or (href not in ('/', '/ih', '/ih/wartung') and pfad.startswith(href)) or (href == '/ih/wartung' and pfad.startswith('/ih/wartung') and not pfad.startswith('/ih/wartung/kalender')) %}aktiv{% endif %}">{{ icon(ic) }}{{ label }}</a>
+      <a href="{{ href }}" class="navlink {% if pfad == href or (href not in ('/', '/ih', '/ih/wartung', '/ih/montage') and pfad.startswith(href)) or (href == '/ih/wartung' and pfad.startswith('/ih/wartung') and not pfad.startswith('/ih/wartung/kalender')) %}aktiv{% endif %}">{{ icon(ic) }}{{ label }}</a>
+      {% if href == "/ih/montage" %}{# Unterpunkte der Montageunterstützung #}
+      {% for h2, l2 in [("/ih/montage/stutzen", "Stutzenübersicht"), ("/ih/montage/protokolle", "Montageprotokolle")] %}
+      <a href="{{ h2 }}" class="navlink pl-11 py-1.5 text-sm {% if pfad.startswith(h2) or (h2.endswith('stutzen') and pfad.startswith('/ih/montage/stutzen')) %}aktiv{% endif %}">{{ l2 }}</a>
+      {% endfor %}{% endif %}
       {% endfor %}
       {% if user.rolle == "admin" %}
       <div class="pt-4 mt-4 border-t border-white/10 space-y-0.5">

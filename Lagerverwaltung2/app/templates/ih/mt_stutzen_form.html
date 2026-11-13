@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "ih/_mt.html" import reiter with context %}
+{% block title %}{{ "Stutzen bearbeiten" if s.id else "Neuer Stutzen" }}{% endblock %}
+{% block content %}
+{{ reiter("stutzen") }}
+{% set zurueck = "/ih/montage/stutzen/" ~ s.id if s.id else "/ih/montage/stutzen" %}
+<div class="mb-4"><a href="{{ zurueck }}" class="text-sm text-muted hover:text-ink">{{ s.kuerzel if s.id else "Stutzenübersicht" }}</a><h1 class="mt-1">{{ "Stutzen bearbeiten" if s.id else "Neuer Stutzen" }}</h1></div>
+{% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-fehler max-w-5xl">{{ fehler }}</div>{% endif %}
+<form method="post" class="max-w-5xl space-y-6">
+  <section class="panel p-5">
+    <h2 class="mb-4">Stutzen</h2>
+    <div class="grid sm:grid-cols-[10rem_1fr_14rem] gap-4">
+      <div><label class="label" for="ku">Stutzen (Kürzel)</label><input id="ku" name="kuerzel" value="{{ s.kuerzel or '' }}" class="field font-semibold" required maxlength="40" placeholder="z. B. RL 1"></div>
+      <div><label class="label" for="bz">Bezeichnung</label><input id="bz" name="bezeichnung" value="{{ s.bezeichnung or '' }}" class="field" maxlength="200" placeholder="z. B. Laser-Stutzen"></div>
+      <div><label class="label" for="gr">Gruppe</label><input id="gr" name="gruppe" value="{{ s.gruppe or '' }}" list="gruppen" class="field" maxlength="100" placeholder="z. B. WHRU Stutzen"></div>
+    </div>
+    <div class="grid sm:grid-cols-2 gap-4 mt-4">
+      <div><label class="label" for="an">Anlage / Reaktor (Vorschlag im Protokoll)</label><input id="an" name="anlage" value="{{ s.anlage or '' }}" class="field" maxlength="200"></div>
+      <div><label class="label" for="tg">Tag-Nr. (optional)</label><input id="tg" name="tag" value="{{ s.tag or '' }}" list="tags" class="field" autocomplete="off" placeholder="Anlage aus Instandhaltung → Anlagen"></div>
+    </div>
+  </section>
+  <section class="panel p-5">
+    <h2 class="mb-1">Schrauben (Soll)</h2>
+    <p class="text-sm text-muted mb-4">Aus der Anzahl entsteht die Skizze im Montageprotokoll – mit genau so vielen Löchern und Zeilen. Werte mit „?“ werden als ungeklärt markiert.</p>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div><label class="label" for="sa">Anzahl Schrauben</label><input id="sa" name="schrauben_anzahl" value="{{ s.schrauben_anzahl or '' }}" type="number" min="1" max="100" class="field text-lg font-semibold"></div>
+      <div><label class="label" for="ge">Größe / Gewinde</label><input id="ge" name="gewinde" value="{{ s.gewinde or '' }}" class="field" maxlength="40" placeholder="z. B. M20"></div>
+      <div><label class="label" for="sl">Länge-Soll [mm]</label><input id="sl" name="schraube_laenge" value="{{ s.schraube_laenge or '' }}" class="field" maxlength="40"></div>
+      <div><label class="label" for="dm">Soll-Drehmoment [Nm]</label><input id="dm" name="drehmoment" value="{{ s.drehmoment or '' }}" class="field font-semibold" maxlength="40" placeholder="z. B. 125 oder 35-47"></div>
+      <div><label class="label" for="ty">Typ / Norm</label><input id="ty" name="schraube_typ" value="{{ s.schraube_typ or '' }}" class="field" maxlength="100" placeholder="z. B. ISO 4014"></div>
+      <div><label class="label" for="ws">Werkstoff / Klasse</label><input id="ws" name="schraube_werkstoff" value="{{ s.schraube_werkstoff or '' }}" class="field" maxlength="100" placeholder="z. B. A4-70"></div>
+      <div class="col-span-2"><label class="label" for="sm">Schmiermittel</label><input id="sm" name="schmiermittel" value="{{ s.schmiermittel or '' }}" class="field" maxlength="200"></div>
+    </div>
+  </section>
+  <section class="panel p-5">
+    <h2 class="mb-1">Dichtungen (bis zu 3 – wie im Protokoll)</h2>
+    <p class="text-sm text-muted mb-4">„Artikel-Nr.“ ist die Bezeichnung/Bestellnummer der Dichtung (in der Excel-Liste Spalte „Auftragsnummer“). Optional mit einem Lagerartikel verknüpfen – dann sehen Sie den Bestand.</p>
+    {% set dd = s.dichtungen or [] %}
+    <div class="space-y-4">
+    {% for i in range(3) %}{% set d = dd[i] if i < dd|length else {} %}
+      <div class="grid sm:grid-cols-[5rem_8rem_8rem_1fr_6rem] gap-3 items-end {{ 'pt-4 border-t border-line' if i }}">
+        <div class="font-semibold pb-2">Dichtung {{ i + 1 }}</div>
+        <div><label class="label">Dichtungsart</label><input name="d{{ i }}_dichtungsart" value="{{ d.dichtungsart or '' }}" class="field" maxlength="100" list="arten" placeholder="MCR"></div>
+        <div><label class="label">Durchmesser</label><input name="d{{ i }}_durchmesser" value="{{ d.durchmesser or '' }}" class="field" maxlength="60" placeholder="Ø110MM"></div>
+        <div><label class="label">Artikel-Nr. / Bestellbezeichnung</label><input name="d{{ i }}_artikel_nr" value="{{ d.artikel_nr or '' }}" class="field" maxlength="200"></div>
+        <div><label class="label">Nenndicke</label><input name="d{{ i }}_nenndicke" value="{{ d.nenndicke if d.nenndicke is not none else '' }}" inputmode="decimal" class="field" placeholder="mm"></div>
+        <div class="sm:col-start-2 sm:col-span-2"><label class="label">Einbauort (optional)</label><input name="d{{ i }}_einbauort" value="{{ d.einbauort or '' }}" class="field" maxlength="100" placeholder="z. B. innen"></div>
+        <div class="sm:col-span-2"><label class="label">Lagerartikel (optional)</label><input name="d{{ i }}_lager" value="{{ d.lager_text or '' }}" list="lager" class="field" autocomplete="off" placeholder="Artikelnummer suchen"></div>
+        <input type="hidden" name="d{{ i }}_menge" value="{{ d.menge if d.menge is not none else '' }}">
+      </div>
+    {% endfor %}
+    </div>
+  </section>
+  <section class="panel p-5"><label class="label" for="bm">Bemerkung</label><textarea id="bm" name="bemerkung" rows="3" class="field">{{ s.bemerkung or '' }}</textarea></section>
+  <div class="flex gap-2"><button class="btn btn-primary btn-lg">{{ "Speichern" if s.id else "Stutzen anlegen" }}</button><a href="{{ zurueck }}" class="btn btn-lg">Abbrechen</a></div>
+  <datalist id="gruppen">{% for g in gruppen %}<option value="{{ g }}">{% endfor %}</datalist>
+  <datalist id="arten">{% for a in ["MCR", "KPD", "VOR", "Dichtscheibe", "Swagelok Verschraubung"] %}<option value="{{ a }}">{% endfor %}</datalist>
+  <datalist id="tags">{% for c, b in tags %}<option value="{{ c }}{% if b %} – {{ b }}{% endif %}">{% endfor %}</datalist>
+  <datalist id="lager">{% for n, b in lager_artikel %}<option value="{{ n }} – {{ b }}">{% endfor %}</datalist>
+</form>
+{% endblock %}

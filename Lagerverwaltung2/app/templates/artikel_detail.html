@@ -11,6 +11,7 @@
       <a href="/artikel" class="text-sm text-muted hover:text-ink">Artikel</a>
       <h1 class="mt-1 flex flex-wrap items-baseline gap-x-3"><span>{{ a.nummer }}</span><span class="font-sans font-medium text-xl text-muted">{{ a.bezeichnung }}</span></h1>
       <div class="mt-2 flex flex-wrap items-center gap-3">{{ status(a.status) }}
+        {% if a.ist_set %}<a href="#set" class="status {{ 'st-kritisch' if a.fehlteile else 'text-primary' }}">{{ "Set unvollständig" if a.fehlteile else "Set" }}</a>{% endif %}
         {% if a.kritisch %}<span class="status st-kritisch">Kritisches Ersatzteil</span>{% endif %}
         {% if not a.aktiv %}<span class="status text-muted">Archiviert</span>{% endif %}
         {% if a.kategorie %}<a class="text-sm text-muted hover:underline" href="/artikel?kategorie={{ a.kategorie|urlq }}">{{ a.kategorie }}</a>{% endif %}
@@ -56,6 +57,64 @@
         {% endfor %}
       </div>
     </section>
+
+    {% if a.ist_set %}
+    <section class="panel {{ 'border-l-4 border-l-crit' if a.fehlteile }}" id="set">
+      <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-line">
+        <h2>Inhalt des Sets</h2>
+        {% if a.fehlteile %}<span class="status st-kritisch">Set unvollständig</span>{% else %}<span class="status st-ok">Vollständig</span>{% endif %}
+      </div>
+      {% if a.set_inhalt %}
+      <ul class="divide-y divide-line text-sm">
+        {% for t in a.set_inhalt %}
+        <li class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5">
+          <span class="font-cond text-lg font-bold tabular-nums w-14">{{ t.menge|num }} ×</span>
+          <a href="/artikel/{{ t.nummer|urlq }}" class="font-semibold text-primary hover:underline">{{ t.nummer }}</a><span>{{ t.bezeichnung }}</span>
+          <span class="ml-auto text-xs text-muted">Einzeln auf Lager: {{ t.einzelbestand|num }} {{ t.einheit }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="px-4 py-4 text-sm text-muted">Noch kein Inhalt eingetragen. Unter „Bearbeiten“ die Teile des Sets eintragen.</p>{% endif %}
+      {% if a.fehlteile %}
+      <div class="border-t border-line bg-crit/5 px-4 py-3">
+        <p class="font-semibold text-crit">{{ a.set_warnung }}</p>
+        <ul class="mt-2 space-y-2 text-sm">
+          {% for f in a.fehlteile %}
+          <li class="flex flex-wrap items-center gap-2">
+            <span class="font-semibold">{{ f.menge|num }} × {{ f.teil_nr }}</span><span>{{ f.teil_bezeichnung or "" }}</span>
+            <span class="text-muted">entnommen {{ f.entnommen_am|datum }} von {{ f.entnommen_von }}{% if f.lagerplatz %}, Set auf {{ f.lagerplatz }}{% endif %}{% if f.empfaenger %}, an {{ f.empfaenger }}{% endif %}{% if f.zweck %} ({{ f.zweck }}){% endif %}</span>
+            {% if ln %}<span class="ml-auto flex gap-1.5 no-print">
+              <form method="post" action="/artikel/{{ a.nummer|urlq }}/set/fehlteil/{{ f.id }}"><input type="hidden" name="art" value="nachgelegt"><button class="btn btn-sm" title="Das Teil liegt wieder im Set (z. B. nicht gebraucht)">Wieder hineingelegt</button></form>
+              <form method="post" action="/artikel/{{ a.nummer|urlq }}/set/fehlteil/{{ f.id }}" onsubmit="return confirm('{{ f.menge|num }} × {{ f.teil_nr }} aus dem Lager entnehmen und ins Set legen? (Bucht eine Entnahme des Teils.)')"><input type="hidden" name="art" value="aus_lager"><button class="btn btn-sm">Aus Lager nachlegen</button></form>
+            </span>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% if ln and a.aktiv and a.set_inhalt and a.bestand > 0 %}
+      <details class="border-t border-line px-4 py-3 bg-soft no-print">
+        <summary class="cursor-pointer font-semibold text-sm">Einzelnes Teil aus dem Set entnehmen</summary>
+        <form method="post" action="/artikel/{{ a.nummer|urlq }}/set/teil-entnehmen" class="grid sm:grid-cols-[1fr_6rem_10rem] gap-3 mt-3"
+              onsubmit="return confirm('Teil aus dem Set entnehmen? Das Set wird danach als UNVOLLSTÄNDIG angezeigt.')">
+          <div><label class="label">Teil</label><select name="teil" class="field" required>{% for t in a.set_inhalt %}<option value="{{ t.nummer }}">{{ t.nummer }} – {{ t.bezeichnung }} ({{ t.menge|num }} je Set)</option>{% endfor %}</select></div>
+          <div><label class="label">Menge</label><input name="menge" value="1" inputmode="decimal" class="field text-center" required></div>
+          <div><label class="label">Set liegt auf</label><select name="platz" class="field">{% for o, n in a.orte if n > 0 %}<option value="{{ o }}">{{ o }} ({{ n|num }})</option>{% endfor %}</select></div>
+          <div><label class="label">Empfänger (optional)</label><input name="empfaenger" class="field" maxlength="200"></div>
+          <div class="sm:col-span-2"><label class="label">Verwendung / Auftrag (optional)</label><input name="zweck" class="field" maxlength="300"></div>
+          <div class="sm:col-span-3 flex flex-wrap items-center gap-3"><button class="btn btn-danger">Teil entnehmen – Set wird unvollständig</button>
+            <span class="text-xs text-muted">Der Bestand des Sets bleibt. Das ganze Set entnehmen Sie wie gewohnt über „Entnehmen“.</span></div>
+        </form>
+      </details>
+      {% endif %}
+    </section>
+    {% endif %}
+    {% if a.in_sets %}
+    <section class="panel px-4 py-3">
+      <h2 class="mb-2">Auch enthalten in Sets</h2>
+      <ul class="text-sm space-y-1">{% for s in a.in_sets %}<li><span class="font-semibold">{{ s.menge|num }} ×</span> in <a href="/artikel/{{ s.nummer|urlq }}" class="font-semibold text-primary hover:underline">{{ s.nummer }}</a> {{ s.bezeichnung }} – <span class="{{ 'text-muted' if not s.sets }}">{{ s.sets|num }} Set(s) auf Lager{% if s.orte %}: {{ s.orte|map(attribute=0)|join(", ") }}{% endif %}</span></li>{% endfor %}</ul>
+    </section>
+    {% endif %}
 
     {% if a.bestellungen %}
     <section class="panel px-4 py-3 border-l-4 border-l-primary">

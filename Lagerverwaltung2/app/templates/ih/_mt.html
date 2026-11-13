@@ -1,0 +1,89 @@
+{# Montageunterstützung (ab 2.12.0): Reiter und das Protokollblatt (gleiches Layout wie die Excel-Vorlage „Blanko Stutzenblatt“) #}
+{% from "_macros.html" import icon %}
+{% macro reiter(aktiv) -%}
+<div class="text-sm text-muted mb-1">Montageunterstützung</div>
+<nav class="flex flex-wrap gap-1 border-b border-line mb-5 no-print" aria-label="Montageunterstützung">
+  {% for href, key, label in [("/ih/montage/stutzen", "stutzen", "Stutzenübersicht"), ("/ih/montage/protokolle", "protokolle", "Montageprotokolle")] %}
+  <a href="{{ href }}" class="px-4 py-2 -mb-px border-b-2 font-semibold {{ 'border-primary text-ink' if aktiv == key else 'border-transparent text-muted hover:text-ink' }}">{{ label }}</a>
+  {% endfor %}
+  {% if darf("ih.montage.erfassen") %}<a href="/ih/montage/protokolle/neu" class="px-4 py-2 -mb-px border-b-2 font-semibold {{ 'border-primary text-ink' if aktiv == 'neu' else 'border-transparent text-primary hover:text-ink' }}">+ Neues Montageprotokoll</a>{% endif %}
+</nav>
+{%- endmacro %}
+
+{% macro kreuz(an) %}{{ "☒" if an else "☐" }}{% endmacro %}
+
+{% macro blatt_stil() %}
+<style>
+  .mt-blatt { font-family: Arial, Helvetica, sans-serif; color: #1F2937; background: #fff; font-size: 8.5pt; line-height: 1.2; }
+  .mt-blatt table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .mt-blatt td, .mt-blatt th { border: 0.75pt solid #7F7F7F; padding: 2px 4px; text-align: center; vertical-align: middle; overflow-wrap: anywhere; }
+  .mt-blatt th, .mt-blatt .lab { background: #E7E6E6; font-weight: 700; font-size: 7.5pt; }
+  .mt-blatt .rot { background: #C00000; color: #fff; font-weight: 700; border-color: #C00000; font-size: 9pt; padding: 3px 6px; }
+  .mt-blatt .kopf { background: #C00000; color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; font-weight: 700; }
+  .mt-blatt .kopf .titel { font-size: 11.5pt; }
+  .mt-blatt .kopf .firma { font-size: 15pt; letter-spacing: .32em; }
+  .mt-blatt .wert { font-size: 9pt; }
+  .mt-blatt .ist { font-weight: 700; }
+  .mt-blatt .box { font-size: 11pt; }
+  .mt-blatt .hinweis { color: #C00000; font-size: 7.6pt; text-align: center; margin: 4px 0; }
+  .mt-blatt .links { text-align: left; vertical-align: top; white-space: pre-line; }
+  .mt-blatt .abstand { height: 8px; }
+  .mt-blatt .fuss { font-size: 7pt; color: #595959; text-align: right; margin-top: 3px; }
+  .mt-blatt .skizze { padding: 6px; }
+  .mt-blatt .skizze svg { display: block; margin: 0 auto; max-width: 250px; }
+</style>
+{% endmacro %}
+
+{# p: Protokoll (mit schrauben_anzeige inkl. kennzeichnung), svg: Skizze #}
+{% macro blatt(p, svg, firma, LECKTEST, blanko=False) %}
+<div class="mt-blatt">
+  <div class="kopf"><span class="titel">MONTAGEPROTOKOLL – REAKTORSTUTZEN / DICHTUNGEN / SCHRAUBEN</span><span class="firma">{{ firma|upper }}</span></div>
+  <div class="abstand"></div>
+  <table>
+    <colgroup><col style="width:12%"><col style="width:20%"><col style="width:10%"><col style="width:22%"><col style="width:12%"><col style="width:24%"></colgroup>
+    <tr style="height:24px"><td class="lab">Anlage / Reaktor</td><td class="wert">{{ p.anlage or "" }}</td><td class="lab">Stutzen</td><td class="wert ist">{{ p.stutzen_bez or p.stutzen or "" }}</td><td class="lab">Datum</td><td class="wert">{{ p.datum.strftime("%d.%m.%Y") if p.datum and p.datum.strftime is defined else (p.datum or "") }}</td></tr>
+    <tr style="height:24px"><td class="lab">Monteur</td><td class="wert">{{ p.monteur or "" }}</td><td class="lab">Prüfer</td><td class="wert">{{ p.pruefer or "" }}</td><td class="lab">Arbeitsauftrag</td><td class="wert">{{ p.arbeitsauftrag or "" }}</td></tr>
+  </table>
+  <table style="margin-top:-0.75pt">
+    <colgroup><col style="width:12%"><col style="width:38%"><col style="width:14%"><col style="width:36%"></colgroup>
+    <tr style="height:28px"><td class="lab">Reinigung</td><td class="wert">{{ p.reinigung or "" }}</td><td class="lab">Schmiermittel</td><td class="wert">{{ p.schmiermittel or "" }}</td></tr>
+  </table>
+  <div class="abstand"></div>
+  <table>
+    <colgroup><col style="width:36%"><col style="width:9%"><col style="width:9%"><col style="width:13%"><col style="width:13%"><col style="width:6%"><col style="width:6%"><col style="width:4%"><col style="width:4%"></colgroup>
+    <tr><td class="rot">STUTZENSKIZZE / SCHRAUBENPOSITIONEN</td><td class="rot" colspan="8">DICHTUNGEN</td></tr>
+    <tr style="height:26px"><td class="skizze" rowspan="6">{{ svg|safe }}</td><th>Pos.</th><th>Einbauort</th><th>Dichtungsart</th><th>Artikel-Nr.</th><th>Nenn D.<br>[mm]</th><th>Ist-Dicke<br>[mm]</th><th>Alt</th><th>Neu</th></tr>
+    {% for d in p.dichtungen %}
+    <tr style="height:32px"><th>Dichtung {{ loop.index }}</th><td style="font-size:7.5pt">{{ d.einbauort or "" }}</td><td>{{ d.dichtungsart or "" }}</td><td style="font-size:7pt">{{ d.artikel_nr or "" }}</td><td>{{ d.nenndicke or "" }}</td><td class="ist">{{ d.ist_dicke or "" }}</td><td class="box">{{ kreuz(d.alt_neu == "alt") }}</td><td class="box">{{ kreuz(d.alt_neu == "neu") }}</td></tr>
+    {% endfor %}
+    <tr style="height:110px"><th>Bemerkung<br>Dichtungen</th><td colspan="7" class="links">{{ p.bemerkung_dichtungen or "" }}</td></tr>
+  </table>
+  <p class="hinweis">Hinweis: Die tatsächlich vorhandenen Schraubenpositionen sind entsprechend der Anzahl zu markieren und fortlaufend in der Reihenfolge des erfolgten Anziehens zu nummerieren. „#“ = gleicher Wert wie in der Zeile darüber.</p>
+  {% set n = p.schrauben_anzahl or 0 %}
+  <table>
+    <colgroup><col style="width:5%"><col style="width:15%"><col style="width:9%"><col style="width:9%"><col style="width:7%"><col style="width:7%"><col style="width:12%"><col style="width:8%"><col style="width:8%"><col style="width:4.5%"><col style="width:4.5%"><col style="width:11%"></colgroup>
+    <thead>
+    <tr><td class="rot" colspan="12">SCHRAUBEN – POSITIONEN 1 BIS {{ n }}</td></tr>
+    <tr><th style="text-align:right">Pos.</th><th>Kennzeichnung<br>z. B. RO-1-65 Nm</th><th>Typ / Norm</th><th>Größe / Gewinde</th><th>Länge-Soll<br>[mm]</th><th>Länge-Ist<br>[mm]</th><th>Werkstoff /<br>Klasse</th><th>Soll<br>[Nm]</th><th>Ist<br>[Nm]</th><th>Alt</th><th>Neu</th><th>Bemerkung</th></tr>
+    </thead>
+    <tbody>
+    {% for z in p.schrauben_anzeige %}
+    <tr style="height:21px"><th style="text-align:right">{{ loop.index }}</th><td>{{ z.kennzeichnung }}</td><td>{{ z.typ }}</td><td>{{ z.groesse }}</td><td>{{ z.laenge_soll }}</td><td>{{ z.laenge_ist }}</td><td>{{ z.werkstoff }}</td><td>{{ z.soll_nm }}</td><td class="ist">{{ z.ist_nm }}</td><td class="box">{{ kreuz(z.alt_neu == "alt") }}</td><td class="box">{{ kreuz(z.alt_neu == "neu") }}</td><td style="font-size:7pt">{{ z.bemerkung }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="abstand"></div>
+  <table>
+    <colgroup><col style="width:18%"><col style="width:82%"></colgroup>
+    <tr style="height:80px"><td class="lab">ALLGEMEINE<br>BEMERKUNGEN</td><td class="links">{{ p.bemerkungen or "" }}</td></tr>
+  </table>
+  <div class="abstand"></div>
+  <table>
+    <colgroup><col style="width:17%"><col style="width:16%"><col style="width:10%"><col style="width:27%"><col style="width:12%"><col style="width:18%"></colgroup>
+    <tr style="height:40px"><td class="lab">Montage abgeschlossen</td><td>{{ kreuz(p.montage_abgeschlossen == "ja") }} Ja &nbsp; {{ kreuz(p.montage_abgeschlossen == "nein") }} Nein</td><td class="lab">Lecktest</td>
+      <td>{% for k, lab in LECKTEST.items() %}{{ kreuz(p.lecktest == k) }} {{ lab }}&nbsp;&nbsp; {% endfor %}</td><td class="lab">Datum / Uhrzeit</td><td>{{ p.abschluss_zeit or "" }}</td></tr>
+    <tr style="height:42px"><td class="lab" colspan="2">Unterschrift Monteur:</td><td colspan="2"></td><td class="lab">Unterschrift Prüfer:</td><td></td></tr>
+  </table>
+  <div class="fuss">{% if not blanko %}{{ p.nummer }}{% if p.status %} · {{ "Abgeschlossen" if p.status == "abgeschlossen" else "In Arbeit" }}{% endif %} · {% endif %}{{ firma }}</div>
+</div>
+{% endmacro %}

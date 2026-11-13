@@ -47,7 +47,7 @@ def _alte_datenbank(pfad: Path):
 def test_neue_datenbank_hat_alle_migrationen(env):
     cfg, eng = env
     with eng.connect() as con:
-        assert [r[0] for r in con.exec_driver_sql("SELECT version FROM schema_version")] == [1, 2, 3, 4]
+        assert [r[0] for r in con.exec_driver_sql("SELECT version FROM schema_version")] == [1, 2, 3, 4, 5]
         spalten = {r[1] for r in con.exec_driver_sql("PRAGMA table_info(bewegungen)")}
     assert {"preis", "auftrag_id"} <= spalten
 
@@ -64,7 +64,7 @@ def test_update_von_2_4_probelauf_sicherung_und_daten_unveraendert(env):
     con = sqlite3.connect(str(datei))
     vorher = migrationen.kennzahlen(con)
     con.close()
-    assert migrationen._datei_ausstehend(datei) == [1, 2, 3, 4]
+    assert migrationen._datei_ausstehend(datei) == [1, 2, 3, 4, 5]
     name = migrationen.vor_start(cfg)
     assert name.startswith("vor_update_") and (cfg.path(cfg.backup.ordner) / name).exists()
     db.init_engine(cfg.db_url)  # führt die Migration aus
@@ -72,7 +72,7 @@ def test_update_von_2_4_probelauf_sicherung_und_daten_unveraendert(env):
     try:
         assert migrationen.kennzahlen(con) == vorher
         assert {"preis", "auftrag_id"} <= {r[1] for r in con.execute("PRAGMA table_info(bewegungen)")}
-        assert con.execute("SELECT count(*) FROM schema_version").fetchone()[0] == 4
+        assert con.execute("SELECT count(*) FROM schema_version").fetchone()[0] == 5
     finally:
         con.close()
     assert migrationen._datei_ausstehend(datei) == []

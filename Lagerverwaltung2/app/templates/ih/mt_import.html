@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_mt.html" import reiter with context %}
+{% block title %}Stutzenübersicht importieren{% endblock %}
+{% block content %}
+{{ reiter("stutzen") }}
+<div class="mb-4"><a href="/ih/montage/stutzen" class="text-sm text-muted hover:text-ink">Stutzenübersicht</a><h1 class="mt-1">Stutzenübersicht aus Excel importieren</h1></div>
+<div class="grid xl:grid-cols-[1fr_420px] gap-6">
+  <div class="space-y-6 min-w-0">
+  <form method="post" enctype="multipart/form-data" class="panel p-5 space-y-4">
+    <div><label class="label" for="datei">Excel-Datei (.xlsx)</label><input id="datei" type="file" name="datei" accept=".xlsx" required class="text-sm file:btn file:mr-2"></div>
+    <div class="max-w-sm"><label class="label" for="ga">Gruppe für Zeilen vor der ersten Zwischenüberschrift</label><input id="ga" name="gruppe_anfang" value="{{ gruppe_anfang if gruppe_anfang is defined else 'Reaktor' }}" class="field" maxlength="100">
+      <p class="text-xs text-muted mt-1">Zwischenüberschriften wie „WHRU Stutzen“, „Verlängerung 1“, „Torch“ werden automatisch zu Gruppen.</p></div>
+    <div class="flex flex-wrap gap-2"><button name="probe" value="1" class="btn">Erst ansehen (nichts speichern)</button><button class="btn btn-primary">{{ icon("upload", "w-4 h-4") }}Importieren</button></div>
+  </form>
+  {% if vorschau is defined and vorschau %}
+  <section class="panel">
+    <div class="px-4 py-3 border-b border-line"><h2>Vorschau: {{ vorschau.stutzen|length }} Stutzen aus Blatt „{{ vorschau.blatt }}“</h2><p class="text-sm text-muted">Noch nichts gespeichert. Zum Übernehmen die Datei oben erneut wählen und „Importieren“.</p></div>
+    <div class="overflow-x-auto"><table class="tbl text-sm">
+      <thead><tr><th>Gruppe</th><th>Stutzen</th><th>Bezeichnung</th><th>Dichtungen</th><th class="num">Soll [Nm]</th><th class="num">Länge</th><th>Gewinde</th></tr></thead>
+      <tbody>{% for s in vorschau.stutzen %}<tr><td>{{ s.gruppe or "" }}</td><td class="font-semibold">{{ s.kuerzel }}</td><td>{{ s.bezeichnung or "" }}</td>
+        <td>{% for d in s.dichtungen %}<div class="whitespace-nowrap">{{ d.dichtungsart or "" }} {{ d.durchmesser or "" }} <span class="text-muted">{{ d.artikel_nr or "" }}</span>{% if d.nenndicke is not none %} · {{ d.nenndicke|num }} mm{% endif %}</div>{% endfor %}</td>
+        <td class="num">{{ s.drehmoment or "" }}</td><td class="num">{{ s.schraube_laenge or "" }}</td><td>{{ s.gewinde or "" }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% if vorschau.hinweise %}<ul class="px-4 py-3 border-t border-line text-sm list-disc pl-8 text-warn">{% for h in vorschau.hinweise %}<li>{{ h }}</li>{% endfor %}</ul>{% endif %}
+  </section>
+  {% endif %}
+  {% if ergebnis %}
+  <section class="panel p-5">
+    <h2 class="mb-2">Import abgeschlossen</h2>
+    <p>{{ ergebnis.neu }} Stutzen neu angelegt, {{ ergebnis.geaendert }} ergänzt/aktualisiert ({{ ergebnis.gesamt }} in der Datei, {{ ergebnis.dichtungen }} Dichtungen).</p>
+    {% if hinweise %}<h3 class="font-semibold mt-3">Hinweise</h3><ul class="list-disc pl-6 text-sm text-warn">{% for h in hinweise %}<li>{{ h }}</li>{% endfor %}</ul>{% endif %}
+    <a href="/ih/montage/stutzen" class="btn btn-primary mt-4">Zur Stutzenübersicht</a>
+  </section>
+  {% endif %}
+  </div>
+  <aside class="panel p-5 text-sm space-y-2 h-fit">
+    <h2>So wird gelesen</h2>
+    <p>Gesucht wird das Blatt mit den Spalten <b>Bezeichnung, Stutzen, Dichtungsart, Dichtungsdurchmesser, Auftragsnummer, Soll Drehmoment [Nm], Schrauben Länge Soll [mm]</b> (Vorlage „Stutzen Übersicht“). Die Spalte ohne Überschrift danach ist <b>Gewinde / Schraubengröße</b>.</p>
+    <p>Mehrere Zeilen mit demselben Stutzen (z. B. RL 1 mit Ø110 und Ø85) werden <b>ein</b> Stutzen mit mehreren Dichtungen (höchstens 3).</p>
+    <p>Die <b>Nenndicke</b> kommt aus dem Blatt „Zuordnung Dichtungen“ (Dicke-Soll); fehlt sie dort, aus der Bezeichnung (z. B. „…-3,18w-…“ = 3,18 mm).</p>
+    <p>Erneut importieren ist jederzeit möglich: Es wird nichts gelöscht. Vorhandene Stutzen bekommen die Werte aus der Datei; was nur im System eingetragen ist (z. B. Anzahl Schrauben), bleibt.</p>
+  </aside>
+</div>
+{% endblock %}

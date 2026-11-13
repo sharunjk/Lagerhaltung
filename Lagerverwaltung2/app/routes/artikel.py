@@ -14,7 +14,7 @@ from sqlalchemy import delete, insert, select
 
 from .. import db
 from ..db import anhaenge, artikel, lagerplaetze, lieferanten
-from ..services import labels, queries
+from ..services import labels, queries, sets
 from ..services.excel import tabelle_xlsx
 from ..services.lager import BuchungsFehler, Lager, audit, fmt_num, parse_num
 from ..web import flash, render, require, sicheres_ziel, zurueck
@@ -50,6 +50,8 @@ def form_daten(form: dict, cfg) -> dict:
     if "lieferant" in form:  # Freitext mit Vorschlägen; neue Namen legt Lager.lieferant_id an
         d["lieferant"] = (form.get("lieferant") or "").strip()
     d["kritisch"] = form.get("kritisch") in ("on", "1", "ja", "true", True)
+    if form.get("set_bearbeitet"):
+        d["ist_set"] = form.get("ist_set") in ("on", "1", "ja", "true", True)
     if "nummer" in form:
         d["nummer"] = (form.get("nummer") or "").strip()
     return d
@@ -57,7 +59,9 @@ def form_daten(form: dict, cfg) -> dict:
 
 def _form_ctx(con):
     from ..db import ih_plaetze
-    return dict(lieferanten=[dict(r) for r in con.execute(select(lieferanten).order_by(lieferanten.c.name)).mappings()],
+    return dict(set_artikel=[(r.nummer, r.bezeichnung) for r in con.execute(select(artikel.c.nummer, artikel.c.bezeichnung)
+                                                                            .where(artikel.c.aktiv, artikel.c.ist_set.is_not(True)).order_by(artikel.c.nummer))],
+                lieferanten=[dict(r) for r in con.execute(select(lieferanten).order_by(lieferanten.c.name)).mappings()],
                 vs=queries.vorschlaege(con),
                 ih_tags=[(r.code, r.bezeichnung or "") for r in con.execute(select(ih_plaetze.c.code, ih_plaetze.c.bezeichnung)
                                                                             .where(ih_plaetze.c.art == "platz", ih_plaetze.c.aktiv)
@@ -154,7 +158,8 @@ def neu_form(request: Request, kopie: str = "", platz: str = ""):
     with db.engine().connect() as con:
         a = {"nummer": queries.naechste_nummer(con), "einheit": request.app.state.cfg.lager.standard_einheit}
         if kopie and (src := queries.artikel_detail(con, kopie)):
-            a = {**src, "nummer": a["nummer"]}
+            a = {**src, "nummer": a["nummer"],
+                 "_set": [{"nummer": f"{t['nummer']} – {t['bezeichnung']}", "menge": fmt_num(t["menge"])} for t in src["set_inhalt"]]}
         if platz.strip():  # „Artikel hier anlegen“ auf einem Lagerplatz / einer Sichtlagerbox
             a["platz"] = " ".join(platz.split())
         return render(request, "artikel_form.html", a=a, neu=True, **_form_ctx(con))
@@ -167,19 +172,33 @@ async def neu(request: Request):
     form = {k: v for k, v in roh.items() if isinstance(v, str)}
     dateien, zu_gross = await dateien_lesen(roh.getlist("dateien"))
     tags = roh.getlist("tag") if form.get("tags_bearbeitet") else None
+    inhalt = set_eintraege(roh, form)
     try:
-        a, n = artikel_mit_dateien_anlegen(request, form, dateien, tags=tags)
+        a, n = artikel_mit_dateien_anlegen(request, form, dateien, tags=tags, set_inhalt=inhalt)
     except BuchungsFehler as e:
         with db.engine().connect() as con:
-            return render(request, "artikel_form.html", a={**form, "_tags": tags or []}, neu=True,
+            return render(request, "artikel_form.html", a={**form, "_tags": tags or [], "_set": _set_zeilen(roh)}, neu=True,
                           fehler=str(e) + (" Fotos/Dateien bitte erneut auswählen." if dateien else ""), **_form_ctx(con))
     flash(request, f"Artikel {a['nummer']} angelegt." + (f" {n} Foto(s)/Datei(en) gespeichert." if n else "")
           + (f" Nicht gespeichert (leer oder größer als 25 MB): {', '.join(zu_gross)}." if zu_gross else ""), "fehler" if zu_gross else "ok")
     return RedirectResponse(f"/artikel/{a['nummer']}" + ("?etikett=1" if form.get("etikett") == "on" else ""), status_code=303)
 
 
+def set_eintraege(roh, form: dict) -> list[tuple[str, str]] | None:
+    """Set-Inhalt aus dem Formular: None = nicht bearbeitet; [] = kein Set (Inhalt leeren)."""
+    if not form.get("set_bearbeitet"):
+        return None
+    if form.get("ist_set") not in ("on", "1", "ja", "true"):
+        return []
+    return list(zip(roh.getlist("set_teil"), roh.getlist("set_menge")))
+
+
+def _set_zeilen(roh) -> list[dict]:
+    return [{"nummer": t, "menge": m} for t, m in zip(roh.getlist("set_teil"), roh.getlist("set_menge"))]
+
+
 def artikel_mit_dateien_anlegen(request, form: dict, dateien: list[tuple[str, str, bytes]], quelle: str = "pc",
-                                tags: list[str] | None = None) -> tuple[dict, int]:
+                                tags: list[str] | None = None, set_inhalt: list[tuple[str, str]] | None = None) -> tuple[dict, int]:
     """Artikel anlegen (Lieferant per Name, ggf. neu) und gleich Fotos/Dateien anhängen – alles in einer Transaktion."""
     geschrieben: list[Path] = []
     try:
@@ -191,6 +210,8 @@ def artikel_mit_dateien_anlegen(request, form: dict, dateien: list[tuple[str, st
             a = lg.artikel_anlegen(daten, form.get("platz", ""), form.get("anfangsbestand") or 0)
             if tags:
                 tags_speichern(con, a["id"], tags, request.session["user"]["username"], a["nummer"])
+            if set_inhalt:
+                sets.inhalt_speichern(con, a["id"], set_inhalt, request.session["user"]["username"], a["nummer"])
             for name, typ, inhalt in dateien:
                 geschrieben.append(anhang_speichern(request, con, a["id"], a["nummer"], name, typ, inhalt))
     except Exception:
@@ -223,6 +244,7 @@ def bearbeiten_form(request: Request, nr: str):
         if not a:
             return RedirectResponse("/artikel", status_code=303)
         a["_tags"] = [t["code"] for t in zugeordnete_tags(con, a["id"])]
+        a["_set"] = [{"nummer": f"{t['nummer']} – {t['bezeichnung']}", "menge": fmt_num(t["menge"])} for t in a["set_inhalt"]]
         return render(request, "artikel_form.html", a=a, neu=False, **_form_ctx(con))
 
 
@@ -232,6 +254,7 @@ async def bearbeiten(request: Request, nr: str):
     roh = await request.form()
     form = {k: v for k, v in roh.items() if isinstance(v, str)}
     tags = roh.getlist("tag") if form.get("tags_bearbeitet") else None
+    inhalt = set_eintraege(roh, form)
     try:
         with db.schreiben() as con:
             aid = con.execute(select(artikel.c.id).where(artikel.c.nummer == nr)).scalar()
@@ -244,12 +267,54 @@ async def bearbeiten(request: Request, nr: str):
             lg.artikel_aendern(aid, daten)
             if tags is not None:
                 tags_speichern(con, aid, tags, me["username"], daten.get("nummer") or nr)
+            if inhalt is not None:
+                if not inhalt and sets.offene_fehlteile(con, aid):
+                    raise BuchungsFehler("Das Set hat noch fehlende Teile (unvollständig). Erst erledigen, dann „Ist ein Set“ abwählen.")
+                sets.inhalt_speichern(con, aid, inhalt, me["username"], daten.get("nummer") or nr)
     except BuchungsFehler as e:
         with db.engine().connect() as con:
-            return render(request, "artikel_form.html", a={**form, "nummer": form.get("nummer") or nr, "_alt": nr, "_tags": tags or []},
+            return render(request, "artikel_form.html", a={**form, "nummer": form.get("nummer") or nr, "_alt": nr, "_tags": tags or [],
+                                                           "_set": _set_zeilen(roh)},
                           neu=False, fehler=str(e), **_form_ctx(con))
     flash(request, "Änderungen gespeichert.")
     return RedirectResponse(f"/artikel/{daten.get('nummer') or nr}", status_code=303)
+
+
+# ------------------------------------------------------------------ Sets (ab 2.12.0)
+@router.post("/artikel/{nr}/set/teil-entnehmen")
+def set_teil_entnehmen(request: Request, nr: str, teil: str = Form(...), menge: str = Form("1"), platz: str = Form(""),
+                       empfaenger: str = Form(""), zweck: str = Form("")):
+    me = require(request, "lager")
+    try:
+        with db.schreiben() as con:
+            a = lager(con, request).artikel(nr)
+            if not a.get("ist_set"):
+                raise BuchungsFehler(f"{nr} ist kein Set.")
+            msg = sets.teil_entnehmen(con, a, teil, menge, platz, me["username"], empfaenger, zweck)
+        flash(request, msg, "fehler")  # bewusst auffällig: Set ist jetzt unvollständig
+    except BuchungsFehler as e:
+        flash(request, str(e), "fehler")
+    return RedirectResponse(f"/artikel/{quote(nr)}#set", status_code=303)
+
+
+@router.post("/artikel/{nr}/set/fehlteil/{fid}")
+def set_fehlteil(request: Request, nr: str, fid: int, art: str = Form(...), platz: str = Form("")):
+    me = require(request, "lager")
+    try:
+        with db.schreiben() as con:
+            L = lager(con, request)
+            if art == "aus_lager" and not platz.strip():  # Platz mit dem meisten Bestand des Teils
+                from ..db import set_fehlteile
+                tid = con.execute(select(set_fehlteile.c.teil_id).where(set_fehlteile.c.id == fid)).scalar()
+                orte = (queries.artikel_detail(con, L.artikel(tid)["nummer"]) or {}).get("orte", []) if tid else []
+                platz = next((o for o, n in orte if n > 0), "")
+                if not platz:
+                    raise BuchungsFehler("Vom Teil ist kein Einzelbestand im Lager. „Wieder hineingelegt“ wählen oder erst einbuchen.")
+            msg = sets.fehlteil_erledigen(con, fid, art, me["username"], L, platz)
+        flash(request, msg)
+    except BuchungsFehler as e:
+        flash(request, str(e), "fehler")
+    return RedirectResponse(f"/artikel/{quote(nr)}#set", status_code=303)
 
 
 @router.post("/artikel/{nr}/archivieren")

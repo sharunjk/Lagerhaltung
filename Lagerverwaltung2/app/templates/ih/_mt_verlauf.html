@@ -1,0 +1,14 @@
+{% if p.verlauf %}
+<section class="panel">
+  <div class="px-4 py-3 border-b border-line"><h2>Verlauf</h2></div>
+  <ul class="divide-y divide-line text-sm">
+    {% for v in p.verlauf|reverse %}
+    <li class="px-4 py-2.5"><div class="flex flex-wrap justify-between gap-2"><span class="font-semibold">{{ {"angelegt": "Angelegt", "gespeichert": "Gespeichert", "abgeschlossen": "Abgeschlossen", "korrigiert": "Korrigiert (abgeschlossen)", "geoeffnet": "Wieder geöffnet"}.get(v.art, v.art) }}</span><span class="text-muted">{{ v.zeit|datum }} · {{ v.benutzer }}</span></div>
+      {% if v.grund %}<p class="mt-1">Grund: {{ v.grund }}</p>{% endif %}
+      {% if v.aenderungen %}<details class="mt-1"><summary class="cursor-pointer text-xs text-muted">{{ v.aenderungen|length }} Änderung(en)</summary>
+        <ul class="mt-1 text-xs space-y-0.5">{% for f, a, n in v.aenderungen %}<li><span class="text-muted">{{ f }}:</span> {{ a if a not in (None, "") else "–" }} → <b>{{ n if n not in (None, "") else "–" }}</b></li>{% endfor %}</ul></details>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

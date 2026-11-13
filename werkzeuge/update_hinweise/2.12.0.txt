@@ -1,0 +1,29 @@
+Neu in 2.12.0 - Sets im Lager und Montageunterstuetzung:
+
+Sets (Lager):
+- Artikel anlegen/bearbeiten -> Haekchen "Dieser Artikel ist ein Set" -> Inhalt: jedes Teil mit eigener
+  Artikelnummer und Menge je Set (z. B. Ersatzteilset Pumpenmodul = Pulsationsdaempfer + Dichtungen ...).
+- Das Set wird als Ganzes eingelagert und entnommen (eigene Nummer, Lagerplatz, Etikett, Tag-Nr.).
+- Einzelnes Teil entnehmen: am Set "Einzelnes Teil aus dem Set entnehmen". Danach Warnung
+  "Set unvollstaendig" am Set, beim Buchen (PC und Scanner-App) und nach jeder Entnahme des Sets,
+  bis das Teil nachgelegt ist.
+- Am Teil steht "Auch enthalten in Sets" mit Lagerplatz des Sets.
+
+Montageunterstuetzung (Instandhaltung -> Montageunterstuetzung):
+- Stutzenuebersicht: alle Stutzen mit Soll-Werten (Dichtungen, Nenndicke, Schrauben, Gewinde, Laenge,
+  Drehmoment). Import aus der Excel-Liste (Blatt "Stutzen Uebersicht"). Anzahl Schrauben je Stutzen eintragen.
+- Montageprotokoll: Stutzen waehlen -> Soll-Werte vorbelegt. Vorher Kopf und Dichtungen ausfuellen und
+  zwischenspeichern, nach der Montage Drehmomente nachtragen. Skizze mit genau so vielen Loechern wie Schrauben:
+  Loecher in der Reihenfolge des Anziehens anklicken. "#" = gleicher Wert wie in der Zeile darueber.
+- Drucken (Layout wie die bisherige Vorlage, zum Unterschreiben) und als Excel-Datei.
+- Uebersicht aller Montageprotokolle. Abgeschlossene Protokolle aendern nur Instandhaltungsingenieur und
+  -manager (mit Grund, alles im Verlauf).
+- Rechte: ansehen alle; erfassen Operator bis Manager; Stutzenuebersicht pflegen Schichtfuehrer, Ingenieur,
+  Manager.
+
+Datenbank: neue Tabellen und eine neue Spalte (Artikel: Set). Beim ersten Start laeuft die Aktualisierung erst
+als Probelauf an einer Kopie, vorher wird gesichert (vor_update_...).
+
+Enthaelt alles aus 2.11.0 (Design CI), 2.10.0 (Umzugspaket), 2.9.0, 2.8.x, 2.7.x, 2.6.0, 2.5.0, 2.4.0, 2.3.1 und
+2.3.0. Nach einem Update von vor 2.5.0 ist die Instandhaltung zunaechst ausgeschaltet (Einstellungen ->
+Allgemein -> Instandhaltung (CMMS) aktivieren).

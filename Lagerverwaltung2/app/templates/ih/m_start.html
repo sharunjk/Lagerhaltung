@@ -25,6 +25,7 @@
     {% endif %}
     <a href="/ih/auftraege" class="panel p-4 hover:border-primary"><span class="block text-3xl font-cond font-bold">{{ auftraege }}</span><span class="text-sm">Aufträge freigegeben / in Arbeit</span></a>
     <a href="/ih/wartung/wochen" class="panel p-4 hover:border-primary"><span class="block mb-1">{{ icon("calendar", "w-7 h-7") }}</span><span class="text-sm">Wartung diese Woche</span></a>
+    {% if darf("ih.montage.ansehen") %}<a href="{{ '/ih/montage/protokolle/neu' if darf('ih.montage.erfassen') else '/ih/montage/protokolle' }}" class="panel p-4 hover:border-primary col-span-2 flex items-center gap-3"><span>{{ icon("flansch", "w-7 h-7") }}</span><span><span class="block font-semibold">Montageprotokoll</span><span class="text-sm text-muted">Flansch öffnen/schließen: Dichtungen, Schrauben, Drehmomente</span></span></a>{% endif %}
   </div>
   <form action="/ih/m/suche" method="get" class="panel p-4 space-y-2">
     <label class="label" for="m_q">Anlage: Tag-Nr. scannen oder eingeben</label>

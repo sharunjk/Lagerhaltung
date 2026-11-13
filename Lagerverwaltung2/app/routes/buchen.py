@@ -11,7 +11,7 @@ from sqlalchemy import insert, select, update
 
 from .. import db
 from ..db import artikel, reservierungen
-from ..services import queries
+from ..services import queries, sets
 from ..services.excel import tabelle_xlsx
 from ..services.lager import BuchungsFehler, Lager, audit, fmt_num, parse_num
 from ..web import flash, render, require, sicheres_ziel, zurueck
@@ -30,7 +30,8 @@ def _d(s: str) -> date | None:
 
 
 def buchung_ausfuehren(L: Lager, typ: str, nr: str, menge: str, platz: str, ziel: str = "", empfaenger: str = "",
-                       kostenstelle: str = "", zweck: str = "", rueckgabe_bis: str = "", reservierung_id: str = "") -> str:
+                       kostenstelle: str = "", zweck: str = "", rueckgabe_bis: str = "", reservierung_id: str = "",
+                       fehlteile_erledigt: list[int] | None = None) -> str:
     """Gemeinsame Buchungsfunktion für PC, Handy und API. Gibt eine Erfolgsmeldung zurück (IDs stehen in ``L.ids``)."""
     m = parse_num(menge)
     ext = dict(empfaenger=empfaenger, kostenstelle=kostenstelle, zweck=zweck)
@@ -39,7 +40,12 @@ def buchung_ausfuehren(L: Lager, typ: str, nr: str, menge: str, platz: str, ziel
         return f"Eingang: {fmt_num(m)} × {nr} auf {e.platz} (jetzt {fmt_num(e.bestand_nachher)})"
     if typ == "ausgang":
         e = L.ausgang(nr, platz, m, reservierung_id=int(reservierung_id) if str(reservierung_id).isdigit() else None, **ext)
-        return f"Entnahme: {fmt_num(m)} × {nr} von {e.platz} (Rest {fmt_num(e.bestand_nachher)})"
+        msg = f"Entnahme: {fmt_num(m)} × {nr} von {e.platz} (Rest {fmt_num(e.bestand_nachher)})"
+        a = L.artikel(nr)
+        if a.get("ist_set"):  # Set: markierte Fehlteile schließen, verbleibende Warnung anhängen
+            w = sets.nach_entnahme(L.con, a["id"], L.benutzer, fehlteile_erledigt)
+            msg += f". {w}" if w else ""
+        return msg
     if typ == "umbuchung":
         e1, e2 = L.umbuchung(nr, platz, ziel, m)
         return f"Umgebucht: {fmt_num(m)} × {nr} von {e1.platz} nach {e2.platz}"
@@ -77,17 +83,19 @@ def panel(request: Request, artikel: str = "", typ: str = "ausgang", ort: str = 
 @router.post("/buchen")
 async def buchen(request: Request):
     require(request, "lager")
-    f = dict(await request.form())
+    roh = await request.form()
+    f = {k: v for k, v in roh.items() if isinstance(v, str)}
     nr, typ = (f.get("artikel") or "").strip(), f.get("typ", "")
+    fehl = [int(x) for x in roh.getlist("fehlteil_erledigt") if str(x).isdigit()]
     try:
         with db.schreiben() as con:
             msg = buchung_ausfuehren(lager(con, request), typ, nr, f.get("menge", ""), f.get("lagerort", ""), f.get("ziel", ""),
                                      f.get("empfaenger", ""), f.get("kostenstelle", ""), f.get("zweck", ""), f.get("rueckgabe_bis", ""),
-                                     f.get("reservierung_id", ""))
+                                     f.get("reservierung_id", ""), fehlteile_erledigt=fehl)
     except BuchungsFehler as e:
         flash(request, str(e), "fehler")
         return RedirectResponse(f"/buchen?artikel={quote(nr)}&typ={quote(typ)}", status_code=303)
-    flash(request, msg)
+    flash(request, msg, "fehler" if "Set unvollständig" in msg else "ok")
     return RedirectResponse(sicheres_ziel(f.get("weiter"), f"/buchen?typ={quote(typ)}"), status_code=303)
 
 

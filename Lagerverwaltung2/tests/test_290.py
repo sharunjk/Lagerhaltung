@@ -214,5 +214,5 @@ def test_migration_4_von_2_8(env):
     migrationen.vor_start(cfg)
     db.init_engine(cfg.db_url)
     with db.engine().connect() as c2:
-        assert [r[0] for r in c2.exec_driver_sql("SELECT version FROM schema_version ORDER BY version")] == [1, 2, 3, 4]
+        assert [r[0] for r in c2.exec_driver_sql("SELECT version FROM schema_version ORDER BY version")] == [1, 2, 3, 4, 5]
         assert {"nachgetragen_am", "nachgetragen_von"} <= {r[1] for r in c2.exec_driver_sql("PRAGMA table_info(sb_meldungen)")}

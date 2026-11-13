@@ -1,0 +1,28 @@
+{# Montageprotokoll drucken (A4 hoch) – gleiches Layout wie die Excel-Vorlage; Skizze mit genau so vielen Löchern wie Schrauben #}
+{% from "ih/_mt.html" import blatt, blatt_stil %}
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ "Montageprotokoll (leer)" if blanko else "Montageprotokoll " ~ p.nummer }} – {{ cfg.server.firmenname }}</title>
+{{ blatt_stil() }}
+<style>
+  @page { size: A4 portrait; margin: 7mm 7mm; }
+  body { margin: 0; background: #fff; }
+  .leiste { position: sticky; top: 0; background: #fff8d6; border-bottom: 1px solid #c9b25a; padding: 8px 12px; font: 14px Arial; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; z-index: 2; }
+  .leiste button, .leiste a { font: 600 14px Arial; padding: 6px 14px; color: #000; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; }
+  @media print { .leiste { display: none; } }
+  @media screen { body { background: #ddd; } .seite { background: #fff; width: 210mm; min-height: 297mm; padding: 7mm; margin: 10px auto; box-shadow: 0 1px 6px rgba(0,0,0,.25); } }
+</style>
+</head>
+<body>
+<div class="leiste"><button onclick="window.print()">Drucken</button>
+  {% if not blanko %}<a href="/ih/montage/protokolle/{{ p.id }}/excel">Als Excel herunterladen</a><a href="/ih/montage/protokolle/{{ p.id }}">Zurück zum Protokoll</a>
+  {% else %}<form method="get" style="display:flex;gap:6px;align-items:center;font:14px Arial">Anzahl Schrauben <input name="n" type="number" min="1" max="100" value="{{ p.schrauben_anzahl }}" style="width:5em"><button>Anzeigen</button></form>{% endif %}
+  <span>Druckeinstellung: A4 Hochformat, Ränder „Standard“ oder „Keine“, Skalierung 100 %.</span></div>
+<div class="seite">{{ blatt(p, svg, cfg.server.firmenname, LECKTEST, blanko) }}</div>
+</body>
+</html>

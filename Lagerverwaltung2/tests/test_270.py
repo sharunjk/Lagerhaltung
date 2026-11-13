@@ -296,7 +296,7 @@ def test_migration_3_von_2_6(env):
     migrationen.vor_start(cfg)
     eng2 = db.init_engine(cfg.db_url)
     with eng2.connect() as c2:
-        assert [r[0] for r in c2.exec_driver_sql("SELECT version FROM schema_version ORDER BY version")] == [1, 2, 3, 4]
+        assert [r[0] for r in c2.exec_driver_sql("SELECT version FROM schema_version ORDER BY version")] == [1, 2, 3, 4, 5]
         spalten = {r[1] for r in c2.exec_driver_sql("PRAGMA table_info(ih_kampagnen)")}
         tabellen = {r[0] for r in c2.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'")}
         assert c2.exec_driver_sql("SELECT sum(menge) FROM bestand").scalar() == 4

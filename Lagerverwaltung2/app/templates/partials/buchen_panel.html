@@ -20,6 +20,19 @@
     <div class="text-right"><div class="font-cond text-3xl font-bold">{{ a.bestand|num }} <span class="text-base font-sans text-muted">{{ a.einheit }}</span></div><div class="text-sm text-muted">Gesamtbestand</div></div>
   </div>
   <div class="p-5 space-y-5">
+    {% if a.ist_set %}
+    <div class="rounded-md border {{ 'border-crit bg-crit/5' if a.fehlteile else 'border-line bg-soft' }} px-4 py-3 text-sm">
+      <p class="font-semibold">Set mit {{ a.set_inhalt|length }} Teil(en): {% for t in a.set_inhalt %}{{ t.menge|num }} × {{ t.nummer }} {{ t.bezeichnung }}{{ ", " if not loop.last }}{% endfor %}</p>
+      {% if a.fehlteile %}
+      <p class="font-semibold text-crit mt-1">{{ a.set_warnung }}</p>
+      {% if typ == "ausgang" %}
+      <div class="mt-2 space-y-1">{% for f in a.fehlteile %}
+        <label class="flex items-center gap-2"><input type="checkbox" name="fehlteil_erledigt" value="{{ f.id }}"> Das entnommene Set ist das, in dem {{ f.menge|num }} × {{ f.teil_nr }} fehlt</label>{% endfor %}
+      </div>{% endif %}
+      {% endif %}
+      {% if typ == "ausgang" %}<p class="text-xs text-muted mt-1">Hier wird das ganze Set entnommen. Ein einzelnes Teil: <a class="text-primary font-semibold" href="/artikel/{{ a.nummer|urlq }}#set">am Artikel unter „Einzelnes Teil aus dem Set entnehmen“</a>.</p>{% endif %}
+    </div>
+    {% endif %}
     <div>
       <div class="label">{{ "Von Lagerplatz" if typ == "umbuchung" else "Lagerplatz" }}</div>
       {% if a.orte %}

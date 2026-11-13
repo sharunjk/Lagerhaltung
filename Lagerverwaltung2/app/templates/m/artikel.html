@@ -16,6 +16,11 @@
     {% else %}<li class="px-4 py-3 text-muted text-sm">Kein Lagerplatz.</li>{% endfor %}
   </ul>
 </div>
+{% if a.ist_set %}<div class="rounded-lg border {{ 'border-crit bg-crit/5' if a.fehlteile else 'border-line bg-surface' }} p-3 mb-4 text-sm">
+  <p class="font-semibold">Set: {% for t in a.set_inhalt %}{{ t.menge|num }} × {{ t.nummer }} {{ t.bezeichnung }}{{ ", " if not loop.last }}{% endfor %}</p>
+  {% if a.fehlteile %}<p class="font-semibold text-crit mt-1">{{ a.set_warnung }}</p>{% endif %}
+</div>{% endif %}
+{% if a.in_sets %}<div class="rounded-lg border border-line bg-surface p-3 mb-4 text-sm">Auch in Sets: {% for s in a.in_sets %}<b>{{ s.nummer }}</b> {{ s.bezeichnung }} ({{ s.sets|num }} auf Lager{% if s.orte %}: {{ s.orte|map(attribute=0)|join(", ") }}{% endif %}){{ "; " if not loop.last }}{% endfor %}</div>{% endif %}
 {% if user.rolle != "lesen" and a.aktiv %}
 <div class="grid grid-cols-2 gap-2 mb-4">
   <a href="/m/buchen?typ=ausgang&artikel={{ a.nummer|urlq }}" class="btn btn-primary h-14 text-lg">Entnahme</a>

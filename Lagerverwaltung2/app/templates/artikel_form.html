@@ -36,6 +36,29 @@
     <div class="mt-4">{{ foto_auswahl() }}</div>
     {% endif %}
   </section>
+  {# Set (ab 2.12.0): ein Lagerartikel aus mehreren Artikeln mit eigener Nummer #}
+  {% set set_zeilen = a._set if a._set is defined and a._set else [] %}
+  <section class="panel p-5" id="set" x-data='{istSet: {{ (a.ist_set in (True, "on", 1) or set_zeilen|length > 0)|tojson }},
+      zeilen: {{ (set_zeilen or [{"nummer": "", "menge": "1"}])|tojson }}}'>
+    <input type="hidden" name="set_bearbeitet" value="1">
+    <label class="flex items-center gap-2 font-semibold"><input type="checkbox" name="ist_set" x-model="istSet"> Dieser Artikel ist ein Set (mehrere Teile mit eigener Artikelnummer)</label>
+    <p class="text-xs text-muted mt-1">Z. B. „Ersatzteilset Pumpenmodul“: wird als Ganzes eingelagert und entnommen. Der Bestand zählt die Sets. Einzelne Teile können trotzdem herausgenommen werden – das Set wird dann als unvollständig angezeigt.</p>
+    <div x-show="istSet" x-cloak class="mt-4">
+      <div class="label">Inhalt des Sets</div>
+      <div class="space-y-2">
+        <template x-for="(z, i) in zeilen" :key="i">
+          <div class="flex gap-2 items-center">
+            <input name="set_teil" x-model="z.nummer" list="set_artikel" class="field flex-1" placeholder="Artikelnummer oder Bezeichnung suchen" autocomplete="off" :aria-label="'Teil ' + (i + 1)">
+            <input name="set_menge" x-model="z.menge" inputmode="decimal" class="field w-24 text-center" aria-label="Menge je Set">
+            <button type="button" class="btn px-3" @click="zeilen.splice(i, 1); if (!zeilen.length) zeilen.push({nummer: '', menge: '1'})" aria-label="Zeile entfernen">×</button>
+          </div>
+        </template>
+      </div>
+      <button type="button" class="btn btn-sm mt-2" @click="zeilen.push({nummer: '', menge: '1'})">+ Weiteres Teil</button>
+      <p class="text-xs text-muted mt-2">Jedes Teil braucht eine eigene Artikelnummer (falls nötig zuerst als Artikel anlegen, Anfangsbestand 0). Menge = Stück je Set. Die Teile im Set zählen nicht zum Einzelbestand der Teile.</p>
+    </div>
+    <datalist id="set_artikel">{% for n, b in set_artikel if n != a.nummer %}<option value="{{ n }} – {{ b }}">{% endfor %}</datalist>
+  </section>
   <section class="panel p-5">
     <h2 class="mb-4">Beschaffung</h2>
     <div class="grid sm:grid-cols-2 gap-4">

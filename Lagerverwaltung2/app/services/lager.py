@@ -315,6 +315,11 @@ class Lager:
         if self.con.execute(select(func.count()).select_from(inventur_pos.join(inventuren, inventuren.c.id == inventur_pos.c.inventur_id))
                             .where(and_(inventur_pos.c.artikel_id == aid, inventuren.c.status != "abgeschlossen"))).scalar():
             raise BuchungsFehler("Der Artikel gehört zu einer laufenden Inventur. Erst nach deren Abschluss löschen.")
+        from ..db import artikel_set_inhalt
+        in_set = [r[0] for r in self.con.execute(select(artikel.c.nummer).select_from(
+            artikel_set_inhalt.join(artikel, artikel.c.id == artikel_set_inhalt.c.set_id)).where(artikel_set_inhalt.c.teil_id == aid))]
+        if in_set:
+            raise BuchungsFehler(f"Der Artikel gehört zum Inhalt von Set {', '.join(in_set)}. Erst dort aus dem Set-Inhalt entfernen.")
         dateien = [r[0] for r in self.con.execute(select(anhaenge.c.speichername).where(anhaenge.c.artikel_id == aid))]
         buchungen = self.con.execute(select(func.count()).select_from(bewegungen).where(bewegungen.c.artikel_id == aid)).scalar()
         self.con.execute(update(bewegungen).where(bewegungen.c.artikel_id == aid).values(artikel_id=None))

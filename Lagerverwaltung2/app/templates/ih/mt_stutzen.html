@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_mt.html" import reiter with context %}
+{% block title %}Stutzenübersicht{% endblock %}
+{% block content %}
+{{ reiter("stutzen") }}
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div><h1>Stutzenübersicht</h1><p class="text-muted">{{ rows|length }} Stutzen{% if archiv %} (archiviert){% endif %} · Soll-Werte für Dichtungen, Schrauben und Drehmomente</p></div>
+  <div class="flex flex-wrap gap-2">
+    {% if darf("ih.montage.stutzen") %}<a href="/ih/montage/stutzen/neu" class="btn btn-primary">{{ icon("plus", "w-4 h-4") }}Neuer Stutzen</a>
+    <a href="/ih/montage/stutzen-import" class="btn">{{ icon("upload", "w-4 h-4") }}Aus Excel importieren</a>{% endif %}
+    <a href="/ih/montage/stutzen/export.xlsx" class="btn">{{ icon("download", "w-4 h-4") }}Excel</a>
+  </div>
+</div>
+<form method="get" class="panel p-4 mb-4 flex flex-wrap gap-3 items-end">
+  <div class="flex-1 min-w-[14rem]"><label class="label" for="q">Suche</label><input id="q" name="q" value="{{ q }}" class="field" placeholder="Stutzen, Bezeichnung, Dichtung, Gewinde …" autofocus></div>
+  <div><label class="label" for="gr">Gruppe</label><select id="gr" name="gruppe" class="field"><option value="">alle</option>{% for g in gruppen %}<option {% if g == gruppe %}selected{% endif %}>{{ g }}</option>{% endfor %}</select></div>
+  <label class="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" name="archiv" value="1" {% if archiv %}checked{% endif %}> Archivierte</label>
+  <button class="btn btn-primary">Filtern</button>{% if q or gruppe or archiv %}<a href="/ih/montage/stutzen" class="btn">Zurücksetzen</a>{% endif %}
+</form>
+{% if not rows %}
+<div class="panel p-8 text-center text-muted">
+  <p class="text-lg">Noch keine Stutzen{% if q or gruppe %} in dieser Auswahl{% endif %}.</p>
+  {% if darf("ih.montage.stutzen") and not (q or gruppe) %}<p class="mt-2">Die vorhandene Excel-Liste (Blatt „Stutzen Übersicht“) über <a class="text-primary font-semibold" href="/ih/montage/stutzen-import">Aus Excel importieren</a> übernehmen oder Stutzen einzeln anlegen.</p>{% endif %}
+</div>
+{% else %}
+<div class="panel overflow-x-auto">
+  <table class="tbl">
+    <thead><tr><th>Stutzen</th><th>Bezeichnung</th><th>Dichtungen (Art · Ø · Artikel-Nr. · Nenndicke)</th><th class="num">Soll [Nm]</th><th class="num">Länge [mm]</th><th>Gewinde</th><th class="num">Schrauben</th><th>Letzte Montage</th><th></th></tr></thead>
+    <tbody>
+    {% set ns = namespace(gr="__") %}
+    {% for s in rows %}
+      {% if s.gruppe != ns.gr %}{% set ns.gr = s.gruppe %}<tr class="bg-soft"><td colspan="9" class="font-cond font-bold text-base py-1.5">{{ s.gruppe or "Ohne Gruppe" }}</td></tr>{% endif %}
+      <tr>
+        <td class="whitespace-nowrap"><a href="/ih/montage/stutzen/{{ s.id }}" class="font-cond text-lg font-bold text-primary hover:underline">{{ s.kuerzel }}</a></td>
+        <td>{{ s.bezeichnung or "" }}{% if s.ungeklaert %} <span class="status st-melden" title="Ein Wert enthält „?“ – bitte klären">ungeklärt</span>{% endif %}</td>
+        <td class="text-sm">{% for d in s.dichtungen %}<div class="whitespace-nowrap">{{ d.pos }}. <b>{{ d.dichtungsart or "–" }}</b> {{ d.durchmesser or "" }} <span class="text-muted">{{ d.artikel_nr or "" }}</span>{% if d.nenndicke is not none %} · {{ d.nenndicke|num }} mm{% endif %}</div>{% else %}<span class="text-muted">–</span>{% endfor %}</td>
+        <td class="num whitespace-nowrap {{ 'text-warn font-semibold' if '?' in (s.drehmoment or '') }}">{{ s.drehmoment or "–" }}</td>
+        <td class="num {{ 'text-warn font-semibold' if '?' in (s.schraube_laenge or '') }}">{{ s.schraube_laenge or "–" }}</td>
+        <td>{{ s.gewinde or "–" }}</td>
+        <td class="num">{% if s.schrauben_anzahl %}{{ s.schrauben_anzahl }}{% else %}<span class="text-muted" title="Anzahl Schrauben noch nicht eingetragen – wird für die Skizze gebraucht">fehlt</span>{% endif %}</td>
+        <td class="text-sm whitespace-nowrap">{% if s.letztes_datum %}{{ s.letztes_datum|datum(False) }}<span class="block text-xs text-muted">{{ s.protokolle }} Protokoll(e)</span>{% else %}<span class="text-muted">–</span>{% endif %}</td>
+        <td class="text-right whitespace-nowrap">{% if darf("ih.montage.erfassen") and s.aktiv %}<a href="/ih/montage/protokolle/neu?stutzen={{ s.id }}" class="btn btn-sm">Protokoll</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

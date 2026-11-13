@@ -59,12 +59,17 @@ def _m4_nachtrag(con: Connection) -> None:
     _spalte_ergaenzen(con, "sb_meldungen", "nachgetragen_von", "VARCHAR(100)")
 
 
+def _m5_sets(con: Connection) -> None:
+    _spalte_ergaenzen(con, "artikel", "ist_set", "BOOLEAN")
+
+
 # (Nummer, Beschreibung, Funktion) – nur anhängen, nie ändern oder entfernen
 MIGRATIONEN = [
     (1, "Buchungen: Preis zum Buchungszeitpunkt und Auftragsbezug; Reservierungen: Auftragsbezug", _m1_buchungen_preis_auftrag),
     (2, "Importläufe: Art (Asset-Liste oder Instandhaltungsplan)", _m2_importart),
     (3, "Kampagnen: Rhythmus (fest oder ab letzter Durchführung), Tätigkeit, eigene Kampagnen", _m3_kampagnen),
     (4, "Schichtbuch: Nachträge (nachgetragen am/von)", _m4_nachtrag),
+    (5, "Artikel: Sets aus mehreren Artikeln", _m5_sets),
 ]
 
 

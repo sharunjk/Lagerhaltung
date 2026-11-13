@@ -34,6 +34,11 @@
     <div class="mt-1 flex gap-3 text-sm">{{ status(a.status) }}{% if a.reserviert %}<span class="text-warn">{{ a.reserviert|num }} reserviert</span>{% endif %}</div>
   </div>
 </div>
+{% if a.ist_set %}<div class="rounded-lg border {{ 'border-crit bg-crit/5' if a.fehlteile else 'border-line bg-surface' }} p-3 mb-4 text-sm">
+  <p class="font-semibold">Set: {% for t in a.set_inhalt %}{{ t.menge|num }} × {{ t.nummer }} {{ t.bezeichnung }}{{ ", " if not loop.last }}{% endfor %}</p>
+  {% if a.fehlteile %}<p class="font-semibold text-crit mt-1">{{ a.set_warnung }}</p>{% endif %}
+</div>{% endif %}
+{% if a.in_sets %}<div class="rounded-lg border border-line bg-surface p-3 mb-4 text-sm">Auch in Sets: {% for s in a.in_sets %}<b>{{ s.nummer }}</b> {{ s.bezeichnung }} ({{ s.sets|num }} auf Lager{% if s.orte %}: {{ s.orte|map(attribute=0)|join(", ") }}{% endif %}){{ "; " if not loop.last }}{% endfor %}</div>{% endif %}
 <form method="post" action="/m/buchen" class="space-y-4" data-offline x-data='{ort: {{ vorwahl|tojson }}}'>
   <input type="hidden" name="artikel" value="{{ a.nummer }}"><input type="hidden" name="typ" value="{{ typ }}">
   {% if res %}<input type="hidden" name="reservierung_id" value="{{ res.id }}"><div class="rounded-lg border border-primary bg-primary/10 p-3 text-sm">Reservierung: <b>{{ res.menge|num }}</b> für {{ res.fuer }} – wird mit der Entnahme erledigt.</div>{% endif %}
