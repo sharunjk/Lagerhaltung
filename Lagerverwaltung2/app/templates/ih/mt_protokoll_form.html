@@ -72,10 +72,14 @@
       <h2 class="mb-3">Dichtungen</h2>
       <div class="overflow-x-auto">
       <table class="tbl text-sm min-w-[640px]">
-        <thead><tr><th>Pos.</th><th>Einbauort</th><th>Dichtungsart</th><th>Artikel-Nr.</th><th>Nenn D. [mm]</th><th>Ist-Dicke [mm]</th><th class="text-center">Alt</th><th class="text-center">Neu</th></tr></thead>
+        <thead><tr><th>Pos.</th><th class="text-center whitespace-nowrap" title="innerste / mittlere / äußerste Dichtung">Lage i · m · ä</th><th>Einbauort</th><th>Dichtungsart</th><th>Artikel-Nr.</th><th>Nenn D. [mm]</th><th>Ist-Dicke [mm]</th><th class="text-center">Alt</th><th class="text-center">Neu</th></tr></thead>
         <tbody>
           <template x-for="(d, i) in dicht" :key="i"><tr>
             <td class="font-semibold whitespace-nowrap" x-text="'Dichtung ' + (i + 1)"></td>
+            <td class="whitespace-nowrap text-center"><input type="hidden" :name="'d' + i + '_lage'" :value="d.lage || ''">
+              <template x-for="[k, lab, lang] in [['i', 'i', 'innerste'], ['m', 'm', 'mittlere'], ['a', 'ä', 'äußerste']]" :key="k">
+                <label class="inline-flex flex-col items-center mx-0.5 text-xs" :title="lang + ' Dichtung'"><input type="checkbox" class="w-5 h-5" :checked="d.lage === k" @change="d.lage = $event.target.checked ? k : ''; dirty = window.mtDirty = true" :aria-label="'Dichtung ' + (i + 1) + ' ' + lang"><span x-text="lab"></span></label>
+              </template></td>
             <td><input :name="'d' + i + '_einbauort'" x-model="d.einbauort" class="field py-1 px-2 text-sm" maxlength="200"></td>
             <td><input :name="'d' + i + '_dichtungsart'" x-model="d.dichtungsart" class="field py-1 px-2 text-sm" maxlength="200"></td>
             <td><input :name="'d' + i + '_artikel_nr'" x-model="d.artikel_nr" class="field py-1 px-2 text-xs" maxlength="200"></td>
@@ -204,7 +208,7 @@ function mtFormular() {
       const hatWerte = this.schr.some(z => z.ist_nm) || this.dicht.some(d => d.ist_dicke);
       if (hatWerte && !confirm("Soll-Werte von " + s.label + " übernehmen? Eingetragene Soll-Werte werden ersetzt, Ist-Werte bleiben.")) return;
       this.stutzenId = s.id; this.kuerzel = s.kuerzel; this.ungeklaert = s.ungeklaert;
-      s.dichtungen.forEach((d, i) => { Object.assign(this.dicht[i], {einbauort: d.einbauort, dichtungsart: d.dichtungsart, artikel_nr: d.artikel_nr, nenndicke: d.nenndicke}); });
+      s.dichtungen.forEach((d, i) => { Object.assign(this.dicht[i], {einbauort: d.einbauort, lage: d.lage || "", dichtungsart: d.dichtungsart, artikel_nr: d.artikel_nr, nenndicke: d.nenndicke}); });
       if (!this.anlage) this.anlage = s.anlage;
       if (!this.schmiermittel) this.schmiermittel = s.schmiermittel;
       if (s.n) { this.setN(s.n); this.$nextTick(() => { const f = document.getElementById("n"); if (f) f.value = s.n; }); }

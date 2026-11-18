@@ -447,7 +447,77 @@ sb_schichten = Table(
     Column("beendet_am", DateTime),
     Column("beendet_von", String(100)),
     Column("uebergabe_notiz", Text),
+    Column("vertretung_fuer", String(200)),   # ab 2.13.0: Schichtführer vertritt …
     UniqueConstraint("datum", "zeit_id", name="uq_sb_schicht"),
+)
+
+sb_schicht_wechsel = Table(
+    "sb_schicht_wechsel", md,  # ab 2.13.0: Schicht übernommen / Schichtführer gewechselt (Vertretung) – wer, wann, von wem
+    Column("id", Integer, primary_key=True),
+    Column("schicht_id", Integer, ForeignKey("sb_schichten.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("zeit", DateTime, nullable=False),
+    Column("benutzer", String(100)),
+    Column("team_id", Integer),
+    Column("schichtfuehrer", String(200)),
+    Column("vertretung_fuer", String(200)),
+    Column("vorher", String(300)),                  # Team und Schichtführer davor (Text)
+    Column("grund", String(300)),
+)
+
+sb_handys = Table(
+    "sb_handys", md,  # ab 2.13.0: EX-Handys (Nummer zum Anrufen, SIM-PIN/PUK verschlüsselt)
+    Column("id", Integer, primary_key=True),
+    Column("name", String(100), nullable=False),
+    Column("nummer", String(60)),
+    Column("pin", Text),                            # verschlüsselt (Fernet, Schlüssel aus dem Sitzungsschlüssel)
+    Column("puk", Text),
+    Column("bemerkung", String(300)),
+    Column("reihenfolge", Integer, nullable=False, default=0),
+    Column("aktiv", Boolean, nullable=False, default=True),
+    Column("geaendert_am", DateTime),
+    Column("geaendert_von", String(100)),
+)
+
+sb_handy_uebergaben = Table(
+    "sb_handy_uebergaben", md,  # ab 2.13.0: EX-Handy bei der Schichtübergabe weitergegeben
+    Column("id", Integer, primary_key=True),
+    Column("handy_id", Integer, ForeignKey("sb_handys.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("schicht_id", Integer, ForeignKey("sb_schichten.id", ondelete="SET NULL"), index=True),
+    Column("zeit", DateTime, nullable=False),
+    Column("von", String(200)),
+    Column("an", String(200), nullable=False),
+    Column("benutzer", String(100)),
+)
+
+sb_aufgaben = Table(
+    "sb_aufgaben", md,  # ab 2.13.0: allgemeine To-do-Liste im Schichtbuch (unabhängig von einer Schicht)
+    Column("id", Integer, primary_key=True),
+    Column("titel", String(200), nullable=False),
+    Column("beschreibung", Text),
+    Column("prioritaet", String(10), nullable=False, default="mittel"),  # hoch | mittel | niedrig
+    Column("faellig", Date),
+    Column("team_id", Integer, ForeignKey("sb_teams.id", ondelete="SET NULL"), index=True),  # leer = alle Teams
+    Column("platz_id", Integer, ForeignKey("ih_plaetze.id", ondelete="SET NULL")),
+    Column("asset", String(120)),
+    Column("status", String(20), nullable=False, default="offen"),      # offen | in_arbeit | erledigt
+    Column("wiederholen_tage", Integer),                                # nach Erledigen neu anlegen, fällig + n Tage
+    Column("erstellt_am", DateTime, nullable=False),
+    Column("erstellt_von", String(100)),
+    Column("geaendert_am", DateTime),
+    Column("geaendert_von", String(100)),
+    Column("erledigt_am", DateTime),
+    Column("erledigt_von", String(100)),
+    Column("erledigt_text", Text),
+)
+
+sb_aufgaben_verlauf = Table(
+    "sb_aufgaben_verlauf", md,
+    Column("id", Integer, primary_key=True),
+    Column("aufgabe_id", Integer, ForeignKey("sb_aufgaben.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("zeit", DateTime, nullable=False),
+    Column("benutzer", String(100)),
+    Column("art", String(20), nullable=False),     # angelegt | kommentar | status | zugeteilt | geaendert
+    Column("text", Text),
 )
 
 sb_meldungen = Table(
@@ -563,6 +633,7 @@ mt_stutzen_dichtungen = Table(
     Column("artikel_id", Integer, ForeignKey("artikel.id", ondelete="SET NULL")),  # Lagerartikel (optional)
     Column("nenndicke", Float),                    # Nenn-/Neudicke [mm]
     Column("menge", Float),
+    Column("lage", String(1)),                     # ab 2.13.0: i = innerste, m = mittlere, a = äußerste
 )
 
 mt_protokolle = Table(

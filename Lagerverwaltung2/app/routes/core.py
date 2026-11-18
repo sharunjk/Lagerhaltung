@@ -10,7 +10,7 @@ from sqlalchemy import func, insert, select, update
 
 from .. import db
 from ..db import artikel, lagerplaetze, users
-from ..services import queries, sicherung
+from ..services import profil, queries, sicherung
 from ..rechte import bereiche
 from ..services.betrieb import check_pw, get_setting, hash_pw, set_setting
 from ..services.lager import audit
@@ -72,7 +72,8 @@ def login(request: Request, username: str = Form(...), passwort: str = Form(""),
         flash(request, f"Ihr Passwort ist kürzer als {MIN_PASSWORT} Zeichen. Bitte jetzt ein neues vergeben.", "fehler")
         return RedirectResponse("/m/passwort" if weiter.startswith("/m") or ist_mobil(request) else "/passwort", status_code=303)
     if weiter == "/":
-        weiter = startziel(request, u["id"], erlaubt)
+        with db.engine().connect() as con:  # ab 2.13.0: persönliche Startseite (oder Vorgabe der Rolle)
+            weiter = profil.startpfad(con, current_user(request), request.app.state.cfg) or startziel(request, u["id"], erlaubt)
     elif "lager" not in erlaubt and not weiter.startswith("/ih"):
         weiter = "/ih"  # nur Instandhaltung (z. B. Anmeldung aus der Scanner-App)
     return RedirectResponse(weiter, status_code=303)
@@ -309,3 +310,55 @@ def schnellsuche(request: Request, q: str = ""):
         with db.engine().connect() as con:
             treffer = queries.artikel_liste(con, q=q)[:8]
     return render(request, "partials/suche.html", treffer=treffer, q=q)
+
+
+# ------------------------------------------------------------------ Meine Einstellungen (ab 2.13.0)
+@router.get("/mein")
+def mein(request: Request):
+    """Persönliche Einstellungen für jeden Benutzer: Startseite, Name, Vorgaben je Tätigkeit.
+    Administratoren und Instandhaltungsmanager legen hier zusätzlich die Startseite je Rolle fest."""
+    me = current_user(request)
+    if not me:
+        from ..web import LoginRequired
+        raise LoginRequired()
+    cfg = request.app.state.cfg
+    with db.engine().connect() as con:
+        werte = profil.alle(con, me["id"])
+        rollen = profil.rollen_standard(con) if profil.darf_verwalten(me, cfg) else None
+        team = None
+        if me.get("ih"):
+            from ..services import schichtbuch as sb
+            team = sb.team_von(con, me["id"])
+    from ..rechte import IH_ROLLEN
+    alle_seiten = [(k, lab) for k, _, lab, _ in profil.STARTSEITEN]
+    return render(request, "mein.html", werte=werte, seiten=profil.startseiten(me, cfg), rollen=rollen, alle_seiten=alle_seiten,
+                  IH_ROLLEN=IH_ROLLEN, LAGER_ROLLEN=profil.LAGER_ROLLEN, BUCHUNGSARTEN=profil.BUCHUNGSARTEN, team=team,
+                  verwalten=profil.darf_verwalten(me, cfg))
+
+
+@router.post("/mein")
+async def mein_speichern(request: Request):
+    me = current_user(request)
+    if not me:
+        from ..web import LoginRequired
+        raise LoginRequired()
+    cfg = request.app.state.cfg
+    f = await request.form()
+    erlaubt = {k for k, _ in profil.startseiten(me, cfg)}
+    with db.schreiben() as con:
+        start = f.get("startseite") or ""
+        profil.schreiben(con, me["id"], "startseite", start if start in erlaubt else None)
+        profil.schreiben(con, me["id"], "monteur_vorbelegen", "1" if f.get("monteur_vorbelegen") == "on" else None)
+        art = f.get("buchungsart") or ""
+        profil.schreiben(con, me["id"], "buchungsart", art if art in profil.BUCHUNGSARTEN else None)
+        name = " ".join((f.get("anzeigename") or "").split())[:100]
+        if name and name != me["name"]:
+            con.execute(update(users).where(users.c.id == me["id"]).values(anzeigename=name))
+            audit(con, me["username"], "Anzeigename geändert", me["username"], {"alt": me["name"], "neu": name})
+            request.session["user"] = {**request.session.get("user", {}), "name": name}
+        if f.get("rollen_bearbeitet") and profil.darf_verwalten(me, cfg):
+            werte = {k[len("rolle_"):]: v for k, v in f.items() if k.startswith("rolle_")}
+            profil.rollen_standard_setzen(con, werte)
+            audit(con, me["username"], "Startseiten je Rolle geändert", "", werte)
+    flash(request, "Einstellungen gespeichert.")
+    return RedirectResponse("/mein", status_code=303)

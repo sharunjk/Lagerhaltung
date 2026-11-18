@@ -44,7 +44,8 @@
         <div><label class="label">Durchmesser</label><input name="d{{ i }}_durchmesser" value="{{ d.durchmesser or '' }}" class="field" maxlength="60" placeholder="Ø110MM"></div>
         <div><label class="label">Artikel-Nr. / Bestellbezeichnung</label><input name="d{{ i }}_artikel_nr" value="{{ d.artikel_nr or '' }}" class="field" maxlength="200"></div>
         <div><label class="label">Nenndicke</label><input name="d{{ i }}_nenndicke" value="{{ d.nenndicke if d.nenndicke is not none else '' }}" inputmode="decimal" class="field" placeholder="mm"></div>
-        <div class="sm:col-start-2 sm:col-span-2"><label class="label">Einbauort (optional)</label><input name="d{{ i }}_einbauort" value="{{ d.einbauort or '' }}" class="field" maxlength="100" placeholder="z. B. innen"></div>
+        <div class="sm:col-start-2"><label class="label">Lage</label><select name="d{{ i }}_lage" class="field"><option value="">–</option>{% for k, lab in [("i", "innerste (i)"), ("m", "mittlere (m)"), ("a", "äußerste (ä)")] %}<option value="{{ k }}" {% if d.lage == k %}selected{% endif %}>{{ lab }}</option>{% endfor %}</select></div>
+        <div><label class="label">Einbauort (optional)</label><input name="d{{ i }}_einbauort" value="{{ d.einbauort or '' }}" class="field" maxlength="100"></div>
         <div class="sm:col-span-2"><label class="label">Lagerartikel (optional)</label><input name="d{{ i }}_lager" value="{{ d.lager_text or '' }}" list="lager" class="field" autocomplete="off" placeholder="Artikelnummer suchen"></div>
         <input type="hidden" name="d{{ i }}_menge" value="{{ d.menge if d.menge is not none else '' }}">
       </div>

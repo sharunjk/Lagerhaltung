@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_ih.html" import team_chip %}
+{% block title %}Aufgabe {{ a.titel }}{% endblock %}
+{% block content %}
+{% set schreiben = darf("ih.schichtbuch.schreiben") %}
+<div class="text-sm text-muted mb-1"><a href="/ih/schichtbuch" class="hover:text-ink">Schichtbuch</a> · <a href="/ih/schichtbuch/aufgaben" class="hover:text-ink">Aufgaben</a></div>
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div><h1>{{ a.titel }}</h1>
+    <div class="mt-1 flex flex-wrap gap-2 items-center text-sm">
+      <span class="status {{ 'st-ok' if a.status == 'erledigt' else ('text-primary' if a.status == 'in_arbeit' else 'st-melden') }}">{{ STATUS[a.status] }}</span>
+      {% if a.prioritaet == "hoch" %}<span class="status st-kritisch">Prio hoch</span>{% endif %}
+      <span>{{ team_chip(a.team, a.team_farbe) if a.team else "alle Teams" }}</span>
+      {% if a.faellig %}<span class="{{ 'text-crit font-semibold' if a.ueberfaellig else 'text-muted' }}">fällig {{ a.faellig|datum(False) }}{% if a.ueberfaellig %} – überfällig{% endif %}</span>{% endif %}
+      {% if a.wiederholen_tage %}<span class="text-muted">wiederholt sich alle {{ a.wiederholen_tage }} Tage</span>{% endif %}
+      {% if a.asset %}{% if a.platz_id %}<a class="hover:underline" href="/ih/anlagen/{{ a.platz_id }}">{{ a.asset }}</a>{% else %}<span>{{ a.asset }}</span>{% endif %}{% endif %}
+    </div></div>
+  {% if schreiben %}<a href="?bearbeiten=1" class="btn">{{ icon("edit", "w-4 h-4") }}Bearbeiten</a>{% endif %}
+</div>
+<div class="grid xl:grid-cols-[1fr_380px] gap-6">
+  <div class="space-y-6 min-w-0">
+    <section class="panel p-5">
+      {% if a.beschreibung %}<p class="whitespace-pre-line">{{ a.beschreibung }}</p>{% else %}<p class="text-muted">Keine Beschreibung.</p>{% endif %}
+      <p class="text-xs text-muted mt-3">Angelegt {{ a.erstellt_am|datum }} von {{ a.erstellt_von }}{% if a.erledigt_am %} · erledigt {{ a.erledigt_am|datum }} von {{ a.erledigt_von }}{% endif %}</p>
+      {% if a.erledigt_text %}<p class="mt-2 rounded-md bg-soft px-3 py-2 text-sm">{{ a.erledigt_text }}</p>{% endif %}
+    </section>
+    {% if schreiben %}
+    <section class="panel p-5">
+      <h2 class="mb-3">Status ändern / Kommentar</h2>
+      <form method="post" action="/ih/schichtbuch/aufgaben/{{ a.id }}/status" class="space-y-3">
+        <textarea name="text" rows="2" class="field" placeholder="Notiz, z. B. was gemacht wurde (optional)"></textarea>
+        <div class="flex flex-wrap gap-2">
+          {% if a.status != "erledigt" %}<button name="status" value="erledigt" class="btn btn-primary">✓ Erledigt</button>{% endif %}
+          {% if a.status == "offen" %}<button name="status" value="in_arbeit" class="btn">In Arbeit</button>{% endif %}
+          {% if a.status != "offen" %}<button name="status" value="offen" class="btn">{{ "Wieder öffnen" if a.status == "erledigt" else "Zurück auf offen" }}</button>{% endif %}
+          <button name="status" value="{{ a.status }}" class="btn">Nur Kommentar</button>
+        </div>
+      </form>
+    </section>
+    {% endif %}
+  </div>
+  <aside class="space-y-6">
+    <section class="panel">
+      <div class="px-4 py-3 border-b border-line"><h2>Verlauf</h2></div>
+      <ul class="divide-y divide-line text-sm">{% for v in a.verlauf|reverse %}<li class="px-4 py-2.5"><div class="flex justify-between gap-2"><span class="font-semibold">{{ {"angelegt": "Angelegt", "kommentar": "Kommentar", "status": "Status", "zugeteilt": "Zugeteilt", "geaendert": "Geändert"}.get(v.art, v.art) }}</span><span class="text-xs text-muted">{{ v.zeit|datum }} · {{ v.benutzer }}</span></div>{% if v.text %}<p class="mt-0.5 whitespace-pre-line">{{ v.text }}</p>{% endif %}</li>{% endfor %}</ul>
+    </section>
+    {% if darf_loeschen %}
+    <form method="post" action="/ih/schichtbuch/aufgaben/{{ a.id }}/loeschen" onsubmit="return confirm('Aufgabe endgültig löschen?')"><button class="btn btn-danger w-full">Aufgabe löschen</button></form>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

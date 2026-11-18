@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Meine Einstellungen{% endblock %}
+{% block head %}
+<script>
+function lvDesignLesen() { try { return localStorage.getItem("lv-theme") || ""; } catch (e) { return ""; } }
+function lvDesignSetzen(t) {
+  try { if (t) localStorage.setItem("lv-theme", t); else localStorage.removeItem("lv-theme"); } catch (e) {}
+  document.documentElement.classList.toggle("dark", t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches));
+}
+</script>
+{% endblock %}
+{% block content %}
+<div class="mb-5">
+  <h1>Meine Einstellungen</h1>
+  <p class="text-muted">Gelten nur für Ihren Benutzer {{ user.username }}.{% if user.rolle == "admin" %} Die Einstellungen für das ganze System stehen unter <a class="text-primary font-semibold" href="/einstellungen">Einstellungen</a>.{% endif %}</p>
+</div>
+<form method="post" class="max-w-3xl space-y-6">
+  <section class="panel p-5">
+    <h2 class="mb-4">Startseite nach dem Anmelden</h2>
+    <label class="label" for="st">Diese Seite zuerst zeigen</label>
+    <select id="st" name="startseite" class="field max-w-md">
+      <option value="">Automatisch{% if rollen is not none %} (Vorgabe der Rolle bzw. zuletzt genutzter Bereich){% else %} (Vorgabe Ihrer Rolle bzw. zuletzt genutzter Bereich){% endif %}</option>
+      {% for k, lab in seiten %}<option value="{{ k }}" {% if werte.startseite == k %}selected{% endif %}>{{ lab }}</option>{% endfor %}
+    </select>
+    <p class="text-xs text-muted mt-1">Zum Beispiel „Schichtbuch“, damit Sie nach dem Anmelden direkt im Schichtbuch sind. Gilt am PC und am Handy (die Scanner-App startet immer im Lager).</p>
+  </section>
+
+  <section class="panel p-5">
+    <h2 class="mb-4">Persönlich</h2>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div><label class="label" for="an">Anzeigename</label><input id="an" name="anzeigename" value="{{ user.name }}" class="field" maxlength="100">
+        <p class="text-xs text-muted mt-1">So erscheinen Sie z. B. als Schichtführer oder Monteur.</p></div>
+      <div class="text-sm space-y-1 pt-6">
+        <div><span class="text-muted">Benutzername:</span> {{ user.username }}</div>
+        {% if "lager" in module %}<div><span class="text-muted">Lager:</span> {{ ROLLEN_NAMEN.get(user.rolle, user.rolle) }}</div>{% endif %}
+        {% if user.ih %}<div><span class="text-muted">Instandhaltung:</span> {{ IH_ROLLEN.get(user.ih, user.ih) }}</div>{% endif %}
+        {% if team %}<div><span class="text-muted">Schichtteam:</span> {{ team.name }}</div>{% endif %}
+      </div>
+    </div>
+    <a href="/passwort" class="btn mt-4">Passwort ändern</a>
+  </section>
+
+  <section class="panel p-5" x-data="{t: lvDesignLesen()}">
+    <h2 class="mb-1">Darstellung auf diesem Gerät</h2>
+    <p class="text-xs text-muted mb-3">Wird sofort übernommen und gilt für diesen Browser.</p>
+    <div class="flex flex-wrap gap-4">
+      {% for wert, lab in [("", "Automatisch (wie das Gerät)"), ("light", "Hell"), ("dark", "Dunkel")] %}
+      <label class="flex items-center gap-2"><input type="radio" name="_design" value="{{ wert }}" x-model="t"
+        @change="lvDesignSetzen(t)"> {{ lab }}</label>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if darf("ih.montage.erfassen") or user.rolle in ("lager", "admin") %}
+  <section class="panel p-5 space-y-4">
+    <h2>Für meine Tätigkeit</h2>
+    {% if darf("ih.montage.erfassen") %}
+    <label class="flex items-start gap-2"><input type="checkbox" name="monteur_vorbelegen" class="mt-1" {% if werte.monteur_vorbelegen %}checked{% endif %}>
+      <span><b>Montageprotokoll:</b> meinen Namen als Monteur vorbelegen</span></label>
+    {% endif %}
+    {% if user.rolle in ("lager", "admin") %}
+    <div><label class="label" for="ba">Lager: „Buchen“ öffnet mit</label>
+      <select id="ba" name="buchungsart" class="field max-w-xs"><option value="">Entnahme (Standard)</option>{% for k, lab in BUCHUNGSARTEN.items() if k != "ausgang" %}<option value="{{ k }}" {% if werte.buchungsart == k %}selected{% endif %}>{{ lab }}</option>{% endfor %}</select></div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if rollen is not none %}
+  <section class="panel p-5">
+    <input type="hidden" name="rollen_bearbeitet" value="1">
+    <h2 class="mb-1">Startseite je Rolle (für alle Benutzer)</h2>
+    <p class="text-sm text-muted mb-4">Gilt für alle, die keine eigene Startseite gewählt haben – z. B. Operator → Schichtbuch. Kann ein Benutzer die Seite nicht öffnen, bleibt es beim bisherigen Verhalten.</p>
+    <div class="grid sm:grid-cols-2 gap-3">
+      {% for r, lab in IH_ROLLEN.items() %}
+      <div><label class="label" for="r_ih_{{ r }}">Instandhaltung: {{ lab }}</label><select id="r_ih_{{ r }}" name="rolle_ih:{{ r }}" class="field"><option value="">– wie bisher –</option>{% for k, l in alle_seiten %}<option value="{{ k }}" {% if rollen.get("ih:" ~ r) == k %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+      {% endfor %}
+      {% for r, lab in LAGER_ROLLEN.items() %}
+      <div><label class="label" for="r_l_{{ r }}">{{ lab }} (ohne Rolle Instandhaltung)</label><select id="r_l_{{ r }}" name="rolle_lager:{{ r }}" class="field"><option value="">– wie bisher –</option>{% for k, l in alle_seiten %}<option value="{{ k }}" {% if rollen.get("lager:" ~ r) == k %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="flex gap-2"><button class="btn btn-primary btn-lg">Speichern</button></div>
+</form>
+
+{% if verwalten %}
+<section class="panel p-5 max-w-3xl mt-6">
+  <h2 class="mb-3">Verwalten</h2>
+  <div class="flex flex-wrap gap-2">
+    {% if user.rolle == "admin" %}<a href="/einstellungen" class="btn">{{ icon("settings", "w-4 h-4") }}System-Einstellungen</a>{% endif %}
+    {% if darf("ih.schichtbuch.einrichten") %}<a href="/ih/schichtbuch/einrichten" class="btn">Schichtbuch einrichten (Teams, Zeiten, Benutzer)</a>{% endif %}
+    {% if darf("ih.schichtbuch.einrichten") %}<a href="/ih/schichtbuch/handys?bearbeiten=1" class="btn">{{ icon("phone", "w-4 h-4") }}EX-Handys</a>{% endif %}
+    {% if darf("ih.montage.stutzen") %}<a href="/ih/montage/stutzen" class="btn">Stutzenübersicht</a>{% endif %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

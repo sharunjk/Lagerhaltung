@@ -54,11 +54,11 @@
     <tr><td class="rot">STUTZENSKIZZE / SCHRAUBENPOSITIONEN</td><td class="rot" colspan="8">DICHTUNGEN</td></tr>
     <tr style="height:26px"><td class="skizze" rowspan="6">{{ svg|safe }}</td><th>Pos.</th><th>Einbauort</th><th>Dichtungsart</th><th>Artikel-Nr.</th><th>Nenn D.<br>[mm]</th><th>Ist-Dicke<br>[mm]</th><th>Alt</th><th>Neu</th></tr>
     {% for d in p.dichtungen %}
-    <tr style="height:32px"><th>Dichtung {{ loop.index }}</th><td style="font-size:7.5pt">{{ d.einbauort or "" }}</td><td>{{ d.dichtungsart or "" }}</td><td style="font-size:7pt">{{ d.artikel_nr or "" }}</td><td>{{ d.nenndicke or "" }}</td><td class="ist">{{ d.ist_dicke or "" }}</td><td class="box">{{ kreuz(d.alt_neu == "alt") }}</td><td class="box">{{ kreuz(d.alt_neu == "neu") }}</td></tr>
+    <tr style="height:32px"><th>Dichtung {{ loop.index }}{% if d.lage in ("i", "m", "a") %} · {{ {"i": "i", "m": "m", "a": "ä"}[d.lage] }}{% endif %}</th><td style="font-size:7.5pt">{{ d.einbauort or "" }}</td><td>{{ d.dichtungsart or "" }}</td><td style="font-size:7pt">{{ d.artikel_nr or "" }}</td><td>{{ d.nenndicke or "" }}</td><td class="ist">{{ d.ist_dicke or "" }}</td><td class="box">{{ kreuz(d.alt_neu == "alt") }}</td><td class="box">{{ kreuz(d.alt_neu == "neu") }}</td></tr>
     {% endfor %}
     <tr style="height:110px"><th>Bemerkung<br>Dichtungen</th><td colspan="7" class="links">{{ p.bemerkung_dichtungen or "" }}</td></tr>
   </table>
-  <p class="hinweis">Hinweis: Die tatsächlich vorhandenen Schraubenpositionen sind entsprechend der Anzahl zu markieren und fortlaufend in der Reihenfolge des erfolgten Anziehens zu nummerieren. „#“ = gleicher Wert wie in der Zeile darüber.</p>
+  <p class="hinweis">Hinweis: Die tatsächlich vorhandenen Schraubenpositionen sind entsprechend der Anzahl zu markieren und fortlaufend in der Reihenfolge des erfolgten Anziehens zu nummerieren. „#“ = gleicher Wert wie in der Zeile darüber. Dichtung i / m / ä = innerste / mittlere / äußerste.</p>
   {% set n = p.schrauben_anzahl or 0 %}
   <table>
     <colgroup><col style="width:5%"><col style="width:15%"><col style="width:9%"><col style="width:9%"><col style="width:7%"><col style="width:7%"><col style="width:12%"><col style="width:8%"><col style="width:8%"><col style="width:4.5%"><col style="width:4.5%"><col style="width:11%"></colgroup>

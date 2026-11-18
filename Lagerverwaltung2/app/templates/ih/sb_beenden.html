@@ -25,6 +25,23 @@
   <section class="panel p-4 text-sm"><h2 class="mb-1">In dieser Schicht erledigt</h2>
     <ul class="space-y-0.5">{% for m in erledigt %}<li>✓ <a class="hover:underline" href="/ih/schichtbuch/meldung/{{ m.id }}">{{ m.titel }}</a></li>{% endfor %}</ul></section>
   {% endif %}
+  {% if handys %}
+  <section class="panel p-4" id="ex-handy">
+    <h2 class="mb-1">EX-Handy</h2>
+    <p class="text-sm text-muted mb-3">Haken setzen, wenn das Handy an die nächste Schicht übergeben wurde, und eintragen, an wen.</p>
+    <div class="space-y-3">
+    {% for h in handys %}
+      <div class="flex flex-wrap items-end gap-3" x-data="{an: false}">
+        <label class="flex items-center gap-2 font-semibold min-w-[12rem]"><input type="checkbox" name="handy" value="{{ h.id }}" x-model="an" class="w-5 h-5"> {{ h.name }} übergeben</label>
+        <div class="flex-1 min-w-[14rem]" x-show="an" x-cloak><label class="label" for="ha{{ h.id }}">an</label>
+          <input id="ha{{ h.id }}" name="handy_an_{{ h.id }}" list="namen_liste" class="field" maxlength="200" placeholder="Name der Person, die das Handy bekommt" :required="an"></div>
+        {% if h.letzte %}<span class="text-xs text-muted pb-2">zuletzt an {{ h.letzte.an }} ({{ h.letzte.zeit|datum }})</span>{% endif %}
+      </div>
+    {% endfor %}
+    </div>
+    <datalist id="namen_liste">{% for n in namen %}<option value="{{ n }}">{% endfor %}</datalist>
+  </section>
+  {% endif %}
   <section class="panel p-4">
     <label class="label" for="notiz">Übergabenotiz (allgemein: Anlagenzustand, Fahrweise, Besonderheiten)</label>
     <textarea id="notiz" name="notiz" rows="4" class="field">{{ s.uebergabe_notiz or "" }}</textarea>

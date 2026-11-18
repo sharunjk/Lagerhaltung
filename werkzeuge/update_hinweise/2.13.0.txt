@@ -1,0 +1,31 @@
+Neu in 2.13.0 - Schichtbuch, EX-Handys, Aufgaben, Meine Einstellungen:
+
+Fehler behoben (Schichtbuch):
+- Wurde eine Schicht erst nach ihrem planmaessigen Ende uebergeben, rutschten Eintraege und "Schicht beenden"
+  in die naechste Schicht - die bekam dabei Team und Namen der alten Schicht ("Schicht laeuft Gruen, begonnen von
+  ..."). Jetzt laeuft die alte Schicht weiter, bis sie beendet ist oder die naechste Schicht beginnt.
+  Hinweis "Uebergabe steht noch aus", Knopf "Schicht ... beginnen" fuer die naechste Schicht.
+- Schon falsch zugeordnete Schicht korrigieren: unter der laufenden Schicht "Schicht uebernehmen /
+  Schichtfuehrer wechseln" (Team, Name, Grund - wird festgehalten).
+
+Neu im Schichtbuch:
+- Vertretung: beim Schichtbeginn oder beim Uebernehmen "Vertretung fuer ..." eintragen.
+- EX-Handys (Schichtbuch -> EX-Handys): Rufnummer zum Anrufen, SIM-PIN und PUK. PIN/PUK verdeckt, Augensymbol
+  + eigenes Passwort zeigt sie 30 Sekunden. Jede Anzeige wird protokolliert. Beim Schichtende Haken
+  "EX-Handy uebergeben" und an wen. Handys anlegen: Schichtfuehrer oder Manager.
+- Aufgaben (To-do-Liste): Aufgaben einem Team oder allen Teams zuteilen, Faelligkeit, Prioritaet, Anlage,
+  Kommentare, wiederkehrend. Im Schichtbuch-Dashboard des Teams sichtbar, mit "Erledigt".
+
+Montageprotokoll:
+- Je Dichtung die Lage ankreuzen: innerste / mittlere / aeusserste. Im Ausdruck "Dichtung 1 . i" usw.
+
+Meine Einstellungen (unten im Menue, fuer alle Benutzer):
+- Startseite nach dem Anmelden (z. B. Operator -> Schichtbuch), Anzeigename, Passwort, hell/dunkel,
+  Monteur vorbelegen, Standard-Buchungsart.
+- Admin und Instandhaltungsmanager: Startseite je Rolle fuer alle festlegen.
+
+Datenbank: neue Tabellen und zwei neue Spalten. Beim ersten Start laeuft die Aktualisierung erst als Probelauf an
+einer Kopie, vorher wird gesichert (vor_update_...).
+
+Enthaelt alles aus 2.12.0 (Sets, Montageunterstuetzung), 2.11.0, 2.10.0, 2.9.0, 2.8.x, 2.7.x, 2.6.0, 2.5.0, 2.4.0,
+2.3.1 und 2.3.0.

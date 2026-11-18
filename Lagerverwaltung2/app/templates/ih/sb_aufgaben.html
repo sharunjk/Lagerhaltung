@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "ih/_ih.html" import team_chip %}
+{% block title %}Aufgaben{% endblock %}
+{% block content %}
+<div class="text-sm text-muted mb-1"><a href="/ih/schichtbuch" class="hover:text-ink">Schichtbuch</a></div>
+<div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+  <div><h1>Aufgaben</h1><p class="text-muted">Allgemeine To-do-Liste – unabhängig von einer Schicht. Einem Team zugeteilte Aufgaben stehen im Schichtbuch dieses Teams.</p></div>
+  <div class="flex gap-2">
+    {% if darf("ih.schichtbuch.schreiben") %}<a href="/ih/schichtbuch/aufgaben/neu" class="btn btn-primary">{{ icon("plus", "w-4 h-4") }}Neue Aufgabe</a>{% endif %}
+    <a href="/ih/schichtbuch/aufgaben/export.xlsx{% if query %}?{{ query }}{% endif %}" class="btn">{{ icon("download", "w-4 h-4") }}Excel</a>
+  </div>
+</div>
+<form method="get" class="panel p-4 mb-4 grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+  <div class="sm:col-span-2"><label class="label" for="q">Suche</label><input id="q" name="q" value="{{ fl.q }}" class="field" placeholder="Titel, Beschreibung, Anlage …"></div>
+  <div><label class="label" for="st">Status</label><select id="st" name="status" class="field"><option value="offen" {% if fl.status == "offen" %}selected{% endif %}>offen + in Arbeit</option>{% for k, lab in STATUS.items() %}<option value="{{ k }}" {% if fl.status == k %}selected{% endif %}>{{ lab }}</option>{% endfor %}<option value="alle" {% if fl.status == "alle" %}selected{% endif %}>alle</option></select></div>
+  <div><label class="label" for="te">Team</label><select id="te" name="team" class="field"><option value="">alle</option><option value="alle" {% if fl.team == "alle" %}selected{% endif %}>nur „alle Teams“</option>{% for t in teams %}<option value="{{ t.id }}" {% if fl.team == t.id|string %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
+  <label class="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" name="nur" value="ueberfaellig" {% if fl.nur == "ueberfaellig" %}checked{% endif %}> nur überfällige</label>
+  <div class="flex gap-2 lg:col-span-5"><button class="btn btn-primary">Filtern</button><a href="/ih/schichtbuch/aufgaben" class="btn">Zurücksetzen</a></div>
+</form>
+<div class="panel overflow-x-auto">
+  <table class="tbl">
+    <thead><tr><th>Aufgabe</th><th>Team</th><th>Fällig</th><th>Priorität</th><th>Status</th><th>Angelegt</th><th></th></tr></thead>
+    <tbody>
+    {% for a in rows %}
+      <tr class="{{ 'opacity-60' if a.status == 'erledigt' }}">
+        <td><a class="font-semibold hover:underline" href="/ih/schichtbuch/aufgaben/{{ a.id }}">{{ a.titel }}</a>
+          <span class="block text-xs text-muted">{% if a.asset %}{{ a.asset }}{% endif %}{% if a.wiederholen_tage %}{{ " · " if a.asset }}alle {{ a.wiederholen_tage }} Tage{% endif %}</span></td>
+        <td class="whitespace-nowrap">{{ team_chip(a.team, a.team_farbe) if a.team else "alle Teams" }}</td>
+        <td class="whitespace-nowrap {{ 'text-crit font-semibold' if a.ueberfaellig else ('text-warn font-semibold' if a.heute_faellig else '') }}">{{ a.faellig|datum(False) if a.faellig else "–" }}{% if a.ueberfaellig %}<span class="block text-xs">überfällig</span>{% elif a.heute_faellig %}<span class="block text-xs">heute</span>{% endif %}</td>
+        <td>{% if a.prioritaet == "hoch" %}<span class="status st-kritisch">Hoch</span>{% else %}{{ PRIO[a.prioritaet] }}{% endif %}</td>
+        <td class="text-sm">{{ STATUS[a.status] }}{% if a.erledigt_am %}<span class="block text-xs text-muted">{{ a.erledigt_am|datum }} · {{ a.erledigt_von }}</span>{% endif %}</td>
+        <td class="text-xs text-muted whitespace-nowrap">{{ a.erstellt_am|datum }}<span class="block">{{ a.erstellt_von }}</span></td>
+        <td class="text-right">{% if a.status != "erledigt" and darf("ih.schichtbuch.schreiben") %}<form method="post" action="/ih/schichtbuch/aufgaben/{{ a.id }}/status"><input type="hidden" name="status" value="erledigt"><button class="btn btn-sm">✓ Erledigt</button></form>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="py-6 text-center text-muted">Keine Aufgaben in dieser Auswahl.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

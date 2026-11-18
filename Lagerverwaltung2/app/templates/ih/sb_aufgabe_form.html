@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ "Neue Aufgabe" if neu else "Aufgabe bearbeiten" }}{% endblock %}
+{% block content %}
+<div class="text-sm text-muted mb-1"><a href="/ih/schichtbuch" class="hover:text-ink">Schichtbuch</a> · <a href="/ih/schichtbuch/aufgaben" class="hover:text-ink">Aufgaben</a></div>
+<h1 class="mb-4">{{ "Neue Aufgabe" if neu else "Aufgabe bearbeiten" }}</h1>
+{% if fehler %}<div class="mb-4 rounded-md border px-4 py-3 text-sm font-medium flash-fehler max-w-3xl">{{ fehler }}</div>{% endif %}
+<form method="post" action="{{ '/ih/schichtbuch/aufgaben/neu' if neu else '/ih/schichtbuch/aufgaben/' ~ a.id }}" class="panel p-5 max-w-3xl space-y-4">
+  <div><label class="label" for="ti">Aufgabe</label><input id="ti" name="titel" value="{{ a.titel or '' }}" required maxlength="200" class="field text-lg" placeholder="z. B. Filter am Kompressor K-2 bestellen" autofocus></div>
+  <div><label class="label" for="be">Beschreibung (optional)</label><textarea id="be" name="beschreibung" rows="3" class="field">{{ a.beschreibung or '' }}</textarea></div>
+  <div class="grid sm:grid-cols-3 gap-4">
+    <div><label class="label" for="te">Zuteilen an</label><select id="te" name="team_id" class="field"><option value="">alle Teams</option>{% for t in teams %}<option value="{{ t.id }}" {% if a.team_id|string == t.id|string %}selected{% endif %}>Team {{ t.name }}</option>{% endfor %}</select></div>
+    <div><label class="label" for="fa">Fällig am</label><input id="fa" type="date" name="faellig" value="{{ a.faellig.isoformat() if a.faellig and a.faellig.isoformat is defined else (a.faellig or '') }}" class="field"></div>
+    <div><label class="label" for="pr">Priorität</label><select id="pr" name="prioritaet" class="field">{% for k, lab in PRIO.items() %}<option value="{{ k }}" {% if (a.prioritaet or "mittel") == k %}selected{% endif %}>{{ lab }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="grid sm:grid-cols-2 gap-4">
+    <div><label class="label" for="as">Anlage / Tag-Nr. (optional)</label><input id="as" name="asset" value="{{ a.asset or '' }}" list="tags" class="field" autocomplete="off"></div>
+    <div><label class="label" for="wd">Wiederholen alle … Tage (optional)</label><input id="wd" name="wiederholen_tage" value="{{ a.wiederholen_tage or '' }}" inputmode="numeric" class="field" placeholder="z. B. 7 = wöchentlich">
+      <p class="text-xs text-muted mt-1">Nach dem Erledigen legt sich die Aufgabe mit neuem Fälligkeitsdatum wieder an.</p></div>
+  </div>
+  <div class="flex flex-wrap gap-2"><button class="btn btn-primary btn-lg">{{ "Aufgabe anlegen" if neu else "Speichern" }}</button>
+    {% if neu %}<button class="btn btn-lg" name="weiter" value="neu">Anlegen und nächste</button>{% endif %}
+    <a href="{{ '/ih/schichtbuch/aufgaben' if neu else '/ih/schichtbuch/aufgaben/' ~ a.id }}" class="btn btn-lg">Abbrechen</a></div>
+  <datalist id="tags">{% for c, b in tags %}<option value="{{ c }}{% if b %} – {{ b }}{% endif %}">{% endfor %}</datalist>
+</form>
+{% endblock %}

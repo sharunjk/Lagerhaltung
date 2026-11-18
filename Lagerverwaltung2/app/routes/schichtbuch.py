@@ -65,6 +65,13 @@ def dashboard(request: Request, team: str = ""):
         offene = [m for m in sb.offene(con) if m["id"] not in ueb_ids]
         diese = sb.der_schicht(con, akt["id"]) if akt else []
         letzte = sb.letzte_schichten(con, beginn, 4)
+        from ..services import aufgaben as aufg, handys as hy
+        handy_ueb = hy.der_schichten(con, [s["id"] for s in letzte] + ([akt["id"]] if akt else []))
+        handys = hy.liste(con)
+        aufgaben = aufg.fuer_team(con, sicht["id"] if sicht else None)
+        aufgaben_n = aufg.anzahl_offen(con, sicht["id"] if sicht else None)
+        wechsel = sb.wechsel(con, akt["id"]) if akt else []
+        ueberzogen = bool(akt and akt["begonnen_am"] and not akt["beendet_am"] and schluss <= jetzt)
         team_letzte = sb.letzte_schichten(con, beginn, 1, team_id=sicht["id"]) if sicht else []
         seit_ab = (team_letzte[0]["beendet_am"] or team_letzte[0]["schluss"]) if team_letzte else None
         seit = sb.seit(con, seit_ab) if seit_ab else []
@@ -74,7 +81,8 @@ def dashboard(request: Request, team: str = ""):
                   slot_zeit=z, beginn=beginn, schluss=schluss, uebergaben=uebergaben, offene=offene, diese=diese, letzte=letzte,
                   team_letzte=team_letzte[0] if team_letzte else None, seit=seit, seit_ab=seit_ab, haengend=haengend,
                   auftraege=auftraege, STATUS=sb.STATUS, PRIO=sb.PRIO, jetzt=jetzt, naechste_text=sb.bezeichnung(nd, nz), n_beginn=n_beginn,
-                  vorzeitig=vorzeitig, oeffnen_grund=oeffnen_grund)
+                  vorzeitig=vorzeitig, oeffnen_grund=oeffnen_grund, handy_ueb=handy_ueb, handys=handys, aufgaben=aufgaben,
+                  aufgaben_n=aufgaben_n, wechsel=wechsel, ueberzogen=ueberzogen, ASTATUS=aufg.STATUS)
 
 
 @router.post("/beginnen")
@@ -92,10 +100,33 @@ async def beginnen(request: Request):
                 return RedirectResponse("/ih/schichtbuch", status_code=303)
         tid = int(f["team_id"]) if (f.get("team_id") or "").isdigit() and con.execute(
             select(sb_teams.c.id).where(sb_teams.c.id == int(f["team_id"]))).scalar() else None
-        sid = sb.beginnen(con, d, z["id"], tid, f.get("schichtfuehrer") or me["name"], me["username"])
-        audit(con, me["username"], "Schicht begonnen", sb.bezeichnung(d, z), {"schicht_id": sid, "team_id": tid})
+        vertr = (f.get("vertretung_fuer") or "").strip() if f.get("vertretung") == "on" else ""
+        sid = sb.beginnen(con, d, z["id"], tid, f.get("schichtfuehrer") or me["name"], me["username"], vertr)
+        audit(con, me["username"], "Schicht begonnen", sb.bezeichnung(d, z), {"schicht_id": sid, "team_id": tid, "vertretung_fuer": vertr or None})
     flash(request, f"Schicht {sb.bezeichnung(d, z)} begonnen. Bitte zuerst die offenen Übergaben lesen und übernehmen.")
     return RedirectResponse("/ih/schichtbuch#uebergaben", status_code=303)
+
+
+@router.post("/schicht-uebernehmen")
+async def schicht_uebernehmen(request: Request):
+    """Laufende Schicht übernehmen / Schichtführer wechseln (Vertretung, falsch begonnene Schicht)."""
+    me = require_recht(request, "ih.schichtbuch.schreiben")
+    f = await request.form()
+    sid = int(f["schicht_id"]) if (f.get("schicht_id") or "").isdigit() else 0
+    try:
+        with db.schreiben() as con:
+            tid = int(f["team_id"]) if (f.get("team_id") or "").isdigit() and con.execute(
+                select(sb_teams.c.id).where(sb_teams.c.id == int(f["team_id"]))).scalar() else None
+            vertr = (f.get("vertretung_fuer") or "").strip() if f.get("vertretung") == "on" else ""
+            s = sb.uebernehmen_schicht(con, sid, tid, f.get("schichtfuehrer") or me["name"], vertr, me["username"], f.get("grund") or "")
+            audit(con, me["username"], "Schicht übernommen", s["text"], {"schicht_id": sid, "team": s["team"], "schichtfuehrer": s["schichtfuehrer"],
+                                                                        "vertretung_fuer": vertr or None})
+    except sb.SchichtFehler as e:
+        flash(request, str(e), "fehler")
+        return RedirectResponse("/ih/schichtbuch", status_code=303)
+    flash(request, f"Schicht {s['text']} übernommen: {s['team'] or 'ohne Team'}, Schichtführer {s['schichtfuehrer']}"
+          + (f" (Vertretung für {s['vertretung_fuer']})" if s["vertretung_fuer"] else "") + ".")
+    return RedirectResponse("/ih/schichtbuch", status_code=303)
 
 
 @router.get("/papier")
@@ -255,21 +286,28 @@ def uebernehmen_alle(request: Request):
 # ------------------------------------------------------------------ Schichtende
 @router.get("/beenden")
 def beenden_form(request: Request, schicht: str = ""):
-    me = require_recht(request, "ih.schichtbuch.schreiben")
-    with db.schreiben() as con:
-        sb.sicherstellen(con)
-        sid = int(schicht) if schicht.isdigit() else sb.aktuelle_schicht_id(con, me)
+    require_recht(request, "ih.schichtbuch.schreiben")
+    _grunddaten()
     with db.engine().connect() as con:
-        s = sb.schicht(con, sid)
-        if not s:
+        if schicht.isdigit():
+            s = sb.schicht(con, int(schicht))
+        else:  # die laufende Schicht – nichts anlegen (sonst bekäme die neue Schicht Team und Namen der alten)
+            d, z = sb.laufender_slot(con)
+            s = sb.schicht(con, datum=d, zeit_id=z["id"])
+        if not s or not s["begonnen_am"] and not sb.der_schicht(con, s["id"]):
+            flash(request, "Diese Schicht wurde noch nicht begonnen – es gibt nichts zu übergeben.", "fehler")
             return RedirectResponse("/ih/schichtbuch", status_code=303)
+        sid = s["id"]
+        from ..services import handys as hy
+        handys = hy.liste(con)
         offene = sb.offene(con)
         for m in offene:
             m["vorschlag"] = (m["schicht_id"] == sid or m["uebernommen_schicht_id"] == sid or m["uebergeben_schicht_id"] == sid
                               or m["prioritaet"] == "hoch" or m["sicherheitsrelevant"] or m["stillstand"])
             m["text_vor"] = m["uebergabe_text"] if m["uebergeben_schicht_id"] == sid else ""
         erledigt = [m for m in sb.der_schicht(con, sid) if m["status"] == "erledigt"]
-    return render(request, "ih/sb_beenden.html", s=s, offene=offene, erledigt=erledigt, STATUS=sb.STATUS, PRIO=sb.PRIO)
+        namen = [r[0] for r in con.execute(select(users.c.anzeigename).where(users.c.aktiv).order_by(users.c.anzeigename)) if r[0]]
+    return render(request, "ih/sb_beenden.html", s=s, offene=offene, erledigt=erledigt, STATUS=sb.STATUS, PRIO=sb.PRIO, handys=handys, namen=namen)
 
 
 @router.post("/beenden")
@@ -278,14 +316,18 @@ async def beenden(request: Request):
     f = await request.form()
     sid = int(f["schicht_id"]) if (f.get("schicht_id") or "").isdigit() else 0
     auswahl = {int(x): f.get(f"text_{x}") or "" for x in f.getlist("ueb") if x.isdigit()}
+    handys = [(int(x), (f.get(f"handy_an_{x}") or "").strip()) for x in f.getlist("handy") if x.isdigit()]
     try:
+        fehlt = [str(h) for h, an in handys if not an]
+        if fehlt:
+            raise sb.SchichtFehler("EX-Handy übergeben: bitte angeben, an wen. Die Schicht ist noch nicht beendet.")
         with db.schreiben() as con:
             s = sb.schicht(con, sid)
-            n = sb.beenden(con, sid, me["username"], auswahl, f.get("notiz") or "")
-            audit(con, me["username"], "Schicht beendet", s["text"] if s else str(sid), {"uebergaben": n})
-    except sb.SchichtFehler as e:
+            n = sb.beenden(con, sid, me["username"], auswahl, f.get("notiz") or "", handys)
+            audit(con, me["username"], "Schicht beendet", s["text"] if s else str(sid), {"uebergaben": n, "ex_handys": [an for _, an in handys] or None})
+    except (sb.SchichtFehler, ValueError) as e:
         flash(request, str(e), "fehler")
-        return RedirectResponse("/ih/schichtbuch", status_code=303)
+        return RedirectResponse(f"/ih/schichtbuch/beenden?schicht={sid}" if sid else "/ih/schichtbuch", status_code=303)
     flash(request, f"Schicht {s['text']} beendet, {n} Punkt(e) an die nächste Schicht übergeben.")
     return RedirectResponse("/ih/schichtbuch", status_code=303)
 

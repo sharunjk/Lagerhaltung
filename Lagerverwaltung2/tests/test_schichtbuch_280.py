@@ -149,6 +149,10 @@ def test_ablauf_beginn_meldung_uebergabe_naechste_schicht(env, monkeypatch):
     uhr.stelle(2026, 11, 12, 6, 10)
     seite = anna.get("/ih/schichtbuch").text
     assert "Seit der letzten Schicht von" in seite and "Gleitring" in seite.split("Seit der letzten Schicht von")[1]
+    # ab 2.13.0: die nicht beendete Nachtschicht läuft weiter, bis die Tagschicht beginnt (sonst rutschen Einträge falsch)
+    assert "Übergabe steht noch aus" in seite and "Schicht Tag 12.11.2026 beginnen" in seite
+    anna.post("/ih/schichtbuch/beginnen", data={"naechste": "1", "team_id": _team_id(eng, "Grün"), "schichtfuehrer": "Anna"})
+    seite = anna.get("/ih/schichtbuch").text
     assert "Übergabe nachholen" in seite and "Tag 12.11.2026" in seite
     assert anna.get(f"/ih/schichtbuch/beenden?schicht={nacht}").status_code == 200
 

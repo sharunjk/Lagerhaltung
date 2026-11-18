@@ -34,11 +34,11 @@
     <section class="panel">
       <div class="px-4 py-3 border-b border-line"><h2>Dichtungen</h2></div>
       <div class="overflow-x-auto"><table class="tbl">
-        <thead><tr><th>Pos.</th><th>Dichtungsart</th><th>Durchmesser</th><th>Artikel-Nr.</th><th class="num">Nenndicke [mm]</th><th>Einbauort</th><th>Lager</th></tr></thead>
+        <thead><tr><th>Pos.</th><th>Dichtungsart</th><th>Durchmesser</th><th>Artikel-Nr.</th><th class="num">Nenndicke [mm]</th><th>Lage</th><th>Einbauort</th><th>Lager</th></tr></thead>
         <tbody>{% for d in s.dichtungen %}<tr><td>{{ d.pos }}</td><td class="font-semibold">{{ d.dichtungsart or "" }}</td><td>{{ d.durchmesser or "" }}</td><td class="text-sm">{{ d.artikel_nr or "" }}</td>
-          <td class="num">{{ d.nenndicke|num if d.nenndicke is not none else "" }}</td><td>{{ d.einbauort or "" }}</td>
+          <td class="num">{{ d.nenndicke|num if d.nenndicke is not none else "" }}</td><td>{{ {"i": "innerste", "m": "mittlere", "a": "äußerste"}.get(d.lage, "") }}</td><td>{{ d.einbauort or "" }}</td>
           <td class="text-sm">{% if d.lager_nr %}{% if "lager" in module %}<a class="text-primary hover:underline" href="/artikel/{{ d.lager_nr|urlq }}">{{ d.lager_nr }}</a>{% else %}{{ d.lager_nr }}{% endif %} <span class="{{ 'text-crit font-semibold' if not d.bestand }}">({{ d.bestand|num }} auf Lager)</span>{% else %}<span class="text-muted">–</span>{% endif %}</td></tr>
-        {% else %}<tr><td colspan="7" class="text-muted py-4">Keine Dichtungen eingetragen.</td></tr>{% endfor %}</tbody>
+        {% else %}<tr><td colspan="8" class="text-muted py-4">Keine Dichtungen eingetragen.</td></tr>{% endfor %}</tbody>
       </table></div>
     </section>
     <section class="panel">

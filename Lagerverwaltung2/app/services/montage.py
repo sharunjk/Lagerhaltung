@@ -30,7 +30,9 @@ MAX_SCHRAUBEN = 100
 DITTO = "#"
 STUTZEN_FELDER = ["gruppe", "kuerzel", "bezeichnung", "anlage", "schrauben_anzahl", "gewinde", "schraube_typ", "schraube_laenge",
                   "schraube_werkstoff", "drehmoment", "schmiermittel", "bemerkung"]
-DICHTUNG_FELDER = ["einbauort", "dichtungsart", "artikel_nr", "nenndicke", "ist_dicke", "alt_neu"]
+DICHTUNG_FELDER = ["einbauort", "lage", "dichtungsart", "artikel_nr", "nenndicke", "ist_dicke", "alt_neu"]
+LAGE = {"i": "innerste", "m": "mittlere", "a": "äußerste"}   # ab 2.13.0; im Ausdruck nur der Buchstabe
+LAGE_KURZ = {"i": "i", "m": "m", "a": "ä"}
 SCHRAUBEN_FELDER = ["typ", "groesse", "laenge_soll", "laenge_ist", "werkstoff", "soll_nm", "ist_nm", "alt_neu", "bemerkung"]
 DITTO_FELDER = ["typ", "groesse", "laenge_soll", "laenge_ist", "werkstoff", "soll_nm", "ist_nm"]  # dürfen „#“ sein
 KOPF_FELDER = ["anlage", "datum", "monteur", "pruefer", "arbeitsauftrag", "reinigung", "schmiermittel", "bemerkung_dichtungen",
@@ -39,7 +41,7 @@ FELD_NAMEN = {"anlage": "Anlage / Reaktor", "datum": "Datum", "monteur": "Monteu
               "reinigung": "Reinigung", "schmiermittel": "Schmiermittel", "bemerkung_dichtungen": "Bemerkung Dichtungen",
               "bemerkungen": "Allgemeine Bemerkungen", "montage_abgeschlossen": "Montage abgeschlossen", "lecktest": "Lecktest",
               "abschluss_zeit": "Datum / Uhrzeit", "stutzen": "Stutzen", "schrauben_anzahl": "Anzahl Schrauben", "reihenfolge": "Reihenfolge",
-              "einbauort": "Einbauort", "dichtungsart": "Dichtungsart", "artikel_nr": "Artikel-Nr.", "nenndicke": "Nenndicke",
+              "einbauort": "Einbauort", "lage": "Lage", "dichtungsart": "Dichtungsart", "artikel_nr": "Artikel-Nr.", "nenndicke": "Nenndicke",
               "ist_dicke": "Ist-Dicke", "alt_neu": "Alt/Neu", "typ": "Typ / Norm", "groesse": "Größe / Gewinde", "laenge_soll": "Länge-Soll",
               "laenge_ist": "Länge-Ist", "werkstoff": "Werkstoff / Klasse", "soll_nm": "Soll [Nm]", "ist_nm": "Ist [Nm]", "bemerkung": "Bemerkung"}
 STATUS = {"entwurf": "In Arbeit", "abgeschlossen": "Abgeschlossen"}
@@ -185,7 +187,8 @@ def _dichtungen_setzen(con: Connection, sid: int, dichtungen: list[dict]) -> Non
         menge = parse_num(menge) if not isinstance(menge, (int, float)) else float(menge)
         aid = d.get("artikel_id")
         aid = int(aid) if str(aid or "").isdigit() else artikel_zu(con, w["artikel_nr"])
-        con.execute(insert(mt_stutzen_dichtungen).values(stutzen_id=sid, pos=pos, nenndicke=nd, menge=menge, artikel_id=aid, **w))
+        lage = d.get("lage") if d.get("lage") in LAGE else None
+        con.execute(insert(mt_stutzen_dichtungen).values(stutzen_id=sid, pos=pos, nenndicke=nd, menge=menge, artikel_id=aid, lage=lage, **w))
 
 
 # ------------------------------------------------------------------ Import aus der Excel-Vorlage
@@ -323,8 +326,12 @@ def import_uebernehmen(con: Connection, gelesen: dict, benutzer: str) -> dict:
                                                         aktiv=True, erstellt_am=jetzt, erstellt_von=benutzer, **werte)).inserted_primary_key[0]
             neu += 1
         if s["dichtungen"]:
-            alt = [(d["dichtungsart"], d["durchmesser"], d["artikel_nr"], d["nenndicke"]) for d in dichtungen_von(con, sid)]
+            vorher = dichtungen_von(con, sid)
+            alt = [(d["dichtungsart"], d["durchmesser"], d["artikel_nr"], d["nenndicke"]) for d in vorher]
             if alt != [(d["dichtungsart"], d["durchmesser"], d["artikel_nr"], d["nenndicke"]) for d in s["dichtungen"]]:
+                lagen = {d["artikel_nr"]: d.get("lage") for d in vorher if d.get("artikel_nr")}  # im System gesetzte Lage behalten
+                for d in s["dichtungen"]:
+                    d.setdefault("lage", lagen.get(d.get("artikel_nr")))
                 _dichtungen_setzen(con, sid, s["dichtungen"])
                 anders = True
         if vorh and anders:
@@ -345,7 +352,7 @@ def vorbelegung(st: dict | None, n: int | None = None) -> dict:
     if st:
         for i, x in enumerate((st.get("dichtungen") or [])[:3]):
             art = " ".join(v for v in [x.get("dichtungsart"), x.get("durchmesser")] if v)
-            d[i].update(einbauort=x.get("einbauort") or "", dichtungsart=art, artikel_nr=x.get("artikel_nr") or "",
+            d[i].update(einbauort=x.get("einbauort") or "", lage=x.get("lage") or "", dichtungsart=art, artikel_nr=x.get("artikel_nr") or "",
                         nenndicke=fmt_num(x["nenndicke"]) if x.get("nenndicke") is not None else "")
         zeile.update(typ=st.get("schraube_typ") or "", groesse=st.get("gewinde") or "", laenge_soll=st.get("schraube_laenge") or "",
                      werkstoff=st.get("schraube_werkstoff") or "", soll_nm=st.get("drehmoment") or "")
@@ -470,6 +477,8 @@ def aus_formular(form, st: dict | None) -> dict:
         x = {f: _t(form.get(f"d{i}_{f}"), 200) or "" for f in DICHTUNG_FELDER}
         if x["alt_neu"] not in ("alt", "neu"):
             x["alt_neu"] = ""
+        if x["lage"] not in LAGE:
+            x["lage"] = ""
         for f in ("nenndicke", "ist_dicke"):
             if x[f] and parse_num(x[f]) is None:
                 raise BuchungsFehler(f"Dichtung {i + 1}, {FELD_NAMEN[f]}: „{x[f]}“ ist keine Zahl.")
@@ -723,7 +732,7 @@ def excel(p: dict, firmenname: str = "") -> bytes:
     hoehe[8] = 22.2
     for i, d in enumerate(p.get("dichtungen") or leere_dichtungen()):
         z = 9 + i
-        feld(f"H{z}", f"Dichtung {i + 1}", label=True).font = Font(name="Arial", size=7, bold=True, color=DUNKEL)
+        feld(f"H{z}", f"Dichtung {i + 1}" + (f" · {LAGE_KURZ[d['lage']]}" if d.get("lage") in LAGE_KURZ else ""), label=True).font = Font(name="Arial", size=7, bold=True, color=DUNKEL)
         feld(f"I{z}", d.get("einbauort"), groesse=7)
         feld(f"J{z}:L{z}", d.get("dichtungsart"), groesse=8)
         feld(f"M{z}:N{z}", d.get("artikel_nr"), groesse=7)
@@ -739,7 +748,8 @@ def excel(p: dict, firmenname: str = "") -> bytes:
     c = ws["A14"]
     ws.merge_cells("A14:R14")
     c.value = ("Hinweis: Die tatsächlich vorhandenen Schraubenpositionen sind entsprechend der Anzahl zu markieren und fortlaufend "
-               "in der Reihenfolge des erfolgten Anziehens zu nummerieren. „#“ = gleicher Wert wie in der Zeile darüber.")
+               "in der Reihenfolge des erfolgten Anziehens zu nummerieren. „#“ = gleicher Wert wie in der Zeile darüber. "
+               "Dichtung i / m / ä = innerste / mittlere / äußerste.")
     c.font = Font(name="Arial", size=8, color=ROT)
     c.alignment = mitte
     hoehe[14] = 26

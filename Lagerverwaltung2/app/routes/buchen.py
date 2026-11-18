@@ -59,9 +59,12 @@ def buchung_ausfuehren(L: Lager, typ: str, nr: str, menge: str, platz: str, ziel
 
 
 @router.get("/buchen")
-def buchen_seite(request: Request, artikel: str = "", typ: str = "ausgang", ort: str = "", reservierung: str = ""):
-    require(request)
+def buchen_seite(request: Request, artikel: str = "", typ: str = "", ort: str = "", reservierung: str = ""):
+    me = require(request)
     with db.engine().connect() as con:
+        if not typ:  # ab 2.13.0: persönliche Vorgabe (Meine Einstellungen)
+            from ..services import profil
+            typ = profil.lesen(con, me["id"], "buchungsart") or "ausgang"
         a = queries.artikel_detail(con, artikel.strip()) if artikel.strip() else None
         vs = queries.vorschlaege(con)
         letzte, _ = queries.bewegungen_liste(con, benutzer=request.session["user"]["username"], limit=8)

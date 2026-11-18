@@ -2,6 +2,12 @@
 {% from "_macros.html" import icon %}
 {% from "ih/_ih.html" import team_chip, sb_chips, status_chip %}
 {% block title %}Schichtbuch{% endblock %}
+{% macro sf_felder(prefix) %}
+<div><label class="label" for="{{ prefix }}_team">Team</label><select id="{{ prefix }}_team" name="team_id" class="field !w-auto">{% for t in teams %}<option value="{{ t.id }}" {% if sicht and sicht.id == t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
+<div><label class="label" for="{{ prefix }}_sf">Schichtführer</label><input id="{{ prefix }}_sf" name="schichtfuehrer" value="{{ user.name }}" class="field w-48"></div>
+<div x-data="{v: false}" class="flex flex-wrap items-end gap-2"><label class="flex items-center gap-2 text-sm pb-2"><input type="checkbox" name="vertretung" x-model="v"> Vertretung</label>
+  <div x-show="v" x-cloak><label class="label" for="{{ prefix }}_vf">für</label><input id="{{ prefix }}_vf" name="vertretung_fuer" class="field w-44" placeholder="vertretener Schichtführer" maxlength="200"></div></div>
+{% endmacro %}
 {% block content %}
 {% set schreiben = darf("ih.schichtbuch.schreiben") %}
 {% set begonnen = akt and akt.begonnen_am %}
@@ -17,6 +23,8 @@
     <a href="/ih/schichtbuch/meldungen" class="btn">{{ icon("list", "w-4 h-4") }}Alle Meldungen</a>
     {% if darf("ih.schichtbuch.schreiben") %}<a href="/ih/schichtbuch/neu?nachtrag=1" class="btn" title="z. B. vom Papierformular nach einem Systemausfall">{{ icon("history", "w-4 h-4") }}Nachtragen</a>{% endif %}
     <a href="/ih/schichtbuch/papier" class="btn" target="_blank" rel="noopener">{{ icon("print", "w-4 h-4") }}Papierformular</a>
+    <a href="/ih/schichtbuch/aufgaben" class="btn">{{ icon("clipboard", "w-4 h-4") }}Aufgaben{% if aufgaben_n %} <span class="status st-melden">{{ aufgaben_n }}</span>{% endif %}</a>
+    <a href="/ih/schichtbuch/handys" class="btn">{{ icon("phone", "w-4 h-4") }}EX-Handys</a>
     {% if darf("ih.schichtbuch.einrichten") %}<a href="/ih/schichtbuch/einrichten" class="btn">{{ icon("settings", "w-4 h-4") }}Einrichten</a>{% endif %}
   </div>
 </div>
@@ -34,7 +42,9 @@
     <div>
       {% if begonnen %}
       <h2 class="flex flex-wrap items-center gap-2">{{ "Schicht beendet" if beendet else "Schicht läuft" }} {{ team_chip(akt.team, akt.team_farbe) }}</h2>
-      <p class="text-sm text-muted mt-1">Schichtführer <b class="text-ink">{{ akt.schichtfuehrer or "–" }}</b> · begonnen {{ akt.begonnen_am|datum }} von {{ akt.begonnen_von }}{% if beendet %} · <span class="text-ok font-semibold">beendet {{ akt.beendet_am|datum }} von {{ akt.beendet_von }}, übergeben</span>{% endif %}</p>
+      <p class="text-sm text-muted mt-1">Schichtführer <b class="text-ink">{{ akt.schichtfuehrer or "–" }}</b>{% if akt.vertretung_fuer %} <span class="status text-primary">Vertretung für {{ akt.vertretung_fuer }}</span>{% endif %} · begonnen {{ akt.begonnen_am|datum }} von {{ akt.begonnen_von }}{% if beendet %} · <span class="text-ok font-semibold">beendet {{ akt.beendet_am|datum }} von {{ akt.beendet_von }}, übergeben</span>{% endif %}</p>
+      {% for w in wechsel %}<p class="text-xs text-muted mt-0.5">Übernommen {{ w.zeit|datum }} von {{ w.benutzer }}: {{ w.team or "–" }}, {{ w.schichtfuehrer }}{% if w.vertretung_fuer %} (Vertretung für {{ w.vertretung_fuer }}){% endif %} · vorher {{ w.vorher }}{% if w.grund %} · {{ w.grund }}{% endif %}</p>{% endfor %}
+      {% if ueberzogen %}<p class="text-sm mt-1 text-warn font-semibold">Planmäßiges Ende {{ schluss.strftime("%H:%M") }} Uhr ist vorbei – Übergabe steht noch aus. Einträge gehören bis zum Beenden oder bis die nächste Schicht beginnt noch zu dieser Schicht.</p>{% endif %}
       {% if beendet %}<p class="text-sm mt-1">Nächste Schicht: <b>{{ naechste_text }}</b> ab {{ n_beginn.strftime("%H:%M") }} Uhr.{% if oeffnen_grund %} <span class="text-muted">{{ oeffnen_grund }}</span>{% endif %}</p>{% endif %}
       {% else %}
       <h2>Schicht noch nicht begonnen</h2>
@@ -45,8 +55,7 @@
     <div class="flex flex-wrap gap-2">
       {% if not begonnen %}
       <form method="post" action="/ih/schichtbuch/beginnen" class="flex flex-wrap gap-2 items-end">
-        <div><label class="label" for="b_team">Team</label><select id="b_team" name="team_id" class="field !w-auto">{% for t in teams %}<option value="{{ t.id }}" {% if sicht and sicht.id == t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
-        <div><label class="label" for="b_sf">Schichtführer</label><input id="b_sf" name="schichtfuehrer" value="{{ user.name }}" class="field w-48"></div>
+        {{ sf_felder("b") }}
         <button class="btn btn-primary">Schicht beginnen</button>
       </form>
       {% endif %}
@@ -59,11 +68,23 @@
   {% if schreiben and vorzeitig %}
   <form method="post" action="/ih/schichtbuch/beginnen" class="mt-4 rounded-md border border-dashed border-line p-3 flex flex-wrap gap-2 items-end">
     <input type="hidden" name="naechste" value="1">
-    <p class="text-sm basis-full"><b>Nächste Schicht {{ naechste_text }}</b> (ab {{ n_beginn.strftime("%H:%M") }} Uhr) schon jetzt beginnen – z. B. wenn die Übergabe vor der vollen Stunde stattfindet. Neue Meldungen gehören dann zur nächsten Schicht.</p>
-    <div><label class="label" for="n_team">Team</label><select id="n_team" name="team_id" class="field !w-auto">{% for t in teams %}<option value="{{ t.id }}" {% if sicht and sicht.id == t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
-    <div><label class="label" for="n_sf">Schichtführer</label><input id="n_sf" name="schichtfuehrer" value="{{ user.name }}" class="field w-48"></div>
-    <button class="btn">Nächste Schicht beginnen</button>
+    {% if ueberzogen %}<p class="text-sm basis-full"><b>Schicht {{ naechste_text }}</b> (laut Plan ab {{ n_beginn.strftime("%H:%M") }} Uhr) jetzt beginnen. Die laufende Schicht kann ihre Übergabe danach noch nachholen. Neue Meldungen gehören dann zur neuen Schicht.</p>
+    {% else %}<p class="text-sm basis-full"><b>Nächste Schicht {{ naechste_text }}</b> (ab {{ n_beginn.strftime("%H:%M") }} Uhr) schon jetzt beginnen – z. B. wenn die Übergabe vor der vollen Stunde stattfindet. Neue Meldungen gehören dann zur nächsten Schicht.</p>{% endif %}
+    {{ sf_felder("n") }}
+    <button class="btn {{ 'btn-primary' if ueberzogen }}">{{ "Schicht " ~ naechste_text ~ " beginnen" if ueberzogen else "Nächste Schicht beginnen" }}</button>
   </form>
+  {% endif %}
+  {% if schreiben and begonnen and not beendet %}
+  <details class="mt-3 text-sm">
+    <summary class="cursor-pointer text-muted font-medium">Schicht übernehmen / Schichtführer wechseln (z. B. Vertretung, falsch begonnen)</summary>
+    <form method="post" action="/ih/schichtbuch/schicht-uebernehmen" class="mt-2 rounded-md border border-line p-3 flex flex-wrap gap-2 items-end">
+      <input type="hidden" name="schicht_id" value="{{ akt.id }}">
+      {{ sf_felder("u") }}
+      <div><label class="label" for="u_gr">Grund (optional)</label><input id="u_gr" name="grund" class="field w-56" maxlength="300" placeholder="z. B. Schichtführer krank"></div>
+      <button class="btn">Übernehmen</button>
+      <p class="basis-full text-xs text-muted">Team und Schichtführer dieser Schicht werden geändert; der Wechsel steht mit Name und Uhrzeit hier und im Protokoll.</p>
+    </form>
+  </details>
   {% endif %}
   <ol class="grid sm:grid-cols-3 gap-2 mt-4 text-sm">
     <li class="rounded-md border px-3 py-2 {{ 'border-ok text-ok' if begonnen and not uebergaben else ('border-warn' if uebergaben else 'border-line') }}"><b>1 · Schichtbeginn</b><span class="block text-xs {{ 'text-muted' if not uebergaben }}">{% if uebergaben %}{{ uebergaben|length }} Übergabe(n) lesen und übernehmen{% else %}keine offenen Übergaben{% endif %}</span></li>
@@ -113,6 +134,23 @@
       </ul>
     </section>
 
+    <section class="panel overflow-hidden" id="aufgaben">
+      <div class="px-4 py-3 border-b border-line flex flex-wrap items-center justify-between gap-2">
+        <h2 class="flex flex-wrap items-center gap-2">Aufgaben{% if sicht %} für {{ team_chip(sicht.name, sicht.farbe) }}{% endif %} ({{ aufgaben_n }})</h2>
+        <span class="flex gap-3 text-sm">{% if schreiben %}<a class="text-primary hover:underline font-semibold" href="/ih/schichtbuch/aufgaben/neu{% if sicht %}?team={{ sicht.id }}{% endif %}">+ Aufgabe</a>{% endif %}<a class="text-primary hover:underline" href="/ih/schichtbuch/aufgaben">alle Aufgaben</a></span>
+      </div>
+      <ul class="divide-y divide-line">
+      {% for a in aufgaben %}
+        <li class="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <div class="min-w-0"><a class="font-semibold hover:underline" href="/ih/schichtbuch/aufgaben/{{ a.id }}">{{ a.titel }}</a>
+            {% if a.prioritaet == "hoch" %}<span class="status st-kritisch">Prio hoch</span>{% endif %}{% if a.status == "in_arbeit" %}<span class="status text-primary">In Arbeit</span>{% endif %}
+            <span class="block text-xs {{ 'text-crit font-semibold' if a.ueberfaellig else 'text-muted' }}">{% if a.faellig %}fällig {{ a.faellig|datum(False) }}{% if a.ueberfaellig %} – überfällig{% elif a.heute_faellig %} – heute{% endif %} · {% endif %}{{ team_chip(a.team, a.team_farbe) if a.team else "alle Teams" }}{% if a.asset %} · {{ a.asset }}{% endif %}{% if a.wiederholen_tage %} · alle {{ a.wiederholen_tage }} Tage{% endif %}</span></div>
+          {% if schreiben %}<form method="post" action="/ih/schichtbuch/aufgaben/{{ a.id }}/status"><input type="hidden" name="status" value="erledigt"><input type="hidden" name="weiter" value="dashboard"><button class="btn btn-sm">✓ Erledigt</button></form>{% endif %}
+        </li>
+      {% else %}<li class="p-4 text-sm text-muted">Keine offenen Aufgaben.</li>{% endfor %}
+      </ul>
+    </section>
+
     {% if akt %}
     <section class="panel overflow-hidden">
       <div class="px-4 py-3 border-b border-line"><h2>Meldungen dieser Schicht ({{ diese|length }})</h2></div>
@@ -136,14 +174,22 @@
       {% else %}<p class="text-sm text-muted">Team {{ sicht.name }} hatte noch keine Schicht im Schichtbuch.</p>{% endif %}
     </section>
     {% endif %}
+    {% if handys %}
+    <section class="panel p-4">
+      <h2 class="mb-2 flex items-center justify-between">EX-Handys <a href="/ih/schichtbuch/handys" class="text-sm font-normal text-primary hover:underline">Nummern, PIN</a></h2>
+      <ul class="text-sm space-y-1.5">{% for h in handys %}<li class="flex flex-wrap justify-between gap-x-3"><span><b>{{ h.name }}</b>{% if h.nummer %} · <a class="text-primary hover:underline" href="tel:{{ h.nummer|replace(' ', '') }}">{{ h.nummer }}</a>{% endif %}</span>
+        <span class="text-muted">{% if h.letzte %}bei {{ h.letzte.an }} seit {{ h.letzte.zeit|datum }}{% else %}noch keine Übergabe{% endif %}</span></li>{% endfor %}</ul>
+    </section>
+    {% endif %}
     <section class="panel overflow-hidden">
       <div class="px-4 py-3 border-b border-line"><h2>Vorherige Schichten</h2></div>
       <ul class="divide-y divide-line">
       {% for s in letzte %}
         <li class="p-3 border-l-4" style="border-left-color: {{ s.team_farbe or '#D5DBE0' }}">
           <div class="flex flex-wrap justify-between gap-1 text-sm"><b>{{ s.text }}</b>{{ team_chip(s.team, s.team_farbe) }}</div>
-          <p class="text-xs text-muted">{{ s.schichtfuehrer or "–" }}{% if s.beendet_am %} · übergeben {{ s.beendet_am|datum }}{% elif s.begonnen_am %} · <span class="text-warn">nicht beendet</span>{% endif %}</p>
+          <p class="text-xs text-muted">{{ s.schichtfuehrer or "–" }}{% if s.vertretung_fuer %} (Vertretung für {{ s.vertretung_fuer }}){% endif %}{% if s.beendet_am %} · übergeben {{ s.beendet_am|datum }}{% elif s.begonnen_am %} · <span class="text-warn">nicht beendet</span>{% endif %}</p>
           {% if s.uebergabe_notiz %}<p class="text-sm mt-1 whitespace-pre-line">{{ s.uebergabe_notiz }}</p>{% endif %}
+          {% for u in handy_ueb.get(s.id, []) %}<p class="text-xs mt-0.5">{{ u.name }} übergeben an <b>{{ u.an }}</b></p>{% endfor %}
           {% if s.meldungen %}<ul class="mt-1 text-sm space-y-0.5">{% for m in s.meldungen[:8] %}<li class="flex gap-1.5"><span class="{{ 'text-ok' if m.status == 'erledigt' else ('text-crit' if m.sicherheitsrelevant or m.prioritaet == 'hoch' else 'text-warn') }}">{{ "✓" if m.status == "erledigt" else "●" }}</span><a class="hover:underline" href="/ih/schichtbuch/meldung/{{ m.id }}">{{ m.titel }}</a></li>{% endfor %}{% if s.meldungen|length > 8 %}<li class="text-xs text-muted">… {{ s.meldungen|length - 8 }} weitere</li>{% endif %}</ul>{% endif %}
         </li>
       {% else %}<li class="p-4 text-sm text-muted">Noch keine Schichten im Schichtbuch.</li>{% endfor %}

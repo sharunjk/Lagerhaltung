@@ -82,7 +82,7 @@ def _stutzen_form(con, f) -> tuple[dict, list[dict]]:
     daten = {k: f.get(k) for k in mt.STUTZEN_FELDER}
     dicht = []
     for i in range(3):
-        d = {k: f.get(f"d{i}_{k}") for k in ("einbauort", "dichtungsart", "durchmesser", "artikel_nr", "nenndicke", "menge")}
+        d = {k: f.get(f"d{i}_{k}") for k in ("einbauort", "lage", "dichtungsart", "durchmesser", "artikel_nr", "nenndicke", "menge")}
         lager_nr = (f.get(f"d{i}_lager") or "").split(" – ")[0].strip()
         d["artikel_id"] = None
         if lager_nr:
@@ -135,7 +135,7 @@ async def stutzen_neu(request: Request):
 def _form_zurueck(f) -> dict:
     s = {k: f.get(k) for k in mt.STUTZEN_FELDER}
     s["tag"] = f.get("tag")
-    s["dichtungen"] = [{k: f.get(f"d{i}_{k}") for k in ("einbauort", "dichtungsart", "durchmesser", "artikel_nr", "nenndicke", "menge")}
+    s["dichtungen"] = [{k: f.get(f"d{i}_{k}") for k in ("einbauort", "lage", "dichtungsart", "durchmesser", "artikel_nr", "nenndicke", "menge")}
                        | {"lager_text": f.get(f"d{i}_lager")} for i in range(3)]
     return s
 
@@ -285,6 +285,10 @@ def protokoll_neu_form(request: Request, stutzen: int = 0):
         v = mt.vorbelegung(st)
         p = {"id": None, "status": "entwurf", "datum": date.today(), "stutzen_id": st["id"] if st else None, "stutzen": st["kuerzel"] if st else "",
              "stutzen_bez": st["label"] if st else "", "reihenfolge": [], **v}
+        from ..services import profil
+        me = request.session.get("user") or {}
+        if me.get("id") and profil.lesen(con, me["id"], "monteur_vorbelegen"):
+            p["monteur"] = me.get("name") or ""
         return _form(request, con, p)
 
 

@@ -165,6 +165,15 @@ def schicht_holen(con: Connection, datum: date, zeit_id: int, team_id: int | Non
 VORZEITIG = timedelta(hours=2)  # so lange vor ihrem Beginn darf die nächste Schicht anfangen
 
 
+def vorheriger_slot(con: Connection, datum: date, z: dict) -> tuple[date, dict]:
+    """Die Schicht, die als letzte vor (datum, z) begonnen hat."""
+    start = fenster(datum, z)[0]
+    kandidaten = [(fenster(d, k)[0], d, k) for d in (datum, datum - timedelta(days=1), datum - timedelta(days=2)) for k in zeiten(con)
+                  if fenster(d, k)[0] < start]
+    _, d, k = max(kandidaten, key=lambda x: x[0])
+    return d, k
+
+
 def naechster_slot(con: Connection, datum: date, z: dict) -> tuple[date, dict]:
     """Die Schicht, die als nächste nach (datum, z) beginnt."""
     start = fenster(datum, z)[0]
@@ -182,7 +191,23 @@ def laufender_slot(con: Connection, jetzt: datetime | None = None) -> tuple[date
     s = schicht(con, datum=nd, zeit_id=nz["id"])
     if s and s["begonnen_am"] and s["begonnen_am"] <= jetzt:
         return nd, nz
+    # ab 2.13.0: Ist die Schicht laut Uhr noch nicht begonnen, die vorherige aber begonnen und nicht beendet,
+    # läuft die vorherige noch (Übergabe nach Schichtende). Sonst würden Einträge und „Schicht beenden“ der alten
+    # Schicht in die neue rutschen – mit dem Team und Namen der alten Schicht.
+    akt = schicht(con, datum=d, zeit_id=z["id"])
+    if not (akt and akt["begonnen_am"]):
+        vd, vz = vorheriger_slot(con, d, z)
+        v = schicht(con, datum=vd, zeit_id=vz["id"])
+        if v and v["begonnen_am"] and not v["beendet_am"]:
+            return vd, vz
     return d, z
+
+
+def ueberzogen(con: Connection, jetzt: datetime | None = None) -> bool:
+    """Läuft eine Schicht über ihr planmäßiges Ende hinaus (Übergabe steht noch aus)?"""
+    jetzt = jetzt or datetime.now()
+    d, z = laufender_slot(con, jetzt)
+    return fenster(d, z)[1] <= jetzt
 
 
 def aktuelle_schicht_id(con: Connection, user: dict, jetzt: datetime | None = None) -> int:
@@ -191,14 +216,46 @@ def aktuelle_schicht_id(con: Connection, user: dict, jetzt: datetime | None = No
     return schicht_holen(con, d, z["id"], t["id"] if t else None)
 
 
-def beginnen(con: Connection, datum: date, zeit_id: int, team_id: int | None, schichtfuehrer: str, benutzer: str) -> int:
+def beginnen(con: Connection, datum: date, zeit_id: int, team_id: int | None, schichtfuehrer: str, benutzer: str,
+             vertretung_fuer: str = "") -> int:
     sid = schicht_holen(con, datum, zeit_id, team_id)
     s = con.execute(select(sb_schichten).where(sb_schichten.c.id == sid)).mappings().first()
-    werte = {"team_id": team_id or s["team_id"], "schichtfuehrer": (schichtfuehrer or "").strip()[:200] or benutzer}
+    werte = {"team_id": team_id or s["team_id"], "schichtfuehrer": (schichtfuehrer or "").strip()[:200] or benutzer,
+             "vertretung_fuer": (vertretung_fuer or "").strip()[:200] or None}
     if not s["begonnen_am"]:
         werte.update(begonnen_am=datetime.now().replace(microsecond=0), begonnen_von=benutzer)
     con.execute(update(sb_schichten).where(sb_schichten.c.id == sid).values(**werte))
     return sid
+
+
+def uebernehmen_schicht(con: Connection, sid: int, team_id: int | None, schichtfuehrer: str, vertretung_fuer: str, benutzer: str,
+                        grund: str = "") -> dict:
+    """Laufende Schicht übernehmen bzw. Schichtführer wechseln (z. B. Vertretung, falsch begonnene Schicht). Wird festgehalten."""
+    from ..db import sb_schicht_wechsel
+    s = schicht(con, sid)
+    if not s:
+        raise SchichtFehler("Schicht nicht gefunden.")
+    if s["beendet_am"]:
+        raise SchichtFehler("Die Schicht ist schon beendet.")
+    name = (schichtfuehrer or "").strip()[:200]
+    if not name:
+        raise SchichtFehler("Bitte den Schichtführer angeben.")
+    jetzt = datetime.now().replace(microsecond=0)
+    vorher = f"{s['team'] or 'ohne Team'}, {s['schichtfuehrer'] or '–'}" + (f" (Vertretung für {s['vertretung_fuer']})" if s.get("vertretung_fuer") else "")
+    werte = {"team_id": team_id or s["team_id"], "schichtfuehrer": name, "vertretung_fuer": (vertretung_fuer or "").strip()[:200] or None}
+    if not s["begonnen_am"]:
+        werte.update(begonnen_am=jetzt, begonnen_von=benutzer)
+    con.execute(update(sb_schichten).where(sb_schichten.c.id == sid).values(**werte))
+    con.execute(insert(sb_schicht_wechsel).values(schicht_id=sid, zeit=jetzt, benutzer=benutzer, team_id=werte["team_id"], schichtfuehrer=name,
+                                                  vertretung_fuer=werte["vertretung_fuer"], vorher=vorher, grund=(grund or "").strip()[:300] or None))
+    return schicht(con, sid)
+
+
+def wechsel(con: Connection, sid: int) -> list[dict]:
+    from ..db import sb_schicht_wechsel
+    return [dict(r) for r in con.execute(select(sb_schicht_wechsel, sb_teams.c.name.label("team"))
+                                         .select_from(sb_schicht_wechsel.outerjoin(sb_teams, sb_teams.c.id == sb_schicht_wechsel.c.team_id))
+                                         .where(sb_schicht_wechsel.c.schicht_id == sid).order_by(sb_schicht_wechsel.c.zeit)).mappings()]
 
 
 def nicht_beendet(con: Connection, ausser: int | None = None) -> list[dict]:
@@ -261,7 +318,8 @@ def wieder_oeffnen(con: Connection, sid: int, benutzer: str) -> dict:
     return schicht(con, sid)
 
 
-def beenden(con: Connection, sid: int, benutzer: str, uebergaben: dict[int, str], notiz: str) -> int:
+def beenden(con: Connection, sid: int, benutzer: str, uebergaben: dict[int, str], notiz: str,
+            handys: list[tuple[int, str]] | None = None) -> int:
     """Schicht beenden: ausgewählte Meldungen an die nächste Schicht übergeben (mit Hinweis), Übergabenotiz speichern."""
     s = con.execute(select(sb_schichten).where(sb_schichten.c.id == sid)).mappings().first()
     if not s:
@@ -290,6 +348,10 @@ def beenden(con: Connection, sid: int, benutzer: str, uebergaben: dict[int, str]
     con.execute(update(sb_schichten).where(sb_schichten.c.id == sid).values(
         beendet_am=jetzt, beendet_von=benutzer, uebergabe_notiz=(notiz or "").strip() or None,
         begonnen_am=s["begonnen_am"] or jetzt, begonnen_von=s["begonnen_von"] or benutzer))
+    if handys:  # ab 2.13.0: EX-Handy übergeben an …
+        from .handys import uebergabe_speichern
+        for hid, an in handys:
+            uebergabe_speichern(con, hid, sid, s["schichtfuehrer"] or benutzer, an, benutzer, jetzt)
     return n
 
 

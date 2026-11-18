@@ -58,7 +58,7 @@
     <div class="p-3 border-t border-white/10 text-sm">
       <div class="px-3 pb-2"><span class="text-white font-semibold">{{ user.name }}</span><span class="block text-xs">{{ ("Administrator" if user.rolle == "admin" else IH_ROLLEN.get(user.ih, "")) if ih else ROLLEN_NAMEN.get(user.rolle, "") }}</span></div>
       <div class="flex gap-1">
-        <a href="/passwort" class="navlink flex-1 text-xs">Passwort</a>
+        <a href="/mein" class="navlink flex-1 text-xs {% if pfad == '/mein' %}aktiv{% endif %}" title="Startseite, Name, Passwort">{{ icon("settings", "w-4 h-4") }}Meine Einstellungen</a>
         <button type="button" class="navlink" title="Hell/Dunkel umschalten" onclick="lvTheme()">{{ icon("moon") }}</button>
         <a href="/logout" class="navlink" title="Abmelden">{{ icon("logout") }}</a>
       </div>
@@ -74,6 +74,7 @@
           <div class="absolute left-0 mt-2 w-60 rounded-lg bg-nav p-2 shadow-xl z-30">
             {% for href, ic, label in nav %}<a href="{{ href }}" class="navlink">{{ icon(ic) }}{{ label }}</a>{% endfor %}
             {% if user.rolle == "admin" %}<a href="/einstellungen" class="navlink">{{ icon("settings") }}Einstellungen</a>{% endif %}
+            <a href="/mein" class="navlink">{{ icon("user") }}Meine Einstellungen</a>
             {% if module|length > 1 %}<a href="/bereich/{{ 'lager' if ih else 'ih' }}" class="navlink">{{ icon("switch") }}{{ "Zur Lagerverwaltung" if ih else "Zur Instandhaltung" }}</a>{% endif %}
             {% if not ih %}<a href="/m" class="navlink">{{ icon("scan") }}Scanner-Ansicht</a>{% endif %}
             <a href="/logout" class="navlink">{{ icon("logout") }}Abmelden</a>

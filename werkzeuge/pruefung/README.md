@@ -12,6 +12,7 @@ Voraussetzungen: Python 3.12 mit `requirements-lock.txt` + `pytest httpx`, Node 
 | `notfall_app.cjs <url> <ordner> [pdf-ordner]` | 2.9.0 mit Demodaten: Schicht wieder öffnen, Nachtrag, Papierformulare (auch als PDF für `docs/`), Instandhaltungs-App am Handy, Programmname |
 | `umzug.cjs alt <url> <ausgabe> <zielordner>` / `umzug.cjs neu <url> <ausgabe>` | 2.10.0: Umzugspaket über die Einstellungen erstellen, „nur lesen“ prüfen; nach Entpacken und Start im neuen Ordner: Daten, Einstellungen, Buchen |
 | `montage.cjs <url> <ordner> <demo-vorlage.xlsx>` | 2.12.0: Set (anlegen, Teil entnehmen, Warnung PC/Scanner), Stutzen-Import, Montageprotokoll als Operator (Vorbelegung, Skizze anklicken, #↓, Abschluss), Druck als PDF, Excel, Handy. Demo-Vorlage: `vorlage_xlsx()` aus `tests/test_2120.py` |
+| `schichtbuch_2130.cjs <url> <ordner>` | 2.13.0: EX-Handys (PIN mit Augensymbol + Passwort), Vertretung, Schicht übernehmen, Aufgaben im Team-Dashboard, Übergabe mit EX-Handy, Meine Einstellungen (Startseite), Lage i/m/ä im Montageprotokoll, Handy-Breite |
 | `last.py <url> <lager.db> [sekunden] [real]` | Lasttest mit 10 Benutzern gegen einen laufenden Demo-Server (`[cmms] aktiv = true`); prüft Bestand = Buchungen, keine Minusbestände, Antwortzeiten |
 | `schichtbuch.cjs <url> <ordner>` | 2.8.0 mit Demodaten: Schichtbuch von Einrichten bis Übergabe, Export, Handy-Breite |
 | `ersatzteile.cjs <url> <ordner>` | 2.7.0 mit Demodaten: Ersatzteil ↔ Tag-Nr., eigene Kampagne, Auftrag mit Entnahme, Handy-Breite |

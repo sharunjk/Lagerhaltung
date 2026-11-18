@@ -11,6 +11,7 @@
   <div class="grid gap-2 mt-4" x-data="{laeuft: false}">
     <button type="button" class="btn btn-primary h-12 w-full" :disabled="laeuft" @click="laeuft = true; await lvAbmelden(); laeuft = false">Abmelden / Benutzer wechseln</button>
     <a href="/m/passwort" class="btn h-12 w-full">Passwort ändern</a>
+    <a href="/mein" class="btn h-12 w-full">Meine Einstellungen (Startseite, Name)</a>
   </div>
   <p class="text-sm text-muted mt-3">Jede Buchung wird unter dem angemeldeten Namen gespeichert. Teilen sich mehrere Personen ein Gerät, vor der Übergabe abmelden.</p>
 </section>

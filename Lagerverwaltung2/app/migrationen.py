@@ -63,6 +63,11 @@ def _m5_sets(con: Connection) -> None:
     _spalte_ergaenzen(con, "artikel", "ist_set", "BOOLEAN")
 
 
+def _m6_schichtbuch_montage(con: Connection) -> None:
+    _spalte_ergaenzen(con, "sb_schichten", "vertretung_fuer", "VARCHAR(200)")
+    _spalte_ergaenzen(con, "mt_stutzen_dichtungen", "lage", "VARCHAR(1)")
+
+
 # (Nummer, Beschreibung, Funktion) – nur anhängen, nie ändern oder entfernen
 MIGRATIONEN = [
     (1, "Buchungen: Preis zum Buchungszeitpunkt und Auftragsbezug; Reservierungen: Auftragsbezug", _m1_buchungen_preis_auftrag),
@@ -70,6 +75,7 @@ MIGRATIONEN = [
     (3, "Kampagnen: Rhythmus (fest oder ab letzter Durchführung), Tätigkeit, eigene Kampagnen", _m3_kampagnen),
     (4, "Schichtbuch: Nachträge (nachgetragen am/von)", _m4_nachtrag),
     (5, "Artikel: Sets aus mehreren Artikeln", _m5_sets),
+    (6, "Schichtbuch: Vertretung; Montage: Lage der Dichtung (innen/mitte/außen)", _m6_schichtbuch_montage),
 ]
 
 
